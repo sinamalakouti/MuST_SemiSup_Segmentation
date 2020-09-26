@@ -139,7 +139,8 @@ class Wnet(nn.Module):
 
     def forward(self, X):
         X_in_intermediate = self.Uenc(X)
-        X_out_intermediate = self.conv1(X_in_intermediate)
+        X_in_intermediate = self.conv1(X_in_intermediate)
+        X_out_intermediate = nn.Softmax(X_in_intermediate)
         X_in_final = self.Udec(X_out_intermediate)
         X_out_final = self.conv2(X_in_final)
         return X_out_final
