@@ -1,4 +1,0 @@
-data/dana/preprocess/0372ES/0372ES_FL_preproc.nii.gz
-data/dana/preprocess/0547LB/0547LB_FL_preproc.nii.gz
-data/dana/preprocess/0204BP/0204BP_FL_preproc.nii.gz
-data/dana/preprocess/0064KW/0064KW_FL_preproc.nii.gz

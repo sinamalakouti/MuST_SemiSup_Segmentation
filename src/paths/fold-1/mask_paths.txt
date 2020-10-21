@@ -1,4 +1,0 @@
-data/dana/preprocess/0545GS/0545GS_brain_mask_preproc.nii.gz
-data/dana/preprocess/0580VM24/0580VM24_brain_mask_preproc.nii.gz
-data/dana/preprocess/0280AK/0280AK_brain_mask_preproc.nii.gz
-data/dana/preprocess/0189HW/0189HW_brain_mask_preproc.nii.gz
