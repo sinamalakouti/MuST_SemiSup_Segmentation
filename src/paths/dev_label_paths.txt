@@ -1,0 +1,3 @@
+data/dana/all_15_subjects/manual_tracing/0372ES_flair_tracing.nii
+data/dana/all_15_subjects/manual_tracing/0547LB_flair_tracing.nii
+data/dana/new_5_subjects/tracing/0204BP_25-29.nii

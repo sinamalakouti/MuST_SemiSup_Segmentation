@@ -1,0 +1,5 @@
+data/dana/whitestripe/processed/0064KW_T1_ws.nii.gz
+data/dana/whitestripe/processed/0156ML_T1_ws.nii.gz
+data/dana/whitestripe/processed/0227LB_T1_ws.nii.gz
+data/dana/whitestripe/processed/0237RG_T1_ws.nii.gz
+data/dana/whitestripe/processed/0588NC24_T1_ws.nii.gz

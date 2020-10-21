@@ -1,0 +1,5 @@
+data/dana/all_15_subjects/manual_tracing/0064KW_flair_tracing.nii
+data/dana/all_15_subjects/manual_tracing/0156ML_flair_tracing.nii.gz
+data/dana/all_15_subjects/manual_tracing/0227LB_flair_tracing.nii
+data/dana/all_15_subjects/manual_tracing/0237RG_flair_tracing.nii
+data/dana/all_15_subjects/manual_tracing/0588NC24_flair_tracing.nii
