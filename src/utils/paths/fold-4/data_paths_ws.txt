@@ -1,0 +1,4 @@
+data/dana/whitestripe/processed/0156ML_flair_ws.nii.gz
+data/dana/whitestripe/processed/0227LB_flair_ws.nii.gz
+data/dana/whitestripe/processed/0237RG_flair_ws.nii.gz
+data/dana/whitestripe/processed/0588NC24_flair_ws.nii.gz

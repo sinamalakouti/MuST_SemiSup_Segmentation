@@ -4,8 +4,10 @@ import torch.utils.data as Data
 import os
 import glob
 import numpy as cp
-import soft_n_cut_loss.py
-import Constatns.py
+import nibabel as nib
+import numpy as np
+from src.utils import soft_n_cut_loss
+from src.utils import Constants
 
 class DataLoader():
     # initialization
@@ -79,3 +81,143 @@ class DataLoader():
                 dataset.append(Data.TensorDataset(torch.from_numpy(batch / 256).float()))
         cp.get_default_memory_pool().free_all_blocks()
         return Data.ConcatDataset(dataset)
+
+
+
+
+class PittLocalFull(torch.utils.data.Dataset):
+
+    def __init__(self, ws, T1, mixup_threshold,intensity_aug, data_paths, label_paths, mask_paths,
+                 augment=False, data_paths_t1=None):
+        super(PittLocalFull, self).__init__()
+
+        # NOTE: if dataloader does not shuffle
+        # and batch size is kept to 5, then
+        # each batch equates to a single subject
+        self.T1 = T1
+        self.ws = ws
+        self.intensity_aug = intensity_aug
+        self.augment = augment
+        self.mixup_threshold = mixup_threshold
+        if self.T1 is not None:
+            self.order = [f.strip().split('/')[-1].strip('_FL_preproc.nii.gz')  # change strip later if other exp
+                          for p in data_paths for f in open(p) for _ in range(5)]
+
+            data_paths = [f.strip() for p in data_paths
+                          for f in open(p).readlines()]
+            label_paths = [f.strip() for p in label_paths
+                           for f in open(p).readlines()]
+            mask_paths = [f.strip() for p in mask_paths
+                          for f in open(p).readlines()]
+            data_paths_t1 = [f.strip() for p in data_paths_t1
+                             for f in open(p).readlines()]
+
+            paths = zip(data_paths, label_paths, mask_paths, data_paths_t1)
+            self.data = []
+            for data_f, label_f, mask_f, data_t1_f in paths:
+                X = None
+                X_t1 = None
+                if self.ws is not None:
+                    X = self._extract(data_f, slices=(0, 1, 2, 3, 4))
+                    X_t1 = self._extract(data_t1_f, slices=(0, 1, 2, 3, 4))
+                else:
+                    X = self._extract(data_f)
+                    X_t1 = self._extract(data_t1_f)
+                Y = self._extract(label_f)
+                M = self._extract(mask_f)
+                for sl in range(Y.shape[2]):
+                    self.data.append({
+                        'data': X[:, :, sl],
+                        'label': Y[:, :, sl],
+                        'mask': M[:, :, sl],
+                        'data_t1': X_t1[:, :, sl]})
+        else:
+            self.order = [f.strip().split('/')[-1].strip('_flair.nii.gz')
+                          for p in data_paths for f in open(p) for _ in range(5)]
+
+            data_paths = [f.strip() for p in data_paths
+                          for f in open(p).readlines()]
+            label_paths = [f.strip() for p in label_paths
+                           for f in open(p).readlines()]
+            mask_paths = [f.strip() for p in mask_paths
+                          for f in open(p).readlines()]
+
+            paths = zip(data_paths, label_paths, mask_paths)
+            self.data = []
+            for data_f, label_f, mask_f in paths:
+                X = None
+                if self.ws is not None:
+                    X = self._extract(data_f, slices=(0, 1, 2, 3, 4))
+                else:
+                    X = self._extract(data_f)
+                Y = self._extract(label_f)
+                M = self._extract(mask_f)
+                for sl in range(Y.shape[2]):
+                    self.data.append({
+                        'data': X[:, :, sl],
+                        'label': Y[:, :, sl],
+                        'mask': M[:, :, sl]})
+
+    def __len__(self):
+        return len(self.data)
+
+    def _extract(self, f, slices=(24, 25, 26, 27, 28)):
+        x = nib.load(f).get_data()
+        slices = np.array(slices)
+        return x[:, :, slices].astype('float32')
+
+    def __getitem__(self, index):
+        if self.T1 is not None:
+            x = self.data[index]['data']
+            y = self.data[index]['label']
+            m = self.data[index]['mask']# mask no need to do intensity rescale
+            x_t1 = self.data[index]['data_t1']
+            x = rescale_intensity(x) #chg
+#            y = rescale_intensity(y) #chg
+            x_t1 = rescale_intensity(x_t1) #chg
+            if self.augment:
+                x, y, m, x_t1 = augment(
+                    x=x, y=y, m=m, t1=x_t1, intensity_aug=self.intensity_aug)
+            else:
+                x, y, m, x_t1 = tensorize(x, y, m, x_t1)
+            output_arr = []
+            output_arr.append(x)
+            output_arr.append(x_t1)
+            # lamda * output_arr[0] + (1-lamda)*output_arr[1]
+            if self.mixup_threshold is not None: #chg
+                x_final = self.mixup_threshold * output_arr[0] + (1-self.mixup_threshold)*output_arr[1]
+                # print("mixup is not, none")
+                #print(self.mixup_threshold)
+                #print("mixup is not, none")
+                #print(self.intensity_aug)
+
+            else:
+                x_final = np.concatenate(output_arr[0:2], axis=0)
+               # print(self.mixup_threshold)
+               # print("mixup is none")
+               # print(self.intensity_aug)
+
+            return {'data': x_final, 'label': y, 'mask': m.bool(),
+                    'subject': self.order[index]}
+        else:
+            x = self.data[index]['data']
+            y = self.data[index]['label']
+            m = self.data[index]['mask'] # mask no need to do intensity rescale
+            # x = rescale_intensity(x) #chg/
+#            y = rescale_intensity(y) #chg
+            if self.augment:
+                x, y, m = augment(
+                    x=x, y=y, m=m, intensity_aug=self.intensity_aug)
+            else:
+                x, y, m = tensorize(x, y, m)
+            return {'data': x, 'label': y, 'mask': m.bool(),
+                    'subject': self.order[index]}
+
+def tensorize(*args):
+    return tuple(torch.Tensor(arg).float().unsqueeze(0) for arg in args)
+
+
+def rescale_intensity(x):
+    maximum = np.max(x)
+    minimum = np.min(x)
+    return  (x - minimum) / (maximum - minimum)

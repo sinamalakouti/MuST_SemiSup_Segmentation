@@ -1,0 +1,12 @@
+data/dana/preprocess/0097RS/0097RS_FL_preproc.nii.gz
+data/dana/preprocess/0177CR/0177CR_FL_preproc.nii.gz
+data/dana/preprocess/0332AG/0332AG_FL_preproc.nii.gz
+data/dana/preprocess/0120LB/0120LB_FL_preproc.nii.gz
+data/dana/preprocess/0545GS/0545GS_FL_preproc.nii.gz
+data/dana/preprocess/0580VM24/0580VM24_FL_preproc.nii.gz
+data/dana/preprocess/0280AK/0280AK_FL_preproc.nii.gz
+data/dana/preprocess/0189HW/0189HW_FL_preproc.nii.gz
+data/dana/preprocess/0286MR72/0286MR72_FL_preproc.nii.gz
+data/dana/preprocess/0242CK/0242CK_FL_preproc.nii.gz
+data/dana/preprocess/0196BM/0196BM_FL_preproc.nii.gz
+data/dana/preprocess/0525FR/0525FR_FL_preproc.nii.gz

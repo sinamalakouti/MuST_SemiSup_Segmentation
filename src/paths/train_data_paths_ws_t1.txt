@@ -1,0 +1,12 @@
+data/dana/whitestripe/processed/0097RS_T1_ws.nii.gz
+data/dana/whitestripe/processed/0177CR_T1_ws.nii.gz
+data/dana/whitestripe/processed/0332AG_T1_ws.nii.gz
+data/dana/whitestripe/processed/0120LB_T1_ws.nii.gz
+data/dana/whitestripe/processed/0545GS_T1_ws.nii.gz
+data/dana/whitestripe/processed/0580VM24_T1_ws.nii.gz
+data/dana/whitestripe/processed/0280AK_T1_ws.nii.gz
+data/dana/whitestripe/processed/0189HW_T1_ws.nii.gz
+data/dana/whitestripe/processed/0286MR72_T1_ws.nii.gz
+data/dana/whitestripe/processed/0242CK_T1_ws.nii.gz
+data/dana/whitestripe/processed/0196BM_T1_ws.nii.gz
+data/dana/whitestripe/processed/0525FR_T1_ws.nii.gz

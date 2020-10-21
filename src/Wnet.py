@@ -9,6 +9,10 @@ from torchvision.transforms import ToTensor
 from torchvision.utils import make_grid
 from torch.utils.data.dataloader import DataLoader
 from torch.utils.data import random_split
+from src.utils.reconstruction_loss import ReconstructionLoss
+
+
+from src.utils import  Constants
 
 
 class Module(nn.Module):
@@ -82,7 +86,9 @@ class Unet(nn.Module):
                 modules.append(m)
 
         pool = nn.MaxPool2d(kernel_size=2, stride=2, padding=0)
+        dropout = nn.Dropout(Constants.DROP_OUT)
         self.down_samplers = [None] + [pool] * (n_contracting_path - 1)
+        self.dropOuts = [None] + [dropout] * (n_contracting_path)
         self.up_samplers = [nn.ConvTranspose2d(self.dim_out[i], self.dim_in[i],
                                                kernel_size=3, stride=2, padding=1, output_padding=1)
                             for i in range(n_contracting_path - 1, -1, -1)]
@@ -97,7 +103,12 @@ class Unet(nn.Module):
             if self.down_samplers[i] is None:
                 X_in = X
             else:
-                X_in = self.down_samplers[i](Xs[-1])
+                if Constants.DROP_OUT:
+                    X_in = self.dropOuts[i](Xs[-1])
+                else:
+                    X_in = Xs[-1]
+                # X_in = Xs[-1]
+                X_in = self.down_samplers[i](X_in)
             X_out = self.net[i](X_in)
             if i != n_contracting_path - 1:
                 Xs.append(X_out)
@@ -106,6 +117,12 @@ class Unet(nn.Module):
         for i in range(self.n_modules - n_contracting_path):
             j = i + n_contracting_path
             X_in = self.up_samplers[i](X_out)
+            h_diff = Xs[i].size()[2] - X_in.size()[2]
+            w_diff = Xs[i].size()[3] - X_in.size()[3]
+
+            if (h_diff != 0 or w_diff != 0):
+                X_in = F.pad(X_in, (0, w_diff, 0 ,h_diff ))
+                # print("shape shpae  ", X_in.shape)
             X_in = torch.cat([Xs[i], X_in], 1)
             X_out = self.net[j](X_in)
 
@@ -140,14 +157,15 @@ class Wnet(nn.Module):
     def forward(self, X):
         X_in_intermediate = self.Uenc(X)
         X_in_intermediate = self.conv1(X_in_intermediate)
-        X_out_intermediate = nn.Softmax(X_in_intermediate)
+        softmax = nn.Softmax2d()
+        X_out_intermediate = softmax(X_in_intermediate)
         X_in_final = self.Udec(X_out_intermediate)
         X_out_final = self.conv2(X_in_final)
         return X_out_final
 
 
 if __name__ == '__main__':
-    inputs_dim = [3, 64, 128, 256, 512, 1024, 512, 256, 128]
+    inputs_dim = [1, 64, 128, 256, 512, 1024, 512, 256, 128]
     outputs_dim = [64, 128, 256, 512, 1024, 512, 256, 128, 64]
     kernels = [3, 3, 3, 3, 3, 3, 3, 3, 3]
     paddings = [1, 1, 1, 1, 1, 1, 1, 1, 1]
@@ -157,8 +175,9 @@ if __name__ == '__main__':
                 separables=separables)
     wnet.build()
 
-    a = np.random.rand(20, 3, 224, 224)
+    a = np.random.rand(20, 1, 212, 256)
     X = list(a)
     X = torch.FloatTensor(X)
     Y = wnet(X)
+    optimizer = torch.optim.SGD(wnet.parameters(), 0.001)
     print(Y.shape)

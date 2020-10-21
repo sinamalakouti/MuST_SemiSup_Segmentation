@@ -1,0 +1,5 @@
+data/dana/preprocess/0064KW/0064KW_T1_preproc.nii.gz
+data/dana/preprocess/0156ML/0156ML_T1_preproc.nii.gz
+data/dana/preprocess/0227LB/0227LB_T1_preproc.nii.gz
+data/dana/preprocess/0237RG/0237RG_T1_preproc.nii.gz
+data/dana/preprocess/0588NC24/0588NC24_T1_preproc.nii.gz
