@@ -69,39 +69,40 @@ class Unet(nn.Module):
         self.separable = separable
         self.kernel_size = kernel_size
         self.n_modules = n_modules
-        self.net = self.__build()
+        self.__build()
 
     def __build(self):
         n_contracting_path = self.n_modules // 2 + 1
         # n_expanding_path = self.n_modules - n_contracting_path
-        modules = []
-
+        contracting_modules = []
+        expanding_modules = []
         for i in range(self.n_modules):
             if i < n_contracting_path:
                 m = Module(self.dim_in[i], self.dim_out[i], stride=self.stride[i], padding=self.padding[i],
                            kernel_size=self.kernel_size[i], separable=self.separable[i])
-                modules.append(m)
+                contracting_modules.append(m)
             else:
                 m = Module(self.dim_in[i], self.dim_out[i], stride=self.stride[i], padding=self.padding[i],
                            kernel_size=self.kernel_size[i], separable=self.separable[i])
-                modules.append(m)
+                expanding_modules.append(m)
 
-        pool = nn.MaxPool2d(kernel_size=2, stride=2, padding=0)
-        dropout = nn.Dropout(Constants.DROP_OUT)
-        self.down_samplers = [None] + [pool] * (n_contracting_path - 1)
-        self.dropOuts = [None] + [dropout] * (n_contracting_path)
+        self.pool = nn.MaxPool2d(kernel_size=2, stride=2, padding=0)
+        self.dropout = nn.Dropout(Constants.DROP_OUT)
+        self.down_samplers = [None] + [self.pool] * (n_contracting_path - 1)
+        self.dropOuts = [None] + [self.dropout] * (n_contracting_path)
         self.up_samplers = [nn.ConvTranspose2d(self.dim_out[i], self.dim_in[i],
                                                kernel_size=3, stride=2, padding=1, output_padding=1)
                             for i in range(n_contracting_path - 1, -1, -1)]
 
-        self.modules = torch.nn.ModuleList(modules)
-        return self.modules
+        self.contracting_modules = torch.nn.ModuleList(contracting_modules)
+        self.expanding_modules = torch.nn.ModuleList(expanding_modules)
+        # return self.modules
 
     def forward(self, X):
         n_contracting_path = self.n_modules // 2 + 1
 
         Xs = []
-        for i in range(n_contracting_path):
+        for i, module in enumerate(self.contracting_modules):
             if self.down_samplers[i] is None:
                 X_in = X
             else:
@@ -111,12 +112,14 @@ class Unet(nn.Module):
                     X_in = Xs[-1]
                 # X_in = Xs[-1]
                 X_in = self.down_samplers[i](X_in)
-            X_out = self.net[i](X_in)
+            X_out = module(X_in)
             if i != n_contracting_path - 1:
                 Xs.append(X_out)
 
+        # expanding modules
         Xs.reverse()
-        for i in range(self.n_modules - n_contracting_path):
+        counter = self.n_modules - n_contracting_path
+        for i, modules in enumerate(self.expanding_modules):
             j = i + n_contracting_path
             X_in = self.up_samplers[i](X_out)
             h_diff = Xs[i].size()[2] - X_in.size()[2]
@@ -126,7 +129,7 @@ class Unet(nn.Module):
                 X_in = F.pad(X_in, (0, w_diff, 0 ,h_diff ))
                 # print("shape shpae  ", X_in.shape)
             X_in = torch.cat([Xs[i], X_in], 1)
-            X_out = self.net[j](X_in)
+            X_out = modules(X_in)
 
         return X_out
 
@@ -155,22 +158,22 @@ class Wnet(nn.Module):
         self.Udec = Unet(self.n_modules // 2, dec_dim_inputs, self.dim_outputs, self.strides, self.paddings,
                          self.kernels, self.separables)
         self.conv2 = nn.Conv2d(self.dim_outputs[-1], self.dim_inputs[0], kernel_size=1)
+        self.softmax = nn.Softmax2d()
 
     def forward(self, X):
-        if torch.cuda.is_available():
-            dev = "cuda:0"
-        else:
-            dev = "cpu"
-        print("11111device is     ", dev)
-        print(" input , ", X.is_cuda)
-        device = torch.device(dev)
+        # if torch.cuda.is_available():
+        #     dev = "cuda:0"
+        # else:
+        #     dev = "cpu"
+        # print("11111device is     ", dev)
+        # print(" input , ", X.is_cuda)
+        # device = torch.device(dev)
        # print("device 1   ",  next(self.Uenc.parameters()))
-        self.Unec = self.Uenc.to(device)
+       #  self.Unec = self.Uenc.to(device)
       #:  print("deviece 22 ", self.Uenc.is_cuda)
         X_in_intermediate = self.Uenc(X)
         X_in_intermediate = self.conv1(X_in_intermediate)
-        softmax = nn.Softmax2d()
-        X_out_intermediate = softmax(X_in_intermediate)
+        X_out_intermediate = self.softmax(X_in_intermediate)
         X_in_final = self.Udec(X_out_intermediate)
         X_out_final = self.conv2(X_in_final)
         return X_out_final

@@ -43,14 +43,12 @@ def train(dataset):
     wnet.to(device)
     wnet.build()
     wnet.to(device)
-    if device != 'cpu':
-        print("cuda cuda")
-        wnet = wnet.cuda(device)
     Recon_loss = ReconstructionLoss()
     optimizer = torch.optim.Adam(wnet.parameters(), 0.01)
 
     test = torch.tensor(dataset.dataset.data[0]['data']).reshape((1,1,212,256))
     for iter in range(utils.Constants.N_ITERATION):
+        print("iteration: ", iter)
         wnet.train()
         print(iter)
         if iter % 200 == 0:
@@ -63,7 +61,7 @@ def train(dataset):
                 torch.save(wnet, f)
 
 
-        if iter % 10 == 0:
+        if iter % 1 == 0:
             with torch.no_grad():
                 wnet.eval()
                 test.reshape((1,1,212,256))
@@ -86,17 +84,6 @@ def train(dataset):
             recon_loss.backward()
             optimizer.step()
             optimizer.zero_grad()
-
-
-
-                # plt.imshow(batch['data'].data[0])
-                # plt.show()
-                # input()
-
-
-
-
-
             # i +=1
     return wnet
 
