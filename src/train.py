@@ -61,12 +61,13 @@ def train(dataset):
                 torch.save(wnet, f)
 
 
-        if iter % 1 == 0:
+        if iter % 10 == 0:
             with torch.no_grad():
                 wnet.eval()
                 test.reshape((1,1,212,256))
                 p = wnet(test.to(device))
                 p = p.reshape((test.shape[2], test.shape[3]))
+                p.cpu()
                 plt.imshow(p)
                 plt.savefig("../images/image_{}.png".format(iter))
                 plt.imshow(test.reshape((212,256)))
@@ -74,12 +75,13 @@ def train(dataset):
                 wnet.train()
 
         for batch in dataset:
-
-            pred = wnet(batch['data'].to(device))
+            b = batch['data']
+            b.to(device)
+            pred = wnet(b)
 
             # recon_loss = Recon_loss.compute_loss(pred, batch['data'])
             loss = torch.nn.MSELoss().to(device)
-            recon_loss = loss(pred, batch['data'])
+            recon_loss = loss(pred, b)
             print(recon_loss)
             recon_loss.backward()
             optimizer.step()
