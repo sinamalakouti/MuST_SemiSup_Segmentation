@@ -9,10 +9,10 @@ from torchvision.transforms import ToTensor
 from torchvision.utils import make_grid
 from torch.utils.data.dataloader import DataLoader
 from torch.utils.data import random_split
-from src.utils.reconstruction_loss import ReconstructionLoss
+from utils.reconstruction_loss import ReconstructionLoss
 
 
-from src.utils import  Constants
+from utils import  Constants
 
 
 class Module(nn.Module):
@@ -24,6 +24,7 @@ class Module(nn.Module):
         self.kernel_size = kernel_size
         self.stride = stride
         self.padding = padding
+        self.net = self.__build_module()
 
     def __depthWise_separable_conv(self, in_dim, out_dim, kernel_size):
         return nn.Sequential(
@@ -54,8 +55,8 @@ class Module(nn.Module):
             )
 
     def forward(self, X):
-        module = self.__build_module()
-        return module(X)
+       # module = self.__build_module()
+        return self.net(X)
 
 
 class Unet(nn.Module):
@@ -93,7 +94,8 @@ class Unet(nn.Module):
                                                kernel_size=3, stride=2, padding=1, output_padding=1)
                             for i in range(n_contracting_path - 1, -1, -1)]
 
-        return modules
+        self.modules = torch.nn.ModuleList(modules)
+        return self.modules
 
     def forward(self, X):
         n_contracting_path = self.n_modules // 2 + 1
@@ -141,7 +143,7 @@ class Wnet(nn.Module):
         self.separables = separables
         self.n_modules = n_modules
         self.k = k
-        # self.__build()
+        self.build()
 
     def build(self):
         self.Uenc = Unet(self.n_modules // 2, self.dim_inputs, self.dim_outputs, self.strides, self.paddings,
@@ -155,6 +157,16 @@ class Wnet(nn.Module):
         self.conv2 = nn.Conv2d(self.dim_outputs[-1], self.dim_inputs[0], kernel_size=1)
 
     def forward(self, X):
+        if torch.cuda.is_available():
+            dev = "cuda:0"
+        else:
+            dev = "cpu"
+        print("11111device is     ", dev)
+        print(" input , ", X.is_cuda)
+        device = torch.device(dev)
+       # print("device 1   ",  next(self.Uenc.parameters()))
+        self.Unec = self.Uenc.to(device)
+      #:  print("deviece 22 ", self.Uenc.is_cuda)
         X_in_intermediate = self.Uenc(X)
         X_in_intermediate = self.conv1(X_in_intermediate)
         softmax = nn.Softmax2d()

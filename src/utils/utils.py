@@ -1,5 +1,5 @@
-from src.utils.Constants import *
-from src.utils.dataloader import *
+from utils.Constants import *
+from utils.dataloader import *
 
 
 # class Utils:

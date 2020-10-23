@@ -6,8 +6,8 @@ import glob
 import numpy as cp
 import nibabel as nib
 import numpy as np
-from src.utils import soft_n_cut_loss
-from src.utils import Constants
+from utils import soft_n_cut_loss
+from utils import Constants
 
 class DataLoader():
     # initialization

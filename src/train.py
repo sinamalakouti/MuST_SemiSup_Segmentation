@@ -3,10 +3,18 @@ import torch
 import os
 import torch.nn as nn
 import torch.nn.functional as F
+import sys
+import os
+sys.path.append('src')
+sys.path.append('src/utils/Constants')
+sys.path.append('srs/utils')
 
-from src.utils import utils
-from src.utils.reconstruction_loss import ReconstructionLoss
-from src import Wnet
+
+for p in sys.path:
+    print("path  ", p)
+from utils import utils
+from utils.reconstruction_loss import ReconstructionLoss
+import Wnet
 import matplotlib.pyplot as plt
 
 utils.Constants.USE_CUDA = True
@@ -34,11 +42,14 @@ def train(dataset):
     device = torch.device(dev)
     wnet.to(device)
     wnet.build()
-
+    wnet.to(device)
+    if device != 'cpu':
+        print("cuda cuda")
+        wnet = wnet.cuda(device)
     Recon_loss = ReconstructionLoss()
     optimizer = torch.optim.Adam(wnet.parameters(), 0.01)
 
-    test = torch.tensor(dataset.dataset.data[0]['data']).reshape((1,1,212,256)).to(device)
+    test = torch.tensor(dataset.dataset.data[0]['data']).reshape((1,1,212,256))
     for iter in range(utils.Constants.N_ITERATION):
         wnet.train()
         print(iter)
@@ -56,7 +67,7 @@ def train(dataset):
             with torch.no_grad():
                 wnet.eval()
                 test.reshape((1,1,212,256))
-                p = wnet(test)
+                p = wnet(test.to(device))
                 p = p.reshape((test.shape[2], test.shape[3]))
                 plt.imshow(p)
                 plt.savefig("../images/image_{}.png".format(iter))
