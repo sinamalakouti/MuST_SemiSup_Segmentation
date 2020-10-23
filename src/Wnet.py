@@ -93,7 +93,7 @@ class Unet(nn.Module):
         self.up_samplers = [nn.ConvTranspose2d(self.dim_out[i], self.dim_in[i],
                                                kernel_size=3, stride=2, padding=1, output_padding=1)
                             for i in range(n_contracting_path - 1, -1, -1)]
-
+        self.up_samplers = torch.nn.ModuleList(self.up_samplers)
         self.contracting_modules = torch.nn.ModuleList(contracting_modules)
         self.expanding_modules = torch.nn.ModuleList(expanding_modules)
         # return self.modules
@@ -121,7 +121,7 @@ class Unet(nn.Module):
         counter = self.n_modules - n_contracting_path
         for i, modules in enumerate(self.expanding_modules):
             j = i + n_contracting_path
-            X_in = self.up_samplers[i](X_out)
+            X_in = self.up_samplers.__getitem__(i)(X_out)
             h_diff = Xs[i].size()[2] - X_in.size()[2]
             w_diff = Xs[i].size()[3] - X_in.size()[3]
 
