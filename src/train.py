@@ -23,6 +23,7 @@ utils.Constants.N_ITERATION = 20000
 def train(dataset):
     # read data
     dataset = utils.get_dataset(dataset)
+    trainset = dataset.dataset.data[0:90][:]
 
     # TODO: preprocessing?
     inputs_dim = [1, 64, 128, 256, 512, 1024, 512, 256, 128]
@@ -44,7 +45,7 @@ def train(dataset):
     wnet.build()
     wnet.to(device)
     Recon_loss = ReconstructionLoss()
-    optimizer = torch.optim.Adam(wnet.parameters(), 0.01)
+    optimizer = torch.optim.Adam(wnet.parameters(), 0.001)
 
     test = torch.tensor(dataset.dataset.data[0]['data']).reshape((1,1,212,256))
     for iter in range(utils.Constants.N_ITERATION):
@@ -73,20 +74,27 @@ def train(dataset):
                 plt.imshow(test.reshape((212,256)))
                 plt.savefig("../images/image_{}_original.png".format(iter))
                 wnet.train()
-
+        j = 0
         for batch in dataset:
             b = batch['data']
             b.to(device)
             pred = wnet(b)
-
             # recon_loss = Recon_loss.compute_loss(pred, batch['data'])
             loss = torch.nn.MSELoss().to(device)
             recon_loss = loss(pred, b)
+            if j == 0:
+                # p = p.reshape((test.shape[2], test.shape[3]))
+                # p.cpu()
+                plt.imshow(pred[0 ,:].data.reshape(212,256))
+                plt.show()
+                plt.imshow(b.data[0].reshape(212,256))
+                plt.show()
             print(recon_loss)
             recon_loss.backward()
             optimizer.step()
             optimizer.zero_grad()
-            # i +=1
+
+            j +=1
     return wnet
 
 

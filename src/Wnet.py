@@ -37,21 +37,24 @@ class Module(nn.Module):
             return nn.Sequential(
                 nn.Conv2d(self.dim_in, self.dim_out, kernel_size=self.kernel_size, padding=self.padding,
                           stride=self.stride),
-                nn.ReLU(),
                 nn.BatchNorm2d(self.dim_out),
+                nn.ReLU(),
                 nn.Conv2d(self.dim_out, self.dim_out, kernel_size=self.kernel_size, padding=self.padding,
                           stride=self.stride),
-                nn.ReLU(),
-                nn.BatchNorm2d(self.dim_out)
+                nn.BatchNorm2d(self.dim_out),
+                nn.ReLU()
+
             )
         else:
             return nn.Sequential(
                 self.__depthWise_separable_conv(self.dim_in, self.dim_out, self.kernel_size),
-                nn.ReLU(),
                 nn.BatchNorm2d(self.dim_out),
-                self.__depthWise_separable_conv(self.dim_out, self.dim_out, self.kernel_size),
                 nn.ReLU(),
-                nn.BatchNorm2d(self.dim_out)
+
+                self.__depthWise_separable_conv(self.dim_out, self.dim_out, self.kernel_size),
+                nn.BatchNorm2d(self.dim_out),
+                nn.ReLU()
+
             )
 
     def forward(self, X):
