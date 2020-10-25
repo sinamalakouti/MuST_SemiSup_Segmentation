@@ -22,8 +22,8 @@ utils.Constants.N_ITERATION = 20000
 
 def train(dataset):
     # read data
-    dataset = utils.get_dataset(dataset)
-    trainset = dataset.dataset.data[0:90][:]
+    trainset = utils.get_trainset(dataset)
+    testset = utils.get_testset(dataset)
 
     # TODO: preprocessing?
     inputs_dim = [1, 64, 128, 256, 512, 1024, 512, 256, 128]
@@ -47,7 +47,7 @@ def train(dataset):
     Recon_loss = ReconstructionLoss()
     optimizer = torch.optim.Adam(wnet.parameters(), 0.001)
 
-    test = torch.tensor(dataset.dataset.data[0]['data']).reshape((1,1,212,256))
+    test = torch.tensor(testset.dataset.data[0]['data']).reshape((1,1,212,256))
     for iter in range(utils.Constants.N_ITERATION):
         print("iteration: ", iter)
         wnet.train()
@@ -75,7 +75,7 @@ def train(dataset):
                 plt.savefig("../images/image_{}_original.png".format(iter))
                 wnet.train()
         j = 0
-        for batch in dataset:
+        for batch in trainset:
             b = batch['data']
             b.to(device)
             pred = wnet(b)
