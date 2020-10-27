@@ -8,6 +8,8 @@ import nibabel as nib
 import numpy as np
 from utils import soft_n_cut_loss
 from utils import Constants
+from utils.soft_n_cut_loss import *
+
 
 class DataLoader():
     # initialization
@@ -35,7 +37,8 @@ class DataLoader():
             with Image.open(file_name) as image:
                 if image.mode != "RGB":
                     image = image.convert("RGB")
-                self.raw_data.append(cp.array(image.resize((Constants.inputsize[0], Constants.inputsize[1]), Image.BILINEAR)))
+                self.raw_data.append(
+                    cp.array(image.resize((Constants.inputsize[0], Constants.inputsize[1]), Image.BILINEAR)))
         # resize and align
         self.scale()
         # normalize
@@ -83,11 +86,9 @@ class DataLoader():
         return Data.ConcatDataset(dataset)
 
 
-
-
 class PittLocalFull(torch.utils.data.Dataset):
 
-    def __init__(self, ws, T1, mixup_threshold,intensity_aug, data_paths, label_paths, mask_paths,
+    def __init__(self, ws, T1, mixup_threshold, intensity_aug, data_paths, label_paths, mask_paths,
                  augment=False, data_paths_t1=None):
         super(PittLocalFull, self).__init__()
 
@@ -170,41 +171,42 @@ class PittLocalFull(torch.utils.data.Dataset):
         if self.T1 is not None:
             x = self.data[index]['data']
             y = self.data[index]['label']
-            m = self.data[index]['mask']# mask no need to do intensity rescale
+            m = self.data[index]['mask']  # mask no need to do intensity rescale
             x_t1 = self.data[index]['data_t1']
-            x = rescale_intensity(x) #chg
-#            y = rescale_intensity(y) #chg
-            x_t1 = rescale_intensity(x_t1) #chg
+            # x = rescale_intensity(x)  # chg
+            #            y = rescale_intensity(y) #chg
+            x_t1 = rescale_intensity(x_t1)  # chg
             if self.augment:
-                x, y, m, x_t1 = augment(
-                    x=x, y=y, m=m, t1=x_t1, intensity_aug=self.intensity_aug)
+                None
+                # x, y, m, x_t1 = augment(
+                #     x=x, y=y, m=m, t1=x_t1, intensity_aug=self.intensity_aug)
             else:
                 x, y, m, x_t1 = tensorize(x, y, m, x_t1)
             output_arr = []
             output_arr.append(x)
             output_arr.append(x_t1)
             # lamda * output_arr[0] + (1-lamda)*output_arr[1]
-            if self.mixup_threshold is not None: #chg
-                x_final = self.mixup_threshold * output_arr[0] + (1-self.mixup_threshold)*output_arr[1]
+            if self.mixup_threshold is not None:  # chg
+                x_final = self.mixup_threshold * output_arr[0] + (1 - self.mixup_threshold) * output_arr[1]
                 # print("mixup is not, none")
-                #print(self.mixup_threshold)
-                #print("mixup is not, none")
-                #print(self.intensity_aug)
+                # print(self.mixup_threshold)
+                # print("mixup is not, none")
+                # print(self.intensity_aug)
 
             else:
                 x_final = np.concatenate(output_arr[0:2], axis=0)
-               # print(self.mixup_threshold)
-               # print("mixup is none")
-               # print(self.intensity_aug)
+            # print(self.mixup_threshold)
+            # print("mixup is none")
+            # print(self.intensity_aug)
 
             return {'data': x_final, 'label': y, 'mask': m.bool(),
                     'subject': self.order[index]}
         else:
             x = self.data[index]['data']
             y = self.data[index]['label']
-            m = self.data[index]['mask'] # mask no need to do intensity rescale
+            m = self.data[index]['mask']  # mask no need to do intensity rescale
             # x = rescale_intensity(x) #chg/
-#            y = rescale_intensity(y) #chg
+            #            y = rescale_intensity(y) #chg
             if self.augment:
                 x, y, m = augment(
                     x=x, y=y, m=m, intensity_aug=self.intensity_aug)
@@ -213,6 +215,7 @@ class PittLocalFull(torch.utils.data.Dataset):
             return {'data': x, 'label': y, 'mask': m.bool(),
                     'subject': self.order[index]}
 
+
 def tensorize(*args):
     return tuple(torch.Tensor(arg).float().unsqueeze(0) for arg in args)
 
@@ -220,4 +223,4 @@ def tensorize(*args):
 def rescale_intensity(x):
     maximum = np.max(x)
     minimum = np.min(x)
-    return  (x - minimum) / (maximum - minimum)
+    return (x - minimum) / (maximum - minimum)
