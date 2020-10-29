@@ -3,6 +3,8 @@ from utils.dataloader import *
 import Wnet
 import matplotlib.pyplot as plt
 import os
+
+
 # class Utils:
 #     def __init__(self, dataset):
 
@@ -60,13 +62,14 @@ def get_testset(dataset) -> torch.utils.data.DataLoader:
 
         return train
 
-def load_model(path) -> Wnet.Wnet:
 
+def load_model(path) -> Wnet.Wnet:
     wnet = torch.load(path)
 
     return wnet
-def save_segment_images(segments, path):
 
+
+def save_segment_images(segments, path):
     n_segments = segments.shape[1]
     n_samples = segments.shape[0]
 
@@ -81,7 +84,7 @@ def save_segment_images(segments, path):
                 print("Successfully created the directory %s " % path)
 
         for j in range(n_segments):
-            plt.imshow(segments[i,j])
+            plt.imshow(segments[i, j])
             image_path = sample_dir + "/segment_{}.png".format(j)
             plt.savefig(image_path)
 
@@ -89,7 +92,7 @@ def save_segment_images(segments, path):
 def save_images(input_images, reconstructed_images, path):
     n_image = reconstructed_images.shape[0]
     for i in range(n_image):
-        recon_image = reconstructed_images[i,0]
+        recon_image = reconstructed_images[i, 0]
         input_image = input_images[i, 0]
         recon_image_path = path + "/recon_image{}.png".format(i)
         input_image_path = path + "/input_image{}.png".format(i)
@@ -97,7 +100,3 @@ def save_images(input_images, reconstructed_images, path):
         plt.savefig(recon_image_path)
         plt.imshow(input_image)
         plt.savefig(input_image_path)
-
-
-
-

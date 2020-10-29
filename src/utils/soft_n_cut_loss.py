@@ -6,22 +6,21 @@ sigma_I = 10
 sigma_X = 4
 radius = 5
 
+
 def compute_weigths(flatten_image, rows, cols, std_intensity=10, std_position=4, radius=5):
 
     A = outer_product(flatten_image, torch.ones_like(flatten_image))
-    A_T = A.T
+    A_T = torch.t(A)
     intensity_weight = torch.exp(-1 * torch.square((torch.div((A - A_T), std_intensity))))
-
-
-    xx, yy = torch.meshgrid(torch.range(1,rows), torch.range(1,cols))
+    # print("intensity weight is   ", intensity_weight.shape)
+    xx, yy = torch.meshgrid(torch.range(1, rows), torch.range(1, cols))
     xx = torch.reshape(xx, (rows * cols,))
     yy = torch.reshape(yy, (rows * cols,))
     A_x = outer_product(xx, torch.ones_like(xx))
     A_y = outer_product(yy, torch.ones_like(yy))
-
-    xi_xj = A_x - A_x.T
-    yi_yj = A_y - A_y.T
-
+    A_xt = torch.t(A_x)
+    xi_xj = A_x - A_xt
+    yi_yj = A_y - torch.t(A_y)
     sq_distance_matrix = torch.square(xi_xj) + torch.square(yi_yj)
     sq_distance_matrix[sq_distance_matrix >= radius] = 0
     dist_weight = torch.exp(-torch.div(sq_distance_matrix, torch.square(torch.tensor(std_position))))
@@ -45,7 +44,7 @@ def outer_product(v1, v2):
     v1 = torch.reshape(v1, (-1,))
     v2 = torch.reshape(v2, (-1,))
     v1 = torch.unsqueeze((v1), axis=0)
-    v2 =torch.unsqueeze((v2), axis=0)
+    v2 = torch.unsqueeze((v2), axis=0)
     return torch.matmul(v1.T, (v2))
 
 
@@ -70,7 +69,18 @@ def denominator(k_class_prob, weights):
     return torch.mul(weights, outer_product(k_class_prob, torch.ones(k_class_prob.shape))).sum()
 
 
-def soft_n_cut_loss(weights, prob, k, rows, cols):
+def soft_n_cut_loss(inputs, segmentations,k) -> torch.Tensor:
+    # We don't do n_cut_loss batch wise -- split it up and do it instance wise
+    loss = 0
+    for i in range(inputs.shape[0]):
+        flatten_image = torch.mean(inputs[i], dim=0)
+        flatten_image = flatten_image.reshape(flatten_image.shape[0]**2)
+
+        loss += soft_n_cut_loss_(flatten_image, segmentations[i], k, inputs.shape[2], inputs.shape[3])
+    loss = loss / inputs.shape[0]
+    return loss
+
+def soft_n_cut_loss_(flatten_image, prob, k,rows, cols):
     '''
     Inputs:
     prob : (rows*cols*k) tensor
@@ -84,10 +94,13 @@ def soft_n_cut_loss(weights, prob, k, rows, cols):
 
     soft_n_cut_loss = k
     print("here1")
-    # weights = edge_weights(flatten_image, rows, cols)
+    weights = compute_weigths(flatten_image, rows, cols)
 
-    for t in range(0,k):
-        print("here")
+    for t in range(0, k):
+        # print("here")
         soft_n_cut_loss = soft_n_cut_loss - (numerator(prob[:, :, t], weights) / denominator(prob[:, :, t], weights))
 
     return soft_n_cut_loss
+
+# if __name__ == '__main__':
+#

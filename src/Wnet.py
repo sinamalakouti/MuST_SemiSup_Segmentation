@@ -164,16 +164,6 @@ class Wnet(nn.Module):
         self.softmax = nn.Softmax2d()
 
     def forward(self, X):
-        # if torch.cuda.is_available():
-        #     dev = "cuda:0"
-        # else:
-        #     dev = "cpu"
-        # print("11111device is     ", dev)
-        # print(" input , ", X.is_cuda)
-        # device = torch.device(dev)
-       # print("device 1   ",  next(self.Uenc.parameters()))
-       #  self.Unec = self.Uenc.to(device)
-      #:  print("deviece 22 ", self.Uenc.is_cuda)
         X_in_intermediate = self.Uenc(X)
         X_in_intermediate = self.conv1(X_in_intermediate)
         X_out_intermediate = self.softmax(X_in_intermediate)
