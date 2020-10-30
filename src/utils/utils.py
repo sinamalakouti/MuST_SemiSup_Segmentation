@@ -85,6 +85,7 @@ def save_segment_images(segments, path):
 
         for j in range(n_segments):
             plt.imshow(segments[i, j])
+            print("shape shape shpae ",segments[i, j].shape )
             image_path = sample_dir + "/segment_{}.png".format(j)
             plt.savefig(image_path)
             sgm = max_images == j
