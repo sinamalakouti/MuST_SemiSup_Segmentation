@@ -80,7 +80,7 @@ def edge_weights(flatten_image, rows, cols, std_intensity=3, std_position=1, rad
     yy = yy.reshape(rows*cols)
     if torch.cuda.is_available():
         xx = xx.cuda()
-        yy = yy.cuda()
+        yy = yy.cuda()  
     ones_xx = torch.ones_like(xx, dtype=torch.float)
     ones_yy = torch.ones_like(yy, dtype=torch.float)
     if torch.cuda.is_available():
