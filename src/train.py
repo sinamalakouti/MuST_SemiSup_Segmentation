@@ -287,7 +287,7 @@ def train_with_two_reconstruction(dataset):
 
             final_loss = intermediate_recon_loss + recon_loss
 
-            final_loss.backward()
+            final_loss.backward(retain_graph=False)
             optimizer.step()
             optimizer.zero_grad()
             for p in wnet.linear_combination.parameters():
