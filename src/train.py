@@ -198,7 +198,6 @@ def train_with_ncut(dataset):
 def train_with_two_reconstruction(dataset):
     testset = utils.get_testset(dataset)
     trainset = utils.get_trainset(dataset)
-    linear_combination = torch.nn.Conv2d(5, 1, kernel_size=1)
 
     # TODO: preprocessing?
     inputs_dim = [1, 64, 128, 256, 512, 1024, 512, 256, 128]
@@ -218,7 +217,7 @@ def train_with_two_reconstruction(dataset):
     device = torch.device(dev)
     wnet.build()
     wnet.to(device)
-    linear_combination.to(device)
+    # linear_combination.to(device)
 
     optimizer = torch.optim.Adam(wnet.parameters(), 0.001)
 
@@ -254,8 +253,8 @@ def train_with_two_reconstruction(dataset):
                 X_in_intermediate = wnet.conv1(X_in_intermediate)
                 X_out_intermediate = wnet.softmax(X_in_intermediate)
                 utils.save_segment_images(X_out_intermediate.cpu(),"../images/segmentation")
-                intermediate_pred = linear_combination(X_out_intermediate)
-                plt.imshow(intermediate_pred.reshape((212, 256)))
+                intermediate_pred = wnet.linear_combination(X_out_intermediate)
+                plt.imshow(intermediate_pred.cpu().reshape((212, 256)))
                 plt.savefig("../images/segmentation/linear_comb_{}_original.png".format(iter))
 
                 wnet.train()
@@ -269,7 +268,7 @@ def train_with_two_reconstruction(dataset):
             X_in_final = wnet.Udec(X_out_intermediate)
             pred = wnet.conv2(X_in_final)
             # ncutLoss = utils.soft_n_cut_loss(b,X_out_intermediate,5)
-            intermediate_pred = linear_combination(X_out_intermediate)
+            intermediate_pred = wnet.linear_combination(X_out_intermediate)
             intermediate_loss = torch.nn.MSELoss().to(device)
             intermediate_recon_loss = intermediate_loss(intermediate_pred,b)
             # intermediate_recon_loss.backward(retain_graph=True)
@@ -283,7 +282,7 @@ def train_with_two_reconstruction(dataset):
             final_loss.backward()
             optimizer.step()
             optimizer.zero_grad()
-            for p in linear_combination.parameters():
+            for p in    wnet.linear_combination.parameters():
                 p.data.clamp_(0)
             print(final_loss)
 

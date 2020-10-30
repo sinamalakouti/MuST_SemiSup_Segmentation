@@ -72,7 +72,7 @@ def load_model(path) -> Wnet.Wnet:
 def save_segment_images(segments, path):
     n_segments = segments.shape[1]
     n_samples = segments.shape[0]
-
+    max_images = segments.argmax(1)
     for i in range(n_samples):
         sample_dir = path + '/sample_{}'.format(i)
         if not os.path.isdir(sample_dir):
@@ -86,6 +86,10 @@ def save_segment_images(segments, path):
         for j in range(n_segments):
             plt.imshow(segments[i, j])
             image_path = sample_dir + "/segment_{}.png".format(j)
+            plt.savefig(image_path)
+
+            plt.imshow(max_images==j)
+            image_path = sample_dir + "/segment_argmax_{}.png".format(j)
             plt.savefig(image_path)
 
 
