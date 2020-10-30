@@ -92,7 +92,7 @@ def save_segment_images(segments, path):
             image_path = sample_dir + "/segment_{}.png".format(j)
             plt.savefig(image_path)
             sgm = max_images == j
-            plt.imshow(sgm.reshape(segments.shape[2],segments.shape[3]))
+            plt.imshow(sgm.reshape(segments.shape[2],segments.shape[3]),'gray')
             image_path = sample_dir + "/segment_argmax_{}.png".format(j)
             plt.savefig(image_path)
 

@@ -30,7 +30,9 @@ def test(dataset, model_path):
     print("device is     ", dev)
 
     # TODO: preprocessing?
-    # inputs_dim = [1, 64, 128, 256, 512, 1024, 512, 256, 128]
+    # inputs_dim = [1, 64, 128, 256,
+    #
+    # 12, 1024, 512, 256, 128]
     # outputs_dim = [64, 128, 256, 512, 1024, 512, 256, 128, 64]
     # kernels = [3, 3, 3, 3, 3, 3, 3, 3, 3]
     # paddings = [1, 1, 1, 1, 1, 1, 1, 1, 1]
@@ -65,7 +67,7 @@ def train_reconstruction(dataset):
     paddings = [1, 1, 1, 1, 1, 1, 1, 1, 1]
     strides = [1, 1, 1, 1, 1, 1, 1, 1, 1]
     separables = [False, True, True, True, True, True, True, True, False]
-    wnet = Wnet.Wnet(18, 5, inputs_dim, outputs_dim, strides=strides, paddings=paddings, kernels=kernels,
+    wnet = Wnet.Wnet(18, 4, inputs_dim, outputs_dim, strides=strides, paddings=paddings, kernels=kernels,
                      separables=separables)
 
     if torch.cuda.is_available() and utils.Constants.USE_CUDA:
@@ -131,7 +133,7 @@ def train_with_ncut(dataset):
     paddings = [1, 1, 1, 1, 1, 1, 1, 1, 1]
     strides = [1, 1, 1, 1, 1, 1, 1, 1, 1]
     separables = [False, True, True, True, True, True, True, True, False]
-    wnet = Wnet.Wnet(18, 5, inputs_dim, outputs_dim, strides=strides, paddings=paddings, kernels=kernels,
+    wnet = Wnet.Wnet(18, 4, inputs_dim, outputs_dim, strides=strides, paddings=paddings, kernels=kernels,
                      separables=separables)
 
     if torch.cuda.is_available() and utils.Constants.USE_CUDA:
@@ -206,7 +208,7 @@ def train_with_two_reconstruction(dataset):
     paddings = [1, 1, 1, 1, 1, 1, 1, 1, 1]
     strides = [1, 1, 1, 1, 1, 1, 1, 1, 1]
     separables = [False, True, True, True, True, True, True, True, False]
-    wnet = Wnet.Wnet(18, 5, inputs_dim, outputs_dim, strides=strides, paddings=paddings, kernels=kernels,
+    wnet = Wnet.Wnet(18, 4, inputs_dim, outputs_dim, strides=strides, paddings=paddings, kernels=kernels,
                      separables=separables)
 
     if torch.cuda.is_available() and utils.Constants.USE_CUDA:
@@ -255,7 +257,7 @@ def train_with_two_reconstruction(dataset):
                 utils.save_segment_images(X_out_intermediate.cpu(),"../images/segmentation")
                 intermediate_pred = wnet.linear_combination(X_out_intermediate)
                 plt.imshow(intermediate_pred.cpu().reshape((212, 256)))
-                plt.savefig("../images/segmentation/linear_comb_{}_original.png".format(iter))
+                plt.savefig("../images/segmentation/linear_comb_{}.png".format(iter))
 
                 wnet.train()
 
@@ -266,7 +268,7 @@ def train_with_two_reconstruction(dataset):
             X_in_intermediate = wnet.conv1(X_in_intermediate)
             X_out_intermediate = wnet.softmax(X_in_intermediate)
 
-            
+
             intermediate_pred = wnet.linear_combination(X_out_intermediate)
             X_in_final = wnet.Udec(X_out_intermediate)
             pred = wnet.conv2(X_in_final)
@@ -286,7 +288,7 @@ def train_with_two_reconstruction(dataset):
             optimizer.step()
             optimizer.zero_grad()
             for p in wnet.linear_combination.parameters():
-                p.data.clamp_(0)
+                p.data.clamp_(0.01)
             print(final_loss)
 
     return wnet

@@ -149,7 +149,7 @@ class Wnet(nn.Module):
         self.separables = separables
         self.n_modules = n_modules
         self.k = k
-        self.linear_combination = torch.nn.Conv2d(5, 1, kernel_size=1,bias=False)
+        self.linear_combination = torch.nn.Conv2d(4, 1, kernel_size=1,bias=False)
         self.build()
 
     def build(self):
@@ -180,7 +180,7 @@ if __name__ == '__main__':
     paddings = [1, 1, 1, 1, 1, 1, 1, 1, 1]
     strides = [1, 1, 1, 1, 1, 1, 1, 1, 1]
     separables = [False, True, True, True, True, True, True, True, False]
-    wnet = Wnet(18, 5, inputs_dim, outputs_dim, strides=strides, paddings=paddings, kernels=kernels,
+    wnet = Wnet(18, 4, inputs_dim, outputs_dim, strides=strides, paddings=paddings, kernels=kernels,
                 separables=separables)
     wnet.build()
 
