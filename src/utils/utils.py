@@ -84,6 +84,10 @@ def save_segment_images(segments, path):
                 print("Successfully created the directory %s " % path)
 
         for j in range(n_segments):
+            maximum = torch.max(segments[:, j, :, :])
+            minimum = torch.min(segments[:, j, :, :])
+            segments[:, j, :, :] = (segments[:, j, :, :] - minimum) / (maximum - minimum)
+
             plt.imshow(segments[i, j])
             image_path = sample_dir + "/segment_{}.png".format(j)
             plt.savefig(image_path)

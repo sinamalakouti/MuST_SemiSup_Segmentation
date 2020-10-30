@@ -266,12 +266,7 @@ def train_with_two_reconstruction(dataset):
             X_in_intermediate = wnet.conv1(X_in_intermediate)
             X_out_intermediate = wnet.softmax(X_in_intermediate)
 
-            with torch.no_grad():
-                for d in range(X_out_intermediate.shape[1]):
-                    maximum =torch.max(X_out_intermediate[:,d,:,:])
-                    minimum = torch.min(X_out_intermediate[:, d, :, :])
-                    X_out_intermediate[:,d,:,:] =  (X_out_intermediate[:,d,:,:] - minimum)/(maximum-minimum)
-
+            
             intermediate_pred = wnet.linear_combination(X_out_intermediate)
             X_in_final = wnet.Udec(X_out_intermediate)
             pred = wnet.conv2(X_in_final)
@@ -287,7 +282,7 @@ def train_with_two_reconstruction(dataset):
 
             final_loss = intermediate_recon_loss + recon_loss
 
-            final_loss.backward(retain_graph=False)
+            final_loss.backward()
             optimizer.step()
             optimizer.zero_grad()
             for p in wnet.linear_combination.parameters():
