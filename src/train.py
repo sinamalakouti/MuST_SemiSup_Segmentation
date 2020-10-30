@@ -275,9 +275,6 @@ def train_with_two_reconstruction(dataset):
             intermediate_pred = wnet.linear_combination(X_out_intermediate)
             intermediate_loss = torch.nn.MSELoss().to(device)
             intermediate_recon_loss = intermediate_loss(intermediate_pred,b)
-            # intermediate_recon_loss.backward(retain_graph=True)
-            # optimizer.step()
-            # optimizer.zero_grad()
             X_in_final = wnet.Udec(X_out_intermediate)
             pred = wnet.conv2(X_in_final)
             loss = torch.nn.MSELoss().to(device)
@@ -287,7 +284,7 @@ def train_with_two_reconstruction(dataset):
             final_loss.backward()
             optimizer.step()
             optimizer.zero_grad()
-            for p in linear_combination.parameters():
+            for p in wnet.linear_combination.parameters():
                 p.data.clamp_(0)
             print(final_loss)
 
