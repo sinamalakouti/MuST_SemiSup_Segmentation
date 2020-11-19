@@ -66,4 +66,4 @@ def test(dataset, model_path):
 
 
 if __name__ == '__main__':
-    test(utils.Constants.Datasets.PittLocalFull, '../models/model_epoch_0_.model')
+    test(utils.Constants.Datasets.PittLocalFull, '../models/model_epoch_1800_.model')
