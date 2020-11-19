@@ -295,6 +295,6 @@ def train_with_two_reconstruction(dataset):
 
 
 if __name__ == '__main__':
-    train_with_two_reconstruction(utils.Constants.Datasets.PittLocalFull)
+    #train_with_two_reconstruction(utils.Constants.Datasets.PittLocalFull)
     # train_reconstruction(utils.Constants.Datasets.PittLocalFull)
-    # test(utils.Constants.Datasets.PittLocalFull, '/Users/sina/PycharmProjects/W-Net/models/model_epoch_0_.model')
+    test(utils.Constants.Datasets.PittLocalFull, '/Users/sinamalakouti/PycharmProjects/WMH_Unsupervised_Segmentation/models/model_epoch_0_.model')

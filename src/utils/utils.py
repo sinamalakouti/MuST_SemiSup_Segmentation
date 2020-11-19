@@ -42,7 +42,7 @@ def get_testset(dataset) -> torch.utils.data.DataLoader:
     if Constants.USE_CUDA:
         mem_pin = True
     if dataset is Datasets.PittLocalFull:
-        batch_sz = 5
+        batch_sz = 20
         train = torch.utils.data.DataLoader(
             PittLocalFull(
                 1,
@@ -53,8 +53,8 @@ def get_testset(dataset) -> torch.utils.data.DataLoader:
                 [f'paths/fold-0/label_paths.txt'],
                 [f'paths/fold-0/mask_paths.txt'],
                 augment=False),
-            batch_size=20,
-            drop_last=True,
+            batch_size= batch_sz,
+            drop_last=False,
             num_workers=0,
             shuffle=True,
             pin_memory=mem_pin
@@ -84,15 +84,15 @@ def save_segment_images(segments, path):
                 print("Successfully created the directory %s " % path)
 
         for j in range(n_segments):
-            maximum = torch.max(segments[:, j, :, :])
-            minimum = torch.min(segments[:, j, :, :])
-            segments[:, j, :, :] = (segments[:, j, :, :] - minimum) / (maximum - minimum)
+            # maximum = torch.max(segments[:, j, :, :])
+            # minimum = torch.min(segments[:, j, :, :])
+            # segments[:, j, :, :] = (segments[:, j, :, :] - minimum) / (maximum - minimum)
 
             plt.imshow(segments[i, j])
             image_path = sample_dir + "/segment_{}.png".format(j)
             plt.savefig(image_path)
             sgm = max_images == j
-            plt.imshow(sgm.reshape(segments.shape[2],segments.shape[3]),'gray')
+            plt.imshow(sgm[i].reshape(segments.shape[2],segments.shape[3]),'gray')
             image_path = sample_dir + "/segment_argmax_{}.png".format(j)
             plt.savefig(image_path)
 
