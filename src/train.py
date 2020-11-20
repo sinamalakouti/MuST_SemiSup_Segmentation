@@ -208,7 +208,8 @@ def train_with_two_reconstruction(dataset):
     paddings = [1, 1, 1, 1, 1, 1, 1, 1, 1]
     strides = [1, 1, 1, 1, 1, 1, 1, 1, 1]
     separables = [False, True, True, True, True, True, True, True, False]
-    wnet = Wnet.Wnet(18, 4, inputs_dim, outputs_dim, strides=strides, paddings=paddings, kernels=kernels,
+    k = 2
+    wnet = Wnet.Wnet(18, 2, inputs_dim, outputs_dim, strides=strides, paddings=paddings, kernels=kernels,
                      separables=separables)
 
     if torch.cuda.is_available() and utils.Constants.USE_CUDA:
@@ -273,7 +274,7 @@ def train_with_two_reconstruction(dataset):
             intermediate_recon_loss.backward()
             optimizer.step()
             optimizer.zero_grad()
-
+    
             for p in wnet.linear_combination.parameters():
                 p.data.clamp_(0.01)
 
@@ -295,6 +296,6 @@ def train_with_two_reconstruction(dataset):
 
 
 if __name__ == '__main__':
-    #train_with_two_reconstruction(utils.Constants.Datasets.PittLocalFull)
+    train_with_two_reconstruction(utils.Constants.Datasets.PittLocalFull)
     # train_reconstruction(utils.Constants.Datasets.PittLocalFull)
-    test(utils.Constants.Datasets.PittLocalFull, '/Users/sinamalakouti/PycharmProjects/WMH_Unsupervised_Segmentation/models/model_epoch_0_.model')
+    #test(utils.Constants.Datasets.PittLocalFull, '/Users/sinamalakouti/PycharmProjects/WMH_Unsupervised_Segmentation/models/model_epoch_0_.model')
