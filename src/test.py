@@ -49,8 +49,7 @@ def test(dataset, model_path):
             X_out_final = wnet.conv2(X_in_final)
             utils.save_segment_images(segmentation.cpu(), "../test/segmentation")
             utils.save_images(x_test.cpu(), X_out_final.cpu(), "../test/reconstruction")
-
-
+            utils.save_label(y_true.reshape(wmh_segment.shape), "../test/labels")
 
 
 #

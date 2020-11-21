@@ -53,7 +53,7 @@ def get_testset(dataset) -> torch.utils.data.DataLoader:
                 [f'paths/fold-0/label_paths.txt'],
                 [f'paths/fold-0/mask_paths.txt'],
                 augment=False),
-            batch_size= batch_sz,
+            batch_size=batch_sz,
             drop_last=False,
             num_workers=0,
             shuffle=True,
@@ -92,7 +92,7 @@ def save_segment_images(segments, path):
             image_path = sample_dir + "/segment_{}.png".format(j)
             plt.savefig(image_path)
             sgm = max_images == j
-            plt.imshow(sgm[i].reshape(segments.shape[2],segments.shape[3]),'gray')
+            plt.imshow(sgm[i].reshape(segments.shape[2], segments.shape[3]), 'gray')
             image_path = sample_dir + "/segment_argmax_{}.png".format(j)
             plt.savefig(image_path)
 
@@ -108,3 +108,12 @@ def save_images(input_images, reconstructed_images, path):
         plt.savefig(recon_image_path)
         plt.imshow(input_image)
         plt.savefig(input_image_path)
+
+
+def save_label(y, path):
+    n_imags = y.shape[0]
+    for i in range(n_imags):
+        label_image = y[i, :]
+        label_image_path = path + "/label_image{}.png".format(i)
+        plt.imshow(label_image)
+        plt.savefig(label_image_path)
