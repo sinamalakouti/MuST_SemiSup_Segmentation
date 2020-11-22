@@ -287,13 +287,13 @@ def train_with_two_reconstruction(dataset):
 
             intermediate_loss = torch.nn.MSELoss().to(device)
             intermediate_recon_loss = intermediate_loss(intermediate_pred, b)
-            # intermediate_recon_loss.backward(retain_graph=True)
-            # optimizer.step()
-            # optimizer.zero_grad()
+            intermediate_recon_loss.backward()
+            optimizer.step()
+            optimizer.zero_grad()
 
             loss = torch.nn.MSELoss().to(device)
             recon_loss = loss(pred, b)
-            final_loss = recon_loss + intermediate_recon_loss
+            final_loss = recon_loss
             final_loss.backward()
             optimizer.step()
             optimizer.zero_grad()
