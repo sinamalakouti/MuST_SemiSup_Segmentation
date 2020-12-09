@@ -11,8 +11,7 @@ from torch.utils.data.dataloader import DataLoader
 from torch.utils.data import random_split
 from utils.reconstruction_loss import ReconstructionLoss
 
-
-from utils import  Constants
+from utils import Constants
 
 
 class Module(nn.Module):
@@ -58,7 +57,7 @@ class Module(nn.Module):
             )
 
     def forward(self, X):
-       # module = self.__build_module()
+        # module = self.__build_module()
         return self.net(X)
 
 
@@ -129,7 +128,7 @@ class Unet(nn.Module):
             w_diff = Xs[i].size()[3] - X_in.size()[3]
 
             if (h_diff != 0 or w_diff != 0):
-                X_in = F.pad(X_in, (0, w_diff, 0 ,h_diff ))
+                X_in = F.pad(X_in, (0, w_diff, 0, h_diff))
                 # print("shape shpae  ", X_in.shape)
             X_in = torch.cat([Xs[i], X_in], 1)
             X_out = modules(X_in)
@@ -154,7 +153,7 @@ class Wnet(nn.Module):
 
     def build(self):
         self.Uenc = Unet(self.n_modules // 2, self.dim_inputs, self.dim_outputs, self.strides, self.paddings,
-                       self.kernels, self.separables)
+                         self.kernels, self.separables)
         self.conv1 = nn.Conv2d(self.dim_outputs[-1], self.k, kernel_size=1)
         dec_dim_inputs = [0] * len(self.dim_inputs)
         dec_dim_inputs[0] = self.k
@@ -164,12 +163,20 @@ class Wnet(nn.Module):
         self.conv2 = nn.Conv2d(self.dim_outputs[-1], self.dim_inputs[0], kernel_size=1)
         self.softmax = nn.Softmax2d()
 
-    def forward(self, X):
+    def U_enc_fw(self, X):
         X_in_intermediate = self.Uenc(X)
         X_in_intermediate = self.conv1(X_in_intermediate)
         X_out_intermediate = self.softmax(X_in_intermediate)
-        X_in_final = self.Udec(X_out_intermediate)
+        return X_out_intermediate
+
+    def U_dec_fw(self, X):
+        X_in_final = self.Udec(X)
         X_out_final = self.conv2(X_in_final)
+        return X_out_final
+
+    def forward(self, X):
+        X_out_intermediate = self.U_enc_fw(X)
+        X_out_final = self.U_dec_fw(X_out_intermediate)
         return X_out_final
 
 
