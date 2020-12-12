@@ -239,7 +239,7 @@ def train_with_two_reconstruction(dataset):
                 print(path)
                 torch.save(wnet, f)
 
-        if iter % 10 == 0:
+        if iter % 2 == 0:
             with torch.no_grad():
                 wnet.eval()
 
@@ -264,7 +264,7 @@ def train_with_two_reconstruction(dataset):
                         os.mkdir(sample_dir)
                     except OSError:
                         print("Creation of the directory %s failed" % path)
-                    else:
+                else:
                        None
 
                 utils.save_segment_images(X_out_intermediate.cpu(),"../images/segmentation/iter_{}".format(iter))
@@ -424,10 +424,13 @@ def train_with_two_reconstruction_old(dataset):
     wnet.to(device)
     # linear_combination.to(device)
 
-    optimizer = torch.optim.Adam(wnet.parameters(), 0.001)
+    optimizer1 = torch.optim.Adam(wnet.parameters(), 0.001)
+    optimizer2 = torch.optim.Adam(wnet.parameters(), 0.001)
 
     test = torch.tensor(testset.dataset.data[0]['data']).reshape((1, 1, 212, 256))
-
+    minim = test.min()
+    maxim = test.max()
+    test = (test - minim) / (maxim - minim)
 
 
     for iter in range(utils.Constants.N_ITERATION):
@@ -463,7 +466,7 @@ def train_with_two_reconstruction_old(dataset):
                 plt.savefig("../images/segmentation/linear_comb_{}.png".format(iter))
 
                 wnet.train()
-
+        torch.autograd.set_detect_anomaly(True)
         for batch in trainset:
             b = batch['data']
             b = b.to(device)
@@ -473,9 +476,9 @@ def train_with_two_reconstruction_old(dataset):
             intermediate_loss = torch.nn.MSELoss().to(device)
             intermediate_pred = wnet.linear_combination(X_out_intermediate)
             intermediate_recon_loss = intermediate_loss(intermediate_pred, b)
-            intermediate_recon_loss.backward()
-            optimizer.step()
-            optimizer.zero_grad()
+            intermediate_recon_loss.backward(retain_graph=True)
+ #           optimizer1.step()
+#            optimizer1.zero_grad()
 
             for p in wnet.linear_combination.parameters():
                 p.data.clamp_(0.01)
@@ -488,8 +491,10 @@ def train_with_two_reconstruction_old(dataset):
             final_loss = recon_loss
 
             final_loss.backward()
-            optimizer.step()
-            optimizer.zero_grad()
+            optimizer1.step()
+            optimizer1.zero_grad()
+            optimizer2.step()
+            optimizer2.zero_grad()
             print(final_loss)
 
     return wnet
