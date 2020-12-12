@@ -209,7 +209,7 @@ class PittLocalFull(torch.utils.data.Dataset):
             x = self.data[index]['data']
             y = self.data[index]['label']
             m = self.data[index]['mask']  # mask no need to do intensity rescale
-            # x = rescale_intensity(x) #chg/
+            x = rescale_intensity(x) #chg/
             #            y = rescale_intensity(y) #chg
             if self.augment:
                 None

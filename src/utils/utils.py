@@ -43,7 +43,7 @@ def get_testset(dataset) -> torch.utils.data.DataLoader:
         mem_pin = True
     if dataset is Datasets.PittLocalFull:
         batch_sz = 20
-        train = torch.utils.data.DataLoader(
+        test = torch.utils.data.DataLoader(
             PittLocalFull(
                 1,
                 None,
@@ -60,7 +60,7 @@ def get_testset(dataset) -> torch.utils.data.DataLoader:
             pin_memory=mem_pin
         )
 
-        return train
+        return test
 
 
 def load_model(path) -> Wnet.Wnet:
