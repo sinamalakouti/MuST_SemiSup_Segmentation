@@ -3,15 +3,13 @@ import sys
 import os
 import torch
 from utils import utils
-from utils import reconstruction_loss
 
 import Wnet
 import matplotlib.pyplot as plt
 
 sys.path.append('src')
 sys.path.append('src/utils/Constants')
-sys.path.append('src/utils/reconstruction_loss')
-sys.path.append('src/utils')
+sys.path.append('srs/utils')
 
 for p in sys.path:
     print("path  ", p)
@@ -284,10 +282,16 @@ def train_with_two_reconstruction(dataset):
             X_in_final = wnet.Udec(X_out_intermediate)
             pred = wnet.conv2(X_in_final)
 
-            intermediate_recon_loss = reconstruction_loss.mse_power(intermediate_pred, b,3)
-            recon_loss = reconstruction_loss.mse_power(pred,b,3)
-            regularization_term = reconstruction_loss.regularization(X_out_intermediate)
-            final_loss = recon_loss + intermediate_recon_loss + regularization_term
+
+            intermediate_loss = torch.nn.MSELoss().to(device)
+            intermediate_recon_loss = intermediate_loss(intermediate_pred, b)
+            # intermediate_recon_loss.backward(retain_graph = True)
+            # optimizer.step()
+            # optimizer.zero_grad()
+
+            loss = torch.nn.MSELoss().to(device)
+            recon_loss = loss(pred, b)
+            final_loss = recon_loss + intermediate_recon_loss
             final_loss.backward()
             optimizer.step()
             optimizer.zero_grad()
@@ -327,8 +331,8 @@ def train_only_first_part(dataset):
     optimizer = torch.optim.Adam(wnet.parameters(), 0.001)
     intermediate_loss = torch.nn.MSELoss().to(device)
 
-    test = torch.tensor(testset.dataset.data[0]['data']).reshape((1, 1, 212, 256))
-
+    test0 = torch.tensor(testset.dataset.data[0]['data']).reshape((1, 1, 212, 256))
+    test1 = torch.tensor(trainset.dataset.data[0]['data']).reshape((1, 1, 212, 256))
 
 
     for iter in range(utils.Constants.N_ITERATION):
@@ -343,39 +347,45 @@ def train_only_first_part(dataset):
                 torch.save(wnet, f)
 
         if iter % 10 == 0:
-            with torch.no_grad():
-                wnet.eval()
+            for ii in range(2):
 
-                test.reshape((1, 1, 212, 256))
-                X_out_intermediate = wnet.U_enc_fw(test.to(device))
-                # p = p.reshape((test.shape[2], test.shape[3]))
-                # p = p.cpu()
-                # plt.imshow(p)
+                if ii ==0:
+                    test = test0
+                else:
+                    test = test1
 
-                # plt.savefig("../images/image_{}.png".format(iter))
-                plt.imshow(test.reshape((212, 256)))
-                plt.savefig("../images/image_{}_original.png".format(iter))
+                with torch.no_grad():
+                    wnet.eval()
 
-                # X_in_intermediate = wnet.Uenc(test.to(device))
-                # X_in_intermediate = wnet.conv1(X_in_intermediate)
-                # X_out_intermediate = wnet.softmax(X_in_intermediate)
+                    test.reshape((1, 1, 212, 256))
+                    X_out_intermediate = wnet.U_enc_fw(test.to(device))
+                    # p = p.reshape((test.shape[2], test.shape[3]))
+                    # p = p.cpu()
+                    # plt.imshow(p)
 
+                    # plt.savefig("../images/image_{}.png".format(iter))
+                    plt.imshow(test.reshape((212, 256)))
+                    plt.savefig("../images/image_{}_{}_original.png".format(ii,iter))
 
-                sample_dir = '../images/segmentation/iter_{}'.format(iter)
-                if not os.path.isdir(sample_dir):
-                    try:
-                        os.mkdir(sample_dir)
-                    except OSError:
-                        print("Creation of the directory %s failed" % path)
-                    else:
-                       None
+                    # X_in_intermediate = wnet.Uenc(test.to(device))
+                    # X_in_intermediate = wnet.conv1(X_in_intermediate)
+                    # X_out_intermediate = wnet.softmax(X_in_intermediate)
 
-                utils.save_segment_images(X_out_intermediate.cpu(),"../images/segmentation/iter_{}".format(iter))
-                intermediate_pred = wnet.linear_combination(X_out_intermediate)
-                plt.imshow(intermediate_pred.cpu().reshape((212, 256)))
-                plt.savefig("../images/segmentation/iter_{}/linear_comb_{}.png".format(iter,iter))
+                    sample_dir = '../images/segmentation/iter_{}_{}'.format(ii,iter)
+                    if not os.path.isdir(sample_dir):
+                        try:
+                            os.mkdir(sample_dir)
+                        except OSError:
+                            print("Creation of the directory %s failed" % path)
+                        else:
+                            None
 
-                wnet.train()
+                    utils.save_segment_images(X_out_intermediate.cpu(), "../images/segmentation/iter_{}".format(iter))
+                    intermediate_pred = wnet.linear_combination(X_out_intermediate)
+                    plt.imshow(intermediate_pred.cpu().reshape((212, 256)))
+                    plt.savefig("../images/segmentation/iter_{}/linear_comb_{}_{}.png".format(iter,ii, iter))
+
+                    wnet.train()
 
         for batch in trainset:
             b = batch['data']
@@ -497,6 +507,7 @@ def train_with_two_reconstruction_old(dataset):
 
 
 if __name__ == '__main__':
+    #None
     #train_with_two_reconstruction_old(utils.Constants.Datasets.PittLocalFull)
     # train_only_first_part(utils.Constants.Datasets.PittLocalFull)
     train_with_two_reconstruction(utils.Constants.Datasets.PittLocalFull)

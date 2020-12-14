@@ -4,17 +4,28 @@ def mse_power( x, y,power=3):
     return temp.mean()
 
 
-def regularization(segments,alpha=0.013):
+def regularizaton(segments,alpha=0.013):
+
+    n_subjects = segments.shape[0]
+    err = 0
+    for i in range(n_subjects):
+        item = segments[i]
+        err += __coss_sim_all_channels(item,alpha)
+    return err /n_subjects
+
+
+
+def __coss_sim_all_channels(segments,alpha=0.013):
     n_segments = segments.shape[1]
     n_subjects = segments.shape[0]
     cos_sim = torch.nn.CosineSimilarity()
     err = 0
     for i in range(n_segments):
-        in1 = segments[:,i,:,:].reshape(1,5*212*256)
+        in1 = segments[i,:,:].reshape(1,212*256)
         for j in range(n_segments):
             if i == j:
                 continue
-            in2 = segments[:, j, :, :].reshape(1, 5 * 212 * 256)
+            in2 = segments[j, :, :].reshape(1,  212 * 256)
             sim = cos_sim(in1,in2)
             err += sim
-    return alpha * err.mean()
+    return alpha * err /n_segments
