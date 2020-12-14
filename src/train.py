@@ -551,6 +551,7 @@ def train_with_fcm(dataset):
             b = b.to(device)
             prior = batch['wmh_cluster']
             prior = prior.to(device)
+            prior = prior.type(torch.DoubleTensor)
 
             X_in_intermediate = wnet.Uenc(b)
             X_in_intermediate = wnet.conv1(X_in_intermediate)
@@ -559,11 +560,15 @@ def train_with_fcm(dataset):
             intermediate_pred = wnet.linear_combination(X_out_intermediate)
             intermediate_recon_loss = intermediate_loss(intermediate_pred, b)
 
+
             X_in_final = wnet.Udec(X_out_intermediate)
             pred = wnet.conv2(X_in_final)
             loss = torch.nn.MSELoss().to(device)
             recon_loss = loss(pred, b)
-            final_loss = recon_loss + intermediate_recon_loss
+
+            regularization = reconstruction_loss.regularizaton(X_out_intermediate)
+            fcm_loss = reconstruction_loss.soft_dice_loss(prior, X_out_intermediate[:,1,:,:])
+            final_loss = recon_loss + intermediate_recon_loss + regularization + fcm_loss
 
             final_loss.backward()
             optimizer.step()
@@ -574,9 +579,9 @@ def train_with_fcm(dataset):
 
 if __name__ == '__main__':
     #None
-  #  train_with_fcm(utils.Constants.Datasets.PittLocalFull)
+    train_with_fcm(utils.Constants.Datasets.PittLocalFull)
     #train_with_two_reconstruction_old(utils.Constants.Datasets.PittLocalFull)
     # train_only_first_part(utils.Constants.Datasets.PittLocalFull)
-    train_with_two_reconstruction(utils.Constants.Datasets.PittLocalFull)
+    #train_with_two_reconstruction(utils.Constants.Datasets.PittLocalFull)
     #train_reconstruction(utils.Constants.Datasets.PittLocalFull)
     #test(utils.Constants.Datasets.PittLocalFull, '/Users/sinamalakouti/PycharmProjects/WMH_Unsupervised_Segmentation/models/model_epoch_0_.model')
