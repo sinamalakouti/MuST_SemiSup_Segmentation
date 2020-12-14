@@ -248,7 +248,6 @@ def train_with_two_reconstruction(dataset):
 
                     wnet.train()
 
-
         for batch in trainset:
             b = batch['data']
             b = b.to(device)
@@ -492,7 +491,8 @@ def train_with_fcm(dataset):
     paddings = [1, 1, 1, 1, 1, 1, 1, 1, 1]
     strides = [1, 1, 1, 1, 1, 1, 1, 1, 1]
     separables = [False, True, True, True, True, True, True, True, False]
-    wnet = Wnet.Wnet(18, 4, inputs_dim, outputs_dim, strides=strides, paddings=paddings, kernels=kernels,
+    k = 5
+    wnet = Wnet.Wnet(18, k, inputs_dim, outputs_dim, strides=strides, paddings=paddings, kernels=kernels,
                      separables=separables)
 
     if torch.cuda.is_available() and utils.Constants.USE_CUDA:
@@ -524,6 +524,7 @@ def train_with_fcm(dataset):
                 torch.save(wnet, f)
 
         if iter % 10 == 0:
+
             with torch.no_grad():
                 wnet.eval()
 
@@ -532,20 +533,33 @@ def train_with_fcm(dataset):
                 p = p.reshape((test.shape[2], test.shape[3]))
                 p = p.cpu()
                 plt.imshow(p)
-                plt.savefig("../images/image_{}.png".format(iter))
+
+                plt.savefig("../images/image_{}.png".format( iter))
                 plt.imshow(test.reshape((212, 256)))
-                plt.savefig("../images/image_{}_original.png".format(iter))
+                plt.savefig("../images/image_{}_original.png".format( iter))
 
                 X_in_intermediate = wnet.Uenc(test.to(device))
                 X_in_intermediate = wnet.conv1(X_in_intermediate)
                 X_out_intermediate = wnet.softmax(X_in_intermediate)
-                utils.save_segment_images(X_out_intermediate.cpu(), "../images/segmentation")
+
+                sample_dir = '../images/segmentation/iter_{}'.format(iter)
+                if not os.path.isdir(sample_dir):
+                    try:
+                        os.mkdir(sample_dir)
+                    except OSError:
+                        print("Creation of the directory %s failed" % path)
+                else:
+                    None
+
+                utils.save_segment_images(X_out_intermediate.cpu(),
+                                          "../images/segmentation/iter_{}".format( iter))
                 intermediate_pred = wnet.linear_combination(X_out_intermediate)
                 plt.imshow(intermediate_pred.cpu().reshape((212, 256)))
-                plt.savefig("../images/segmentation/linear_comb_{}.png".format(iter))
+                plt.savefig("../images/segmentation/iter_{}/linear_comb_{}.png".format(iter, iter))
 
                 wnet.train()
-       # torch.autograd.set_detect_anomaly(True)
+
+        # torch.autograd.set_detect_anomaly(True)
         for batch in trainset:
             b = batch['data']
             b = b.to(device)
@@ -567,6 +581,7 @@ def train_with_fcm(dataset):
             recon_loss = loss(pred, b)
 
             regularization = reconstruction_loss.regularizaton(X_out_intermediate)
+            X_out_intermediate = X_out_intermediate.to(device)
             fcm_loss = reconstruction_loss.soft_dice_loss(prior, X_out_intermediate[:,1,:,:])
             final_loss = recon_loss + intermediate_recon_loss + regularization + fcm_loss
 
