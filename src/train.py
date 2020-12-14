@@ -545,7 +545,7 @@ def train_with_fcm(dataset):
                 plt.savefig("../images/segmentation/linear_comb_{}.png".format(iter))
 
                 wnet.train()
-        torch.autograd.set_detect_anomaly(True)
+       # torch.autograd.set_detect_anomaly(True)
         for batch in trainset:
             b = batch['data']
             b = b.to(device)

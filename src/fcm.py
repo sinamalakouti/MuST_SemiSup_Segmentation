@@ -27,11 +27,11 @@ def fcm_WMH_segmentation(data, nclusters, csf_background_threshold, binwidth):
     csf_background = csf_background.reshape(data.shape)
     csf_background_mask = data[csf_background]
 
-    freq1, intensity1, _ = plt.hist(csf_background_mask,
+    freq1, intensity1 = np.histogram(csf_background_mask,
                                     bins=np.arange(csf_background_mask.min(), csf_background_mask.max() + binwidth,
                                                    binwidth))
     data = data.reshape(-1)
-    freq2, intensity2, _ = plt.hist(data,
+    freq2, intensity2 = np.histogram(data,
                                     bins=np.arange(data.min(), data.max() + binwidth, binwidth))
 
     n = len(freq1) - 1
