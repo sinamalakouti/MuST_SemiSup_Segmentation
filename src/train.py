@@ -262,7 +262,7 @@ def train_with_two_reconstruction(dataset):
 
             # intermediate_loss = torch.nn.MSELoss().to(device)
             # intermediate_recon_loss = intermediate_loss(intermediate_pred, b)
-            intermediate_recon_loss = reconstruction_loss.mse_power(b,intermediate_pred,3 )
+            intermediate_recon_loss = reconstruction_loss.mse_power(b,intermediate_pred,1 )
 
             # loss = torch.nn.MSELoss().to(device)
             # recon_loss = loss(pred, b)
