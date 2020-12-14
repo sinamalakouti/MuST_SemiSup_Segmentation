@@ -6,6 +6,7 @@ from utils import utils
 
 import Wnet
 import matplotlib.pyplot as plt
+from utils import reconstruction_loss
 
 sys.path.append('src')
 sys.path.append('src/utils/Constants')
@@ -202,8 +203,8 @@ def train_with_two_reconstruction(dataset):
                 print(path)
                 torch.save(wnet, f)
 
-        if iter % 100 == 0:
-            for ii in range(0,1):
+        if iter % 10 == 0:
+            for ii in range(0,2):
                 if ii == 0:
                     test = test0
                 else:
@@ -212,7 +213,7 @@ def train_with_two_reconstruction(dataset):
                 minim = test.min()
                 maxim = test.max()
                 test = (test - minim) / (maxim - minim)
-                
+
                 with torch.no_grad():
                     wnet.eval()
 
@@ -258,14 +259,13 @@ def train_with_two_reconstruction(dataset):
             pred = wnet.conv2(X_in_final)
 
 
-            intermediate_loss = torch.nn.MSELoss().to(device)
-            intermediate_recon_loss = intermediate_loss(intermediate_pred, b)
-            # intermediate_recon_loss.backward(retain_graph = True)
-            # optimizer.step()
-            # optimizer.zero_grad()
+            # intermediate_loss = torch.nn.MSELoss().to(device)
+            # intermediate_recon_loss = intermediate_loss(intermediate_pred, b)
+            intermediate_recon_loss = reconstruction_loss.mse_power(b,intermediate_pred,1)
 
-            loss = torch.nn.MSELoss().to(device)
-            recon_loss = loss(pred, b)
+            # loss = torch.nn.MSELoss().to(device)
+            # recon_loss = loss(pred, b)
+            recon_loss = reconstruction_loss.mse_power(b, pred, 1)
             final_loss = recon_loss + intermediate_recon_loss
             final_loss.backward()
             optimizer.step()
