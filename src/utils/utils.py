@@ -37,10 +37,7 @@ def get_trainset(dataset,intensity_rescale) -> torch.utils.data.DataLoader:
         )
     return train
 
-def dis_loss(pred,y):
-    loss = (pred **3 - b**3) **2
 
-    return loss.mean()
 def get_testset(dataset,intensity_rescale) -> torch.utils.data.DataLoader:
     mem_pin = False
     if Constants.USE_CUDA:
@@ -115,9 +112,10 @@ def save_images(input_images, reconstructed_images, path):
         plt.savefig(input_image_path)
 
 
+
+
 def save_label(y, path):
     n_imags = y.shape[0]
-
     for i in range(n_imags):
         label_image = y[i, :]
         label_image_path = path + "/label_image{}.png".format(i)
