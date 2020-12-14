@@ -3,12 +3,12 @@ from utils.dataloader import *
 import Wnet
 import matplotlib.pyplot as plt
 import os
-
+import torch
 
 # class Utils:
 #     def __init__(self, dataset):
 
-def get_trainset(dataset) -> torch.utils.data.DataLoader:
+def get_trainset(dataset,intensity_rescale) -> torch.utils.data.DataLoader:
     mem_pin = False
     if Constants.USE_CUDA:
         mem_pin = True
@@ -20,6 +20,7 @@ def get_trainset(dataset) -> torch.utils.data.DataLoader:
                 None,
                 None,
                 None,
+                intensity_rescale,
                 [f'paths/fold-1/data_paths_ws.txt',
                  f'paths/fold-2/data_paths_ws.txt', f'paths/fold-3/data_paths_ws.txt',
                  f'paths/fold-4/data_paths_ws.txt'],
@@ -36,8 +37,11 @@ def get_trainset(dataset) -> torch.utils.data.DataLoader:
         )
     return train
 
+def dis_loss(pred,y):
+    loss = (pred **3 - b**3) **2
 
-def get_testset(dataset) -> torch.utils.data.DataLoader:
+    return loss.mean()
+def get_testset(dataset,intensity_rescale) -> torch.utils.data.DataLoader:
     mem_pin = False
     if Constants.USE_CUDA:
         mem_pin = True
@@ -49,6 +53,7 @@ def get_testset(dataset) -> torch.utils.data.DataLoader:
                 None,
                 None,
                 None,
+                intensity_rescale,
                 [f'paths/fold-0/data_paths_ws.txt'],
                 [f'paths/fold-0/label_paths.txt'],
                 [f'paths/fold-0/mask_paths.txt'],
@@ -112,6 +117,7 @@ def save_images(input_images, reconstructed_images, path):
 
 def save_label(y, path):
     n_imags = y.shape[0]
+
     for i in range(n_imags):
         label_image = y[i, :]
         label_image_path = path + "/label_image{}.png".format(i)

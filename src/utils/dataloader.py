@@ -89,7 +89,7 @@ class DataLoader():
 
 class PittLocalFull(torch.utils.data.Dataset):
 
-    def __init__(self,ws, T1, mixup_threshold, intensity_aug, data_paths, label_paths, mask_paths,
+    def __init__(self,ws, T1, mixup_threshold, intensity_aug, intensity_rescale, data_paths, label_paths, mask_paths,
                  is_ncut = True, is_train =True, augment=False, data_paths_t1=None):
         super(PittLocalFull, self).__init__()
 
@@ -99,6 +99,7 @@ class PittLocalFull(torch.utils.data.Dataset):
         self.T1 = T1
         self.ws = ws
         self.intensity_aug = intensity_aug
+        self.intensity_rescale = intensity_rescale
         self.augment = augment
         self.mixup_threshold = mixup_threshold
         self.is_train = is_train
@@ -209,7 +210,8 @@ class PittLocalFull(torch.utils.data.Dataset):
             x = self.data[index]['data']
             y = self.data[index]['label']
             m = self.data[index]['mask']  # mask no need to do intensity rescale
-            x = rescale_intensity(x) #chg/
+            if self.intensity_rescale:
+                x = rescale_intensity(x) #chg/
             #            y = rescale_intensity(y) #chg
             if self.augment:
                 None

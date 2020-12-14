@@ -3,14 +3,15 @@ import sys
 import os
 import torch
 from utils import utils
-from utils.reconstruction_loss import ReconstructionLoss
+from utils import reconstruction_loss
 
 import Wnet
 import matplotlib.pyplot as plt
 
 sys.path.append('src')
 sys.path.append('src/utils/Constants')
-sys.path.append('srs/utils')
+sys.path.append('src/utils/reconstruction_loss')
+sys.path.append('src/utils')
 
 for p in sys.path:
     print("path  ", p)
@@ -78,7 +79,6 @@ def train_reconstruction(dataset):
     device = torch.device(dev)
     wnet.build()
     wnet.to(device)
-    Recon_loss = ReconstructionLoss()
     optimizer = torch.optim.Adam(wnet.parameters(), 0.001)
 
     test = torch.tensor(testset.dataset.data[0]['data']).reshape((1, 1, 212, 256))
@@ -198,8 +198,8 @@ def train_with_ncut(dataset):
     return wnet
 
 def train_with_two_reconstruction(dataset):
-    testset = utils.get_testset(dataset)
-    trainset = utils.get_trainset(dataset)
+    testset = utils.get_testset(dataset,True)
+    trainset = utils.get_trainset(dataset,True)
 
     # TODO: preprocessing?
     inputs_dim = [1, 64, 128, 256, 512, 1024, 512, 256, 128]
@@ -208,7 +208,7 @@ def train_with_two_reconstruction(dataset):
     paddings = [1, 1, 1, 1, 1, 1, 1, 1, 1]
     strides = [1, 1, 1, 1, 1, 1, 1, 1, 1]
     separables = [False, True, True, True, True, True, True, True, False]
-    k = 4
+    k = 5
     wnet = Wnet.Wnet(18, k, inputs_dim, outputs_dim, strides=strides, paddings=paddings, kernels=kernels,
                      separables=separables)
 
@@ -239,7 +239,7 @@ def train_with_two_reconstruction(dataset):
                 print(path)
                 torch.save(wnet, f)
 
-        if iter % 2 == 0:
+        if iter % 100 == 0:
             with torch.no_grad():
                 wnet.eval()
 
@@ -265,7 +265,7 @@ def train_with_two_reconstruction(dataset):
                     except OSError:
                         print("Creation of the directory %s failed" % path)
                 else:
-                       None
+                    None
 
                 utils.save_segment_images(X_out_intermediate.cpu(),"../images/segmentation/iter_{}".format(iter))
                 intermediate_pred = wnet.linear_combination(X_out_intermediate)
@@ -284,16 +284,10 @@ def train_with_two_reconstruction(dataset):
             X_in_final = wnet.Udec(X_out_intermediate)
             pred = wnet.conv2(X_in_final)
 
-
-            intermediate_loss = torch.nn.MSELoss().to(device)
-            intermediate_recon_loss = intermediate_loss(intermediate_pred, b)
-            intermediate_recon_loss.backward(retain_graph = True)
-            optimizer.step()
-            optimizer.zero_grad()
-
-            loss = torch.nn.MSELoss().to(device)
-            recon_loss = loss(pred, b)
-            final_loss = recon_loss
+            intermediate_recon_loss = reconstruction_loss.mse_power(intermediate_pred, b,3)
+            recon_loss = reconstruction_loss.mse_power(pred,b,3)
+            regularization_term = reconstruction_loss.regularization(X_out_intermediate)
+            final_loss = recon_loss + intermediate_recon_loss + regularization_term
             final_loss.backward()
             optimizer.step()
             optimizer.zero_grad()
@@ -401,8 +395,8 @@ def train_only_first_part(dataset):
     return wnet
 
 def train_with_two_reconstruction_old(dataset):
-    testset = utils.get_testset(dataset)
-    trainset = utils.get_trainset(dataset)
+    testset = utils.get_testset(dataset,False)
+    trainset = utils.get_trainset(dataset,False)
 
     # TODO: preprocessing?
     inputs_dim = [1, 64, 128, 256, 512, 1024, 512, 256, 128]
@@ -479,9 +473,10 @@ def train_with_two_reconstruction_old(dataset):
             intermediate_recon_loss.backward(retain_graph=True)
  #           optimizer1.step()
 #            optimizer1.zero_grad()
-
-            for p in wnet.linear_combination.parameters():
-                p.data.clamp_(0.01)
+            optimizer1.step()
+            optimizer1.zero_grad()
+           # for p in wnet.linear_combination.parameters():
+            #    p.data.clamp_(0.01)
 
 
             X_in_final = wnet.Udec(X_out_intermediate)
@@ -491,8 +486,6 @@ def train_with_two_reconstruction_old(dataset):
             final_loss = recon_loss
 
             final_loss.backward()
-            optimizer1.step()
-            optimizer1.zero_grad()
             optimizer2.step()
             optimizer2.zero_grad()
             print(final_loss)
@@ -504,8 +497,8 @@ def train_with_two_reconstruction_old(dataset):
 
 
 if __name__ == '__main__':
-    train_with_two_reconstruction_old(utils.Constants.Datasets.PittLocalFull)
+    #train_with_two_reconstruction_old(utils.Constants.Datasets.PittLocalFull)
     # train_only_first_part(utils.Constants.Datasets.PittLocalFull)
-    # train_with_two_reconstruction(utils.Constants.Datasets.PittLocalFull)
-    # train_reconstruction(utils.Constants.Datasets.PittLocalFull)
+    train_with_two_reconstruction(utils.Constants.Datasets.PittLocalFull)
+    #train_reconstruction(utils.Constants.Datasets.PittLocalFull)
     #test(utils.Constants.Datasets.PittLocalFull, '/Users/sinamalakouti/PycharmProjects/WMH_Unsupervised_Segmentation/models/model_epoch_0_.model')

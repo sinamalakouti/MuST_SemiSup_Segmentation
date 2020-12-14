@@ -1,8 +1,6 @@
 import torch
-import numpy as np
-import Wnet
 from utils import utils
-from  utils.evaluation_metrics import dice_coef
+
 
 def test(dataset, model_path):
     testset = utils.get_testset(dataset)
