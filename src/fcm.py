@@ -14,6 +14,7 @@ sys.path.append('srs/utils')
 def fcm_WMH_segmentation(data, nclusters, csf_background_threshold, binwidth):
     if type(data) == torch.Tensor:
         data = data.numpy()
+
     shape = data.shape
     data = data.reshape(-1)
     data = data.reshape(1, len(data))
@@ -54,6 +55,7 @@ def removing_hyper_intense():
 
 
 if __name__ == '__main__':
+    utils.Constants.FCM = True
     dataset = utils.Constants.Datasets.PittLocalFull
     trainset = utils.get_trainset(dataset, False)
     for i in range(0,10):

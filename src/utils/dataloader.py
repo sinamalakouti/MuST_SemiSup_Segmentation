@@ -9,7 +9,7 @@ import numpy as np
 from utils import soft_n_cut_loss
 from utils import Constants
 from utils.soft_n_cut_loss import *
-
+import fcm
 
 class DataLoader():
     # initialization
@@ -90,7 +90,7 @@ class DataLoader():
 class PittLocalFull(torch.utils.data.Dataset):
 
     def __init__(self,ws, T1, mixup_threshold, intensity_aug, intensity_rescale, data_paths, label_paths, mask_paths,
-                 is_ncut = True, is_train =True, augment=False, data_paths_t1=None):
+                 is_ncut = False, is_FCM = False,  is_train =True, augment=False, data_paths_t1=None):
         super(PittLocalFull, self).__init__()
 
         # NOTE: if dataloader does not shuffle
@@ -105,6 +105,7 @@ class PittLocalFull(torch.utils.data.Dataset):
         self.is_train = is_train
         self.weights = {}
         self.is_ncut = is_ncut
+        self.is_FCM = is_FCM
         if self.T1 is not None:
             self.order = [f.strip().split('/')[-1].strip('_FL_preproc.nii.gz')  # change strip later if other exp
                           for p in data_paths for f in open(p) for _ in range(5)]
@@ -210,15 +211,21 @@ class PittLocalFull(torch.utils.data.Dataset):
             x = self.data[index]['data']
             y = self.data[index]['label']
             m = self.data[index]['mask']  # mask no need to do intensity rescale
-            if self.intensity_rescale:
-                x = rescale_intensity(x) #chg/
-            #            y = rescale_intensity(y) #chg
+
             if self.augment:
                 None
                 # x, y, m = augment(
                 #     x=x, y=y, m=m, intensity_aug=self.intensity_aug)
             else:
                 x, y, m = tensorize(x, y, m)
+
+            WMH_cluster = None
+            if self.is_FCM:
+                WMH_cluster = fcm.fcm_WMH_segmentation(x[0],2,0.05,1)
+            if self.intensity_rescale:
+                x = rescale_intensity(x) #chg/
+            #            y = rescale_intensity(y) #chg
+
             # if self.is_train and self.is_ncut:
             #     if index not in self.weights:
             #
@@ -228,7 +235,7 @@ class PittLocalFull(torch.utils.data.Dataset):
 
 
             return {'data': x, 'label': y, 'mask': m.bool(),
-                    'subject': self.order[index]}
+                    'subject': self.order[index],'wmh_cluster': WMH_cluster}
 
 
 def tensorize(*args):
@@ -236,6 +243,6 @@ def tensorize(*args):
 
 
 def rescale_intensity(x):
-    maximum = np.max(x)
-    minimum = np.min(x)
+    maximum = x.max()
+    minimum = x.min()
     return (x - minimum) / (maximum - minimum)

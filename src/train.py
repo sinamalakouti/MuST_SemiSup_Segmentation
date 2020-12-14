@@ -261,12 +261,13 @@ def train_with_two_reconstruction(dataset):
 
             # intermediate_loss = torch.nn.MSELoss().to(device)
             # intermediate_recon_loss = intermediate_loss(intermediate_pred, b)
-            intermediate_recon_loss = reconstruction_loss.mse_power(b,intermediate_pred,1)
+            intermediate_recon_loss = reconstruction_loss.mse_power(b,intermediate_pred,3 )
 
             # loss = torch.nn.MSELoss().to(device)
             # recon_loss = loss(pred, b)
             recon_loss = reconstruction_loss.mse_power(b, pred, 1)
-            final_loss = recon_loss + intermediate_recon_loss
+            regularization = reconstruction_loss.regularizaton(X_out_intermediate)
+            final_loss = recon_loss + intermediate_recon_loss + regularization
             final_loss.backward()
             optimizer.step()
             optimizer.zero_grad()
@@ -479,8 +480,9 @@ def train_with_two_reconstruction_old(dataset):
 
 
 def train_with_fcm(dataset):
-    testset = utils.get_testset(dataset, False)
-    trainset = utils.get_trainset(dataset, False)
+    utils.Constants.FCM = True
+    testset = utils.get_testset(dataset, True)
+    trainset = utils.get_trainset(dataset, True)
 
     # TODO: preprocessing?
     inputs_dim = [1, 64, 128, 256, 512, 1024, 512, 256, 128]
@@ -546,6 +548,9 @@ def train_with_fcm(dataset):
         for batch in trainset:
             b = batch['data']
             b = b.to(device)
+            prior = batch['wmh_cluster']
+            prior = prior.to(device)
+
             X_in_intermediate = wnet.Uenc(b)
             X_in_intermediate = wnet.conv1(X_in_intermediate)
             X_out_intermediate = wnet.softmax(X_in_intermediate)
@@ -568,6 +573,7 @@ def train_with_fcm(dataset):
 
 if __name__ == '__main__':
     #None
+  #  train_with_fcm(utils.Constants.Datasets.PittLocalFull)
     #train_with_two_reconstruction_old(utils.Constants.Datasets.PittLocalFull)
     # train_only_first_part(utils.Constants.Datasets.PittLocalFull)
     train_with_two_reconstruction(utils.Constants.Datasets.PittLocalFull)

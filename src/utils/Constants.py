@@ -9,6 +9,7 @@ DROP_OUT_ENABLE = True
 N_ITERATION = 100
 USE_CUDA = False
 SHUFFLE = False
+FCM=False
 
 
 # class Constants:

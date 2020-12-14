@@ -28,7 +28,9 @@ def get_trainset(dataset,intensity_rescale) -> torch.utils.data.DataLoader:
                  f'paths/fold-3/label_paths.txt', f'paths/fold-4/label_paths.txt'],
                 [f'paths/fold-1/mask_paths.txt', f'paths/fold-2/mask_paths.txt',
                  f'paths/fold-3/mask_paths.txt', f'paths/fold-4/mask_paths.txt'],
-                augment=False),
+                augment=False,
+                is_FCM=Constants.FCM
+            ),
             batch_size=batch_sz,
             drop_last=True,
             num_workers=0,
@@ -54,7 +56,9 @@ def get_testset(dataset,intensity_rescale) -> torch.utils.data.DataLoader:
                 [f'paths/fold-0/data_paths_ws.txt'],
                 [f'paths/fold-0/label_paths.txt'],
                 [f'paths/fold-0/mask_paths.txt'],
-                augment=False),
+                augment=False,
+                is_FCM=Constants.FCM
+            ),
             batch_size=batch_sz,
             drop_last=False,
             num_workers=0,
