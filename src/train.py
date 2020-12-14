@@ -582,6 +582,7 @@ def train_with_fcm(dataset):
 
             regularization = reconstruction_loss.regularizaton(X_out_intermediate)
             X_out_intermediate = X_out_intermediate.to(device)
+            prior = prior.to(device)
             fcm_loss = reconstruction_loss.soft_dice_loss(prior, X_out_intermediate[:,1,:,:])
             final_loss = recon_loss + intermediate_recon_loss + regularization + fcm_loss
 
