@@ -64,7 +64,7 @@ if __name__ == '__main__':
             b = batch['data']
             j +=1
             # for e in b:
-            #     print("here")
+            #     pri   nt("here")
             #     example = e[0].numpy()
             #     # plt.imshow(example)
             #     # plt.show()

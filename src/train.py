@@ -241,7 +241,7 @@ def train_with_two_reconstruction(dataset):
                     else:
                         None
 
-                    utils.save_segment_images(X_out_intermediate.cpu(), "../images/segmentation/iter_ii{}_{}".format(ii,iter))
+                    utils.save_segment_images(X_out_intermediate.cpu(), "WMH_clusterWMH_clusterWMH_cluster".format(ii,iter))
                     intermediate_pred = wnet.linear_combination(X_out_intermediate)
                     plt.imshow(intermediate_pred.cpu().reshape((212, 256)))
                     plt.savefig("../images/segmentation/iter_ii{}_{}/linear_comb_{}.png".format(ii,iter, iter))
@@ -589,6 +589,8 @@ def train_with_fcm(dataset):
             final_loss.backward()
             optimizer.step()
             optimizer.zero_grad()
+            for p in wnet.linear_combination.parameters():
+                p.data.clamp_(0.01)
             print(final_loss)
 
     return wnet

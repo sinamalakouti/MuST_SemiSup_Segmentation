@@ -10,6 +10,7 @@ from utils import soft_n_cut_loss
 from utils import Constants
 from utils.soft_n_cut_loss import *
 import fcm
+from utils import utils
 
 class DataLoader():
     # initialization
@@ -19,6 +20,7 @@ class DataLoader():
         # image container
         self.raw_data = []
         self.mode = mode
+
         # navigate to the image directory
         # images_path = os.path.join(datapath,'images')
         train_image_path = os.path.join(datapath, mode)
@@ -106,6 +108,7 @@ class PittLocalFull(torch.utils.data.Dataset):
         self.weights = {}
         self.is_ncut = is_ncut
         self.is_FCM = is_FCM
+        # self.iter = 0
         if self.T1 is not None:
             self.order = [f.strip().split('/')[-1].strip('_FL_preproc.nii.gz')  # change strip later if other exp
                           for p in data_paths for f in open(p) for _ in range(5)]
@@ -221,7 +224,18 @@ class PittLocalFull(torch.utils.data.Dataset):
 
             WMH_cluster = None
             if self.is_FCM:
-                WMH_cluster = fcm.fcm_WMH_segmentation(x[0],2,0.05,1)
+                import matplotlib.pyplot as plt
+                WMH_cluster = fcm.fcm_WMH_segmentation(x[0],2,0.03,1)
+                # plt.imshow(WMH_cluster, 'gray')
+                # image_path =  "../images/wmh_{}.png".format(self.iter)
+                # plt.savefig(image_path)
+                #
+                # plt.imshow(y.reshape(212,256), 'gray')
+                # image_path = "../images/label_{}.png".format(self.iter)
+                # plt.savefig(image_path)
+
+                # self.iter += 1
+
             if self.intensity_rescale:
                 x = rescale_intensity(x) #chg/
             #            y = rescale_intensity(y) #chg
