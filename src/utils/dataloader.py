@@ -233,9 +233,11 @@ class PittLocalFull(torch.utils.data.Dataset):
             #         c = x.shape[2]
             #         self.weights[index] = compute_weigths(x.flatten(),r,c)
 
-
+            if self.is_FCM:
+                return {'data': x, 'label': y, 'mask': m.bool(),
+                        'subject': self.order[index],'wmh_cluster': WMH_cluster}
             return {'data': x, 'label': y, 'mask': m.bool(),
-                    'subject': self.order[index],'wmh_cluster': WMH_cluster}
+                    'subject': self.order[index]}
 
 
 def tensorize(*args):

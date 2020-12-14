@@ -16,8 +16,8 @@ def regularizaton(segments,alpha=0.013):
 
 
 def __coss_sim_all_channels(segments,alpha=0.013):
-    n_segments = segments.shape[1]
-    n_subjects = segments.shape[0]
+    n_segments = segments.shape[0]
+
     cos_sim = torch.nn.CosineSimilarity()
     err = 0
     for i in range(n_segments):

@@ -162,6 +162,7 @@ def train_with_ncut(dataset):
     return wnet
 
 def train_with_two_reconstruction(dataset):
+    utils.Constants.FCM = False
     testset = utils.get_testset(dataset,True)
     trainset = utils.get_trainset(dataset,True)
 
