@@ -35,8 +35,10 @@ def fcm_WMH_segmentation(data, nclusters, csf_background_threshold, binwidth):
                                     bins=np.arange(data.min(), data.max() + binwidth, binwidth))
 
     n = len(freq1) - 1
-
     while (freq1[n] == freq2[n]):
+        if n <=0:
+            print("************shooot shooot negative n     \n", n)
+
         n -= 1
     intensity_threshold = intensity1[n]
 

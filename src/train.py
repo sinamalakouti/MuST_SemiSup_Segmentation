@@ -323,7 +323,7 @@ def train_only_first_part(dataset):
                 torch.save(wnet, f)
 
         if iter % 10 == 0:
-            for ii in range(2):
+            for ii in range(1):
 
                 if ii ==0:
                     test = test0
@@ -368,14 +368,14 @@ def train_only_first_part(dataset):
             b = b.to(device)
             X_out_intermediate = wnet.U_enc_fw(b)
             intermediate_pred = wnet.linear_combination(X_out_intermediate)
-
-            intermediate_recon_loss = intermediate_loss(intermediate_pred, b)
+            regularization = reconstruction_loss.regularizaton(X_out_intermediate)
+            intermediate_recon_loss = intermediate_loss(intermediate_pred, b)  + regularization
             intermediate_recon_loss.backward()
             optimizer.step()
             optimizer.zero_grad()
             #
             for p in wnet.linear_combination.parameters():
-                p.data.clamp_(0.01)
+                p.data.clamp_(0.0)
             print(intermediate_recon_loss)
 
     return wnet
@@ -599,7 +599,7 @@ if __name__ == '__main__':
     #None
     train_with_fcm(utils.Constants.Datasets.PittLocalFull)
     #train_with_two_reconstruction_old(utils.Constants.Datasets.PittLocalFull)
-    # train_only_first_part(utils.Constants.Datasets.PittLocalFull)
+    train_only_first_part(utils.Constants.Datasets.PittLocalFull)
     #train_with_two_reconstruction(utils.Constants.Datasets.PittLocalFull)
     #train_reconstruction(utils.Constants.Datasets.PittLocalFull)
     #test(utils.Constants.Datasets.PittLocalFull, '/Users/sinamalakouti/PycharmProjects/WMH_Unsupervised_Segmentation/models/model_epoch_0_.model')
