@@ -366,9 +366,10 @@ def train_only_first_part(dataset):
         for batch in trainset:
             b = batch['data']
             b = b.to(device)
-
+            brain = batch['mask']
+            brain = brain.to(device)
             X_out_intermediate = wnet.U_enc_fw(b)
-            X_out_intermediate = torch.mul(X_out_intermediate,batch['mask'])
+            X_out_intermediate = torch.mul(X_out_intermediate,brain)
             X_out_intermediate = X_out_intermediate.type(torch.float)
             intermediate_pred = wnet.linear_combination(X_out_intermediate)
             regularization = reconstruction_loss.regularizaton(X_out_intermediate)
