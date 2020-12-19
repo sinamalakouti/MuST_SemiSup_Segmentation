@@ -280,8 +280,8 @@ def train_with_two_reconstruction(dataset):
 
 
 def train_only_first_part(dataset):
-    testset = utils.get_testset(dataset)
-    trainset = utils.get_trainset(dataset)
+    testset = utils.get_testset(dataset,True)
+    trainset = utils.get_trainset(dataset, True)
 
     # TODO: preprocessing?
     inputs_dim = [1, 64, 128, 256, 512, 1024, 512, 256, 128]
@@ -356,10 +356,10 @@ def train_only_first_part(dataset):
                         else:
                             None
 
-                    utils.save_segment_images(X_out_intermediate.cpu(), "../images/segmentation/iter_{}".format(iter))
+                    utils.save_segment_images(X_out_intermediate.cpu(), "../images/segmentation/iter_{}_{}".format(ii,iter))
                     intermediate_pred = wnet.linear_combination(X_out_intermediate)
                     plt.imshow(intermediate_pred.cpu().reshape((212, 256)))
-                    plt.savefig("../images/segmentation/iter_{}/linear_comb_{}_{}.png".format(iter,ii, iter))
+                    plt.savefig("../images/segmentation/iter_iter_{}/linear_comb_{}_{}.png".format(ii, iter,ii, iter))
 
                     wnet.train()
 
