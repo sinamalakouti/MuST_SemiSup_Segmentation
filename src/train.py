@@ -359,17 +359,20 @@ def train_only_first_part(dataset):
                     utils.save_segment_images(X_out_intermediate.cpu(), "../images/segmentation/iter_{}_{}".format(ii,iter))
                     intermediate_pred = wnet.linear_combination(X_out_intermediate)
                     plt.imshow(intermediate_pred.cpu().reshape((212, 256)))
-                    plt.savefig("../images/segmentation/iter_iter_{}/linear_comb_{}_{}.png".format(ii, iter,ii, iter))
+                    plt.savefig("../images/segmentation/iter_{}_{}/linear_comb_{}_{}.png".format(ii, iter,ii, iter))
 
                     wnet.train()
 
         for batch in trainset:
             b = batch['data']
             b = b.to(device)
+
             X_out_intermediate = wnet.U_enc_fw(b)
+            X_out_intermediate = torch.mul(X_out_intermediate,batch['mask'])
+            X_out_intermediate = X_out_intermediate.type(torch.float)
             intermediate_pred = wnet.linear_combination(X_out_intermediate)
             regularization = reconstruction_loss.regularizaton(X_out_intermediate)
-            intermediate_recon_loss = intermediate_loss(intermediate_pred, b)  + regularization
+            intermediate_recon_loss = intermediate_loss(intermediate_pred, b) + regularization
             intermediate_recon_loss.backward()
             optimizer.step()
             optimizer.zero_grad()
@@ -597,7 +600,7 @@ def train_with_fcm(dataset):
 
 if __name__ == '__main__':
     #None
-    train_with_fcm(utils.Constants.Datasets.PittLocalFull)
+    #train_with_fcm(utils.Constants.Datasets.PittLocalFull)
     #train_with_two_reconstruction_old(utils.Constants.Datasets.PittLocalFull)
     train_only_first_part(utils.Constants.Datasets.PittLocalFull)
     #train_with_two_reconstruction(utils.Constants.Datasets.PittLocalFull)
