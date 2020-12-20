@@ -203,6 +203,9 @@ class PittLocalFull(torch.utils.data.Dataset):
                 # print(self.intensity_aug)
 
             else:
+                if self.intensity_rescale:
+                    output_arr[0] = rescale_intensity(output_arr[0])  # chg/
+                    output_arr[1] = rescale_intensity(output_arr[1])
                 x_final = np.concatenate(output_arr[0:2], axis=0)
             # print(self.mixup_threshold)
             # print("mixup is none")
@@ -261,4 +264,4 @@ def tensorize(*args):
 def rescale_intensity(x):
     maximum = x.max()
     minimum = x.min()
-    return (x - minimum) / (maximum - minimum)
+    return (x - minimum + 0.01) / (maximum - minimum + 0.01)

@@ -280,11 +280,12 @@ def train_with_two_reconstruction(dataset):
 
 
 def train_only_first_part(dataset):
-    testset = utils.get_testset(dataset,True)
+
     trainset = utils.get_trainset(dataset, True)
+    testset = utils.get_testset(dataset, True)
 
     # TODO: preprocessing?
-    inputs_dim = [1, 64, 128, 256, 512, 1024, 512, 256, 128]
+    inputs_dim = [2, 64, 128, 256, 512, 1024, 512, 256, 128]
     outputs_dim = [64, 128, 256, 512, 1024, 512, 256, 128, 64]
     kernels = [3, 3, 3, 3, 3, 3, 3, 3, 3]
     paddings = [1, 1, 1, 1, 1, 1, 1, 1, 1]
@@ -307,8 +308,11 @@ def train_only_first_part(dataset):
     optimizer = torch.optim.Adam(wnet.parameters(), 0.001)
     intermediate_loss = torch.nn.MSELoss().to(device)
 
-    test0 = torch.tensor(testset.dataset.data[0]['data']).reshape((1, 1, 212, 256))
-    test1 = torch.tensor(trainset.dataset.data[0]['data']).reshape((1, 1, 212, 256))
+    test_instance = torch.cat([torch.tensor(testset.dataset.data[1]['data']),torch.tensor(testset.dataset.data[1]['data_t1'])])
+    train_instance = torch.cat([torch.tensor(trainset.dataset.data[0]['data']),torch.tensor(trainset.dataset.data[0]['data_t1'])])
+
+    test0 = test_instance.reshape((1, 2, 212, 256))
+    test1 = train_instance.reshape((1, 2, 212, 256))
 
 
     for iter in range(utils.Constants.N_ITERATION):
@@ -330,24 +334,31 @@ def train_only_first_part(dataset):
                 else:
                     test = test1
 
+                minim = test.min()
+                maxim = test.max()
+                test = (test - minim) / (maxim - minim)
+
+
                 with torch.no_grad():
                     wnet.eval()
 
-                    test.reshape((1, 1, 212, 256))
+                    test.reshape((1, 2, 212, 256))
                     X_out_intermediate = wnet.U_enc_fw(test.to(device))
                     # p = p.reshape((test.shape[2], test.shape[3]))
                     # p = p.cpu()
                     # plt.imshow(p)
 
                     # plt.savefig("../images/image_{}.png".format(iter))
-                    plt.imshow(test.reshape((212, 256)))
-                    plt.savefig("../images/image_{}_{}_original.png".format(ii,iter))
+                    plt.imshow(test[0,0].reshape((212, 256)),'gray' )
+                    plt.savefig("../images/image_{}_{}_original.png".format(0,iter))
+                    plt.imshow(test[0, 1].reshape((212, 256)),'gray')
+                    plt.savefig("../images/image_{}_{}_original.png".format(1, iter))
 
                     # X_in_intermediate = wnet.Uenc(test.to(device))
                     # X_in_intermediate = wnet.conv1(X_in_intermediate)
                     # X_out_intermediate = wnet.softmax(X_in_intermediate)
 
-                    sample_dir = '../images/segmentation/iter_{}_{}'.format(ii,iter)
+                    sample_dir = '../images/segmentation/iter_{}_{}'.format(0,iter)
                     if not os.path.isdir(sample_dir):
                         try:
                             os.mkdir(sample_dir)
@@ -356,19 +367,37 @@ def train_only_first_part(dataset):
                         else:
                             None
 
-                    utils.save_segment_images(X_out_intermediate.cpu(), "../images/segmentation/iter_{}_{}".format(ii,iter))
+                    sample_dir = '../images/segmentation/iter_{}_{}'.format(1, iter)
+                    if not os.path.isdir(sample_dir):
+                        try:
+                            os.mkdir(sample_dir)
+                        except OSError:
+                            print("Creation of the directory %s failed" % path)
+                        else:
+                            None
+
+                    utils.save_segment_images(X_out_intermediate.cpu(), "../images/segmentation/iter_{}_{}".format(0,iter))
                     intermediate_pred = wnet.linear_combination(X_out_intermediate)
-                    plt.imshow(intermediate_pred.cpu().reshape((212, 256)))
+                    plt.imshow(intermediate_pred[0,0].cpu().reshape((212, 256)))
                     plt.savefig("../images/segmentation/iter_{}_{}/linear_comb_{}_{}.png".format(ii, iter,ii, iter))
+                    intermediate_pred = wnet.linear_combination(X_out_intermediate)
+                    plt.imshow(intermediate_pred[0,1].cpu().reshape((212, 256)))
+                    plt.savefig("../images/segmentation/iter_{}_{}/linear_comb_{}_{}.png".format(ii, iter,1, iter))
 
                     wnet.train()
 
         for batch in trainset:
-            b = batch['data']
-            b = b.to(device)
+            f_b = batch['data']
+            b = f_b.to(device)
+            # t1_b = batch['data_t1']
+            # t1_b = t1_b.to(device)
+            # b = torch.cat([f_b,t1_b],axis = 1)
+
+
             brain = batch['mask']
             brain = brain.to(device)
             X_out_intermediate = wnet.U_enc_fw(b)
+
             X_out_intermediate = torch.mul(X_out_intermediate,brain)
             X_out_intermediate = X_out_intermediate.type(torch.float)
             intermediate_pred = wnet.linear_combination(X_out_intermediate)
