@@ -17,7 +17,7 @@ def get_trainset(dataset,intensity_rescale) -> torch.utils.data.DataLoader:
         train = torch.utils.data.DataLoader(
             PittLocalFull(
                 1,
-                1,
+                None,
                 None,
                 None,
                 intensity_rescale,
@@ -52,7 +52,7 @@ def get_testset(dataset,intensity_rescale) -> torch.utils.data.DataLoader:
         test = torch.utils.data.DataLoader(
             PittLocalFull(
                 1,
-                1,
+                None,
                 None,
                 None,
                 intensity_rescale,

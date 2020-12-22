@@ -286,7 +286,7 @@ def train_only_first_part(dataset):
     testset = utils.get_testset(dataset, True)
 
     # TODO: preprocessing?
-    inputs_dim = [2, 64, 128, 256, 512, 1024, 512, 256, 128]
+    inputs_dim = [1, 64, 128, 256, 512, 1024, 512, 256, 128]
     outputs_dim = [64, 128, 256, 512, 1024, 512, 256, 128, 64]
     kernels = [3, 3, 3, 3, 3, 3, 3, 3, 3]
     paddings = [1, 1, 1, 1, 1, 1, 1, 1, 1]
@@ -309,11 +309,12 @@ def train_only_first_part(dataset):
     optimizer = torch.optim.Adam(wnet.parameters(), 0.001)
     intermediate_loss = torch.nn.MSELoss().to(device)
 
-    test_instance = torch.cat([torch.tensor(testset.dataset.data[1]['data']),torch.tensor(testset.dataset.data[1]['data_t1'])])
-    train_instance = torch.cat([torch.tensor(trainset.dataset.data[0]['data']),torch.tensor(trainset.dataset.data[0]['data_t1'])])
-
-    test0 = test_instance.reshape((1, 2, 212, 256))
-    test1 = train_instance.reshape((1, 2, 212, 256))
+    # test_instance = torch.cat([torch.tensor(testset.dataset.data[1]['data']),torch.tensor(testset.dataset.data[1]['data_t1'])])
+    # train_instance = torch.cat([torch.tensor(trainset.dataset.data[0]['data']),torch.tensor(trainset.dataset.data[0]['data_t1'])])
+    test_instance =  torch.tensor(testset.dataset.data[0]['data'])
+    train_instance = torch.tensor(testset.dataset.data[0]['data'])
+    test0 = test_instance.reshape((1, 1, 212, 256))
+    test1 = train_instance.reshape((1, 1, 212, 256))
 
 
     for iter in range(utils.Constants.N_ITERATION):
@@ -343,7 +344,7 @@ def train_only_first_part(dataset):
                 with torch.no_grad():
                     wnet.eval()
 
-                    test.reshape((1, 2, 212, 256))
+                    test.reshape((1, 1, 212, 256))
                     X_out_intermediate = wnet.U_enc_fw(test.to(device))
                     # p = p.reshape((test.shape[2], test.shape[3]))
                     # p = p.cpu()
@@ -352,8 +353,8 @@ def train_only_first_part(dataset):
                     # plt.savefig("../images/image_{}.png".format(iter))
                     plt.imshow(test[0,0].reshape((212, 256)),'gray' )
                     plt.savefig("../images/image_{}_{}_original.png".format(0,iter))
-                    plt.imshow(test[0, 1].reshape((212, 256)),'gray')
-                    plt.savefig("../images/image_{}_{}_original.png".format(1, iter))
+                    # plt.imshow(test[0, 1].reshape((212, 256)),'gray')
+                    # plt.savefig("../images/image_{}_{}_original.png".format(1, iter))
 
                     # X_in_intermediate = wnet.Uenc(test.to(device))
                     # X_in_intermediate = wnet.conv1(X_in_intermediate)
@@ -382,8 +383,8 @@ def train_only_first_part(dataset):
                     plt.imshow(intermediate_pred[0,0].cpu().reshape((212, 256)))
                     plt.savefig("../images/segmentation/iter_{}_{}/linear_comb_{}_{}.png".format(ii, iter,ii, iter))
                     intermediate_pred = wnet.linear_combination(X_out_intermediate)
-                    plt.imshow(intermediate_pred[0,1].cpu().reshape((212, 256)))
-                    plt.savefig("../images/segmentation/iter_{}_{}/linear_comb_{}_{}.png".format(ii, iter,1, iter))
+                    # plt.imshow(intermediate_pred[0,1].cpu().reshape((212, 256)))
+                    # plt.savefig("../images/segmentation/iter_{}_{}/linear_comb_{}_{}.png".format(ii, iter,1, iter))
 
                     wnet.train()
 
