@@ -22,11 +22,12 @@ utils.Constants.N_ITERATION = 20000
 
 def train_reconstruction(dataset):
     # read data
-    trainset = utils.get_trainset(dataset)
-    testset = utils.get_testset(dataset)
+    trainset = utils.get_trainset(dataset,False)
+    testset = utils.get_testset(dataset,False)
 
     # TODO: preprocessing?
     inputs_dim = [1, 64, 128, 256, 512, 1024, 512, 256, 128]
+
     outputs_dim = [64, 128, 256, 512, 1024, 512, 256, 128, 64]
     kernels = [3, 3, 3, 3, 3, 3, 3, 3, 3]
     paddings = [1, 1, 1, 1, 1, 1, 1, 1, 1]
@@ -407,8 +408,9 @@ def train_only_first_part(dataset):
             optimizer.step()
             optimizer.zero_grad()
             #
-            for p in wnet.linear_combination.parameters():
-                p.data.clamp_(0.0)
+            with torch.no_grad():
+                for p in wnet.linear_combination.parameters():
+                    p.data.clamp_(0.0)
             print(intermediate_recon_loss)
 
     return wnet

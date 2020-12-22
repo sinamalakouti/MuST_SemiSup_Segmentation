@@ -30,23 +30,24 @@ class Module(nn.Module):
             return nn.Sequential(
                 nn.Conv2d(self.dim_in, self.dim_out, kernel_size=self.kernel_size, padding=self.padding,
                           stride=self.stride),
-                nn.BatchNorm2d(self.dim_out),
                 nn.ReLU(),
+                nn.BatchNorm2d(self.dim_out),
                 nn.Conv2d(self.dim_out, self.dim_out, kernel_size=self.kernel_size, padding=self.padding,
                           stride=self.stride),
-                nn.BatchNorm2d(self.dim_out),
-                nn.ReLU()
+                nn.ReLU(),
+                nn.BatchNorm2d(self.dim_out)
 
             )
-        else:
+        elif self.separable:
             return nn.Sequential(
                 self.__depthWise_separable_conv(self.dim_in, self.dim_out, self.kernel_size),
-                nn.BatchNorm2d(self.dim_out),
                 nn.ReLU(),
+                nn.BatchNorm2d(self.dim_out),
 
                 self.__depthWise_separable_conv(self.dim_out, self.dim_out, self.kernel_size),
+                nn.ReLU(),
                 nn.BatchNorm2d(self.dim_out),
-                nn.ReLU()
+
 
             )
 
@@ -142,7 +143,10 @@ class Wnet(nn.Module):
         self.separables = separables
         self.n_modules = n_modules
         self.k = k
-        self.linear_combination = torch.nn.Conv2d(k, dim_inputs[0], kernel_size=1, bias=False)
+        self.linear_combination = torch.nn.Conv2d(k, dim_inputs[0], kernel_size = 1, bias=False)
+        with torch.no_grad():
+            for p in self.linear_combination.parameters():
+                p.data = torch.abs(p.data)
         self.build()
 
     def build(self):

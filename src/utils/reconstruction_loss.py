@@ -4,15 +4,14 @@ def mse_power( x, y,power=3):
     temp = (x ** power - y ** power) **2
     return temp.mean()
 
-
-def regularizaton(segments,alpha=0.013):
+def regularizaton(segments,alpha=0.02):
 
     n_subjects = segments.shape[0]
     err = 0
     for i in range(n_subjects):
         item = segments[i]
         err += __coss_sim_all_channels(item,alpha)
-    return err /n_subjects
+    return err /n_subjects * alpha
 
 
 
@@ -28,8 +27,8 @@ def __coss_sim_all_channels(segments,alpha=0.013):
                 continue
             in2 = segments[j, :, :].reshape(1,  212 * 256)
             sim = cos_sim(in1,in2)
-            err += sim
-    return alpha * err /n_segments
+            err += torch.abs(sim)
+    return err
 
 
 def soft_dice_loss(y_true, y_pred, epsilon=1e-6):
