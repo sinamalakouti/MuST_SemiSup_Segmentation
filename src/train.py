@@ -273,8 +273,9 @@ def train_with_two_reconstruction(dataset):
             optimizer.step()
             optimizer.zero_grad()
 
-            for p in wnet.linear_combination.parameters():
-                p.data.clamp_(0.01)
+            with torch.no_grad():
+                for p in wnet.linear_combination.parameters():
+                    p.data.clamp_(0.0)
             print(final_loss)
 
     return wnet
@@ -634,8 +635,8 @@ def train_with_fcm(dataset):
 if __name__ == '__main__':
     #None
     #train_with_fcm(utils.Constants.Datasets.PittLocalFull)
-    #train_with_two_reconstruction_old(utils.Constants.Datasets.PittLocalFull)
-    train_only_first_part(utils.Constants.Datasets.PittLocalFull)
-    #train_with_two_reconstruction(utils.Constants.Datasets.PittLocalFull)
+    # train_with_two_reconstruction_old(utils.Constants.Datasets.PittLocalFull)
+    # train_only_first_part(utils.Constants.Datasets.PittLocalFull)
+    train_with_two_reconstruction(utils.Constants.Datasets.PittLocalFull)
     #train_reconstruction(utils.Constants.Datasets.PittLocalFull)
     #test(utils.Constants.Datasets.PittLocalFull, '/Users/sinamalakouti/PycharmProjects/WMH_Unsupervised_Segmentation/models/model_epoch_0_.model')
