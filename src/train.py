@@ -15,15 +15,14 @@ sys.path.append('srs/utils')
 for p in sys.path:
     print("path  ", p)
 
-
 utils.Constants.USE_CUDA = True
 utils.Constants.N_ITERATION = 20000
 
 
 def train_reconstruction(dataset):
     # read data
-    trainset = utils.get_trainset(dataset,False)
-    testset = utils.get_testset(dataset,False)
+    trainset = utils.get_trainset(dataset, False)
+    testset = utils.get_testset(dataset, False)
 
     # TODO: preprocessing?
     inputs_dim = [1, 64, 128, 256, 512, 1024, 512, 256, 128]
@@ -114,8 +113,6 @@ def train_with_ncut(dataset):
 
     test = torch.tensor(testset.dataset.data[0]['data']).reshape((1, 1, 212, 256))
 
-
-
     for iter in range(utils.Constants.N_ITERATION):
         print("iteration: ", iter)
         wnet.train()
@@ -149,7 +146,7 @@ def train_with_ncut(dataset):
             X_out_intermediate = wnet.softmax(X_in_intermediate)
             X_in_final = wnet.Udec(X_out_intermediate)
             pred = wnet.conv2(X_in_final)
-            ncutLoss = utils.soft_n_cut_loss(b,X_out_intermediate,5)
+            ncutLoss = utils.soft_n_cut_loss(b, X_out_intermediate, 5)
             loss = torch.nn.MSELoss().to(device)
             recon_loss = loss(pred, b)
             ncutLoss.backward()
@@ -162,10 +159,11 @@ def train_with_ncut(dataset):
 
     return wnet
 
+
 def train_with_two_reconstruction(dataset):
     utils.Constants.FCM = False
-    testset = utils.get_testset(dataset,True)
-    trainset = utils.get_trainset(dataset,True)
+    testset = utils.get_testset(dataset, True)
+    trainset = utils.get_trainset(dataset, True)
 
     # TODO: preprocessing?
     inputs_dim = [1, 64, 128, 256, 512, 1024, 512, 256, 128]
@@ -207,7 +205,6 @@ def train_with_two_reconstruction(dataset):
     plt.imshow(test.reshape((212, 256)))
     plt.savefig("../images/image_ii{}_{}_original.png".format(1, 0))
 
-
     for iter in range(utils.Constants.N_ITERATION):
         print("iteration: ", iter)
         wnet.train()
@@ -220,7 +217,7 @@ def train_with_two_reconstruction(dataset):
                 torch.save(wnet, f)
 
         if iter % 10 == 0:
-            for ii in range(0,1):
+            for ii in range(0, 1):
                 if ii == 0:
                     test = test0
                 else:
@@ -239,12 +236,11 @@ def train_with_two_reconstruction(dataset):
                     p = p.cpu()
                     plt.imshow(p)
 
-                    plt.savefig("../images/image_ii{}_{}.png".format(ii,iter))
-
+                    plt.savefig("../images/image_ii{}_{}.png".format(ii, iter))
 
                     X_out_intermediate = wnet.U_enc_fw(test.to(device))
 
-                    sample_dir = '../images/segmentation/iter_{}_{}'.format(ii,iter)
+                    sample_dir = '../images/segmentation/iter_{}_{}'.format(ii, iter)
                     if not os.path.isdir(sample_dir):
                         try:
                             os.mkdir(sample_dir)
@@ -253,10 +249,11 @@ def train_with_two_reconstruction(dataset):
                     else:
                         None
 
-                    utils.save_segment_images(X_out_intermediate.cpu(), "../images/segmentation/iter_{}_{}".format(ii,iter))
+                    utils.save_segment_images(X_out_intermediate.cpu(),
+                                              "../images/segmentation/iter_{}_{}".format(ii, iter))
                     intermediate_pred = wnet.linear_combination(X_out_intermediate)
                     plt.imshow(intermediate_pred.cpu().reshape((212, 256)))
-                    plt.savefig("../images/segmentation/iter_{}_{}/linear_comb_{}.png".format(ii,iter, iter))
+                    plt.savefig("../images/segmentation/iter_{}_{}/linear_comb_{}.png".format(ii, iter, iter))
 
         wnet.train()
         for batch in trainset:
@@ -270,11 +267,10 @@ def train_with_two_reconstruction(dataset):
             intermediate_loss = torch.nn.MSELoss().to(device)
             intermediate_recon_loss = intermediate_loss(intermediate_pred, b)
 
-
             loss = torch.nn.MSELoss().to(device)
             recon_loss = loss(pred, b)
-            regularization = reconstruction_loss.regularizaton(X_out_intermediate)
-            final_loss = recon_loss + intermediate_recon_loss + regularization
+            # regularization = reconstruction_loss.regularizaton(X_out_intermediate)
+            final_loss = recon_loss + intermediate_recon_loss
             final_loss.backward()
             optimizer.step()
             optimizer.zero_grad()
@@ -288,7 +284,6 @@ def train_with_two_reconstruction(dataset):
 
 
 def train_only_first_part(dataset):
-
     trainset = utils.get_trainset(dataset, True)
     testset = utils.get_testset(dataset, True)
 
@@ -318,11 +313,10 @@ def train_only_first_part(dataset):
 
     # test_instance = torch.cat([torch.tensor(testset.dataset.data[1]['data']),torch.tensor(testset.dataset.data[1]['data_t1'])])
     # train_instance = torch.cat([torch.tensor(trainset.dataset.data[0]['data']),torch.tensor(trainset.dataset.data[0]['data_t1'])])
-    test_instance =  torch.tensor(testset.dataset.data[0]['data'])
+    test_instance = torch.tensor(testset.dataset.data[0]['data'])
     train_instance = torch.tensor(testset.dataset.data[0]['data'])
     test0 = test_instance.reshape((1, 1, 212, 256))
     test1 = train_instance.reshape((1, 1, 212, 256))
-
 
     for iter in range(utils.Constants.N_ITERATION):
         print("iteration: ", iter)
@@ -338,7 +332,7 @@ def train_only_first_part(dataset):
         if iter % 10 == 0:
             for ii in range(1):
 
-                if ii ==0:
+                if ii == 0:
                     test = test0
                 else:
                     test = test1
@@ -346,7 +340,6 @@ def train_only_first_part(dataset):
                 minim = test.min()
                 maxim = test.max()
                 test = (test - minim) / (maxim - minim)
-
 
                 with torch.no_grad():
                     wnet.eval()
@@ -358,8 +351,8 @@ def train_only_first_part(dataset):
                     # plt.imshow(p)
 
                     # plt.savefig("../images/image_{}.png".format(iter))
-                    plt.imshow(test[0,0].reshape((212, 256)),'gray' )
-                    plt.savefig("../images/image_{}_{}_original.png".format(0,iter))
+                    plt.imshow(test[0, 0].reshape((212, 256)), 'gray')
+                    plt.savefig("../images/image_{}_{}_original.png".format(0, iter))
                     # plt.imshow(test[0, 1].reshape((212, 256)),'gray')
                     # plt.savefig("../images/image_{}_{}_original.png".format(1, iter))
 
@@ -367,7 +360,7 @@ def train_only_first_part(dataset):
                     # X_in_intermediate = wnet.conv1(X_in_intermediate)
                     # X_out_intermediate = wnet.softmax(X_in_intermediate)
 
-                    sample_dir = '../images/segmentation/iter_{}_{}'.format(0,iter)
+                    sample_dir = '../images/segmentation/iter_{}_{}'.format(0, iter)
                     if not os.path.isdir(sample_dir):
                         try:
                             os.mkdir(sample_dir)
@@ -385,10 +378,11 @@ def train_only_first_part(dataset):
                         else:
                             None
 
-                    utils.save_segment_images(X_out_intermediate.cpu(), "../images/segmentation/iter_{}_{}".format(0,iter))
+                    utils.save_segment_images(X_out_intermediate.cpu(),
+                                              "../images/segmentation/iter_{}_{}".format(0, iter))
                     intermediate_pred = wnet.linear_combination(X_out_intermediate)
-                    plt.imshow(intermediate_pred[0,0].cpu().reshape((212, 256)))
-                    plt.savefig("../images/segmentation/iter_{}_{}/linear_comb_{}_{}.png".format(ii, iter,ii, iter))
+                    plt.imshow(intermediate_pred[0, 0].cpu().reshape((212, 256)))
+                    plt.savefig("../images/segmentation/iter_{}_{}/linear_comb_{}_{}.png".format(ii, iter, ii, iter))
                     intermediate_pred = wnet.linear_combination(X_out_intermediate)
                     # plt.imshow(intermediate_pred[0,1].cpu().reshape((212, 256)))
                     # plt.savefig("../images/segmentation/iter_{}_{}/linear_comb_{}_{}.png".format(ii, iter,1, iter))
@@ -402,12 +396,11 @@ def train_only_first_part(dataset):
             # t1_b = t1_b.to(device)
             # b = torch.cat([f_b,t1_b],axis = 1)
 
-
             brain = batch['mask']
             brain = brain.to(device)
             X_out_intermediate = wnet.U_enc_fw(b)
 
-            X_out_intermediate = torch.mul(X_out_intermediate,brain)
+            X_out_intermediate = torch.mul(X_out_intermediate, brain)
             X_out_intermediate = X_out_intermediate.type(torch.float)
             intermediate_pred = wnet.linear_combination(X_out_intermediate)
             regularization = reconstruction_loss.regularizaton(X_out_intermediate)
@@ -423,9 +416,10 @@ def train_only_first_part(dataset):
 
     return wnet
 
+
 def train_with_two_reconstruction_old(dataset):
-    testset = utils.get_testset(dataset,False)
-    trainset = utils.get_trainset(dataset,False)
+    testset = utils.get_testset(dataset, False)
+    trainset = utils.get_trainset(dataset, False)
 
     # TODO: preprocessing?
     inputs_dim = [1, 64, 128, 256, 512, 1024, 512, 256, 128]
@@ -455,7 +449,6 @@ def train_with_two_reconstruction_old(dataset):
     maxim = test.max()
     test = (test - minim) / (maxim - minim)
 
-
     for iter in range(utils.Constants.N_ITERATION):
         print("iteration: ", iter)
         wnet.train()
@@ -483,7 +476,7 @@ def train_with_two_reconstruction_old(dataset):
                 X_in_intermediate = wnet.Uenc(test.to(device))
                 X_in_intermediate = wnet.conv1(X_in_intermediate)
                 X_out_intermediate = wnet.softmax(X_in_intermediate)
-                utils.save_segment_images(X_out_intermediate.cpu(),"../images/segmentation")
+                utils.save_segment_images(X_out_intermediate.cpu(), "../images/segmentation")
                 intermediate_pred = wnet.linear_combination(X_out_intermediate)
                 plt.imshow(intermediate_pred.cpu().reshape((212, 256)))
                 plt.savefig("../images/segmentation/linear_comb_{}.png".format(iter))
@@ -500,13 +493,12 @@ def train_with_two_reconstruction_old(dataset):
             intermediate_pred = wnet.linear_combination(X_out_intermediate)
             intermediate_recon_loss = intermediate_loss(intermediate_pred, b)
             intermediate_recon_loss.backward(retain_graph=True)
- #           optimizer1.step()
-#            optimizer1.zero_grad()
+            #           optimizer1.step()
+            #            optimizer1.zero_grad()
             optimizer1.step()
             optimizer1.zero_grad()
-           # for p in wnet.linear_combination.parameters():
+            # for p in wnet.linear_combination.parameters():
             #    p.data.clamp_(0.01)
-
 
             X_in_final = wnet.Udec(X_out_intermediate)
             pred = wnet.conv2(X_in_final)
@@ -577,13 +569,11 @@ def train_with_fcm(dataset):
                 p = p.cpu()
                 plt.imshow(p)
 
-                plt.savefig("../images/image_{}.png".format( iter))
+                plt.savefig("../images/image_{}.png".format(iter))
                 plt.imshow(test.reshape((212, 256)))
-                plt.savefig("../images/image_{}_original.png".format( iter))
+                plt.savefig("../images/image_{}_original.png".format(iter))
 
-                X_in_intermediate = wnet.Uenc(test.to(device))
-                X_in_intermediate = wnet.conv1(X_in_intermediate)
-                X_out_intermediate = wnet.softmax(X_in_intermediate)
+                X_out_intermediate = wnet.U_enc_fw(b)
 
                 sample_dir = '../images/segmentation/iter_{}'.format(iter)
                 if not os.path.isdir(sample_dir):
@@ -595,8 +585,10 @@ def train_with_fcm(dataset):
                     None
 
                 utils.save_segment_images(X_out_intermediate.cpu(),
-                                          "../images/segmentation/iter_{}".format( iter))
+                                          "../images/segmentation/iter_{}".format(iter))
+
                 intermediate_pred = wnet.linear_combination(X_out_intermediate)
+
                 plt.imshow(intermediate_pred.cpu().reshape((212, 256)))
                 plt.savefig("../images/segmentation/iter_{}/linear_comb_{}.png".format(iter, iter))
 
@@ -606,43 +598,43 @@ def train_with_fcm(dataset):
         for batch in trainset:
             b = batch['data']
             b = b.to(device)
+
             prior = batch['wmh_cluster']
             prior = prior.to(device)
             prior = prior.type(torch.DoubleTensor)
 
-            X_in_intermediate = wnet.Uenc(b)
-            X_in_intermediate = wnet.conv1(X_in_intermediate)
-            X_out_intermediate = wnet.softmax(X_in_intermediate)
+            X_out_intermediate = wnet.U_enc_fw(b)
             intermediate_loss = torch.nn.MSELoss().to(device)
             intermediate_pred = wnet.linear_combination(X_out_intermediate)
             intermediate_recon_loss = intermediate_loss(intermediate_pred, b)
 
-
-            X_in_final = wnet.Udec(X_out_intermediate)
-            pred = wnet.conv2(X_in_final)
+            pred = wnet.U_dec_fw(X_out_intermediate)
             loss = torch.nn.MSELoss().to(device)
             recon_loss = loss(pred, b)
 
-            regularization = reconstruction_loss.regularizaton(X_out_intermediate)
+            # regularization = reconstruction_loss.regularizaton(X_out_intermediate)
             X_out_intermediate = X_out_intermediate.to(device)
             prior = prior.to(device)
-            fcm_loss = reconstruction_loss.soft_dice_loss(prior, X_out_intermediate[:,1,:,:])
-            final_loss = recon_loss + intermediate_recon_loss + regularization + fcm_loss
+            fcm_loss = reconstruction_loss.soft_dice_loss(prior, X_out_intermediate[:, 1, :, :])
+            final_loss = recon_loss + intermediate_recon_loss + fcm_loss
 
             final_loss.backward()
             optimizer.step()
             optimizer.zero_grad()
-            for p in wnet.linear_combination.parameters():
-                p.data.clamp_(0.01)
+
+            with torch.no_grad():
+                for p in wnet.linear_combination.parameters():
+                    p.data.clamp_(0.0)
             print(final_loss)
 
     return wnet
 
+
 if __name__ == '__main__':
-    #None
-    #train_with_fcm(utils.Constants.Datasets.PittLocalFull)
+    # None
+    train_with_fcm(utils.Constants.Datasets.PittLocalFull)
     # train_with_two_reconstruction_old(utils.Constants.Datasets.PittLocalFull)
-    train_only_first_part(utils.Constants.Datasets.PittLocalFull)
-    train_with_two_reconstruction(utils.Constants.Datasets.PittLocalFull)
-    #train_reconstruction(utils.Constants.Datasets.PittLocalFull)
-    #test(utils.Constants.Datasets.PittLocalFull, '/Users/sinamalakouti/PycharmProjects/WMH_Unsupervised_Segmentation/models/model_epoch_0_.model')
+    # train_only_first_part(utils.Constants.Datasets.PittLocalFull)
+    # train_with_two_reconstruction(utils.Constants.Datasets.PittLocalFull)
+    # train_reconstruction(utils.Constants.Datasets.PittLocalFull)
+    # test(utils.Constants.Datasets.PittLocalFull, '/Users/sinamalakouti/PycharmProjects/WMH_Unsupervised_Segmentation/models/model_epoch_0_.model')
