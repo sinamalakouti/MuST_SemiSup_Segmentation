@@ -573,7 +573,7 @@ def train_with_fcm(dataset):
                 plt.imshow(test.reshape((212, 256)))
                 plt.savefig("../images/image_{}_original.png".format(iter))
 
-                X_out_intermediate = wnet.U_enc_fw(b)
+                X_out_intermediate = wnet.U_enc_fw(test)
 
                 sample_dir = '../images/segmentation/iter_{}'.format(iter)
                 if not os.path.isdir(sample_dir):
