@@ -3,7 +3,7 @@ import sys
 import os
 import torch
 from utils import utils
-
+from evaluation_metrics import dice_coef
 import Wnet
 import matplotlib.pyplot as plt
 from utils import reconstruction_loss
@@ -530,6 +530,7 @@ def train_with_fcm(dataset):
     wnet = Wnet.Wnet(18, k, inputs_dim, outputs_dim, strides=strides, paddings=paddings, kernels=kernels,
                      separables=separables)
 
+
     if torch.cuda.is_available() and utils.Constants.USE_CUDA:
         dev = "cuda:0"
     else:
@@ -537,6 +538,8 @@ def train_with_fcm(dataset):
     print("device is     ", dev)
     device = torch.device(dev)
     wnet.build()
+    wnet = utils.load_model('../models/model_epoch_600_.model')
+
     wnet.to(device)
     # linear_combination.to(device)
 
@@ -549,7 +552,6 @@ def train_with_fcm(dataset):
 
     for iter in range(utils.Constants.N_ITERATION):
         print("iteration: ", iter)
-        wnet.train()
         print(iter)
         if iter % 200 == 0:
             checkname = os.path.join("../models/")
@@ -562,13 +564,13 @@ def train_with_fcm(dataset):
 
             with torch.no_grad():
                 wnet.eval()
+                open_net(wnet)
 
                 test.reshape((1, 1, 212, 256))
                 p = wnet(test.to(device))
                 p = p.reshape((test.shape[2], test.shape[3]))
                 p = p.cpu()
                 plt.imshow(p)
-
                 plt.savefig("../images/image_{}.png".format(iter))
                 plt.imshow(test.reshape((212, 256)))
                 plt.savefig("../images/image_{}_original.png".format(iter))
@@ -595,7 +597,9 @@ def train_with_fcm(dataset):
                 wnet.train()
 
         # torch.autograd.set_detect_anomaly(True)
+        wnet.train()
         for batch in trainset:
+
             b = batch['data']
             b = b.to(device)
 
@@ -625,10 +629,31 @@ def train_with_fcm(dataset):
             with torch.no_grad():
                 for p in wnet.linear_combination.parameters():
                     p.data.clamp_(0.0)
-            print("fcm loss is   {}\n".format(fcm_loss))
-            print("final losst :    {} \n".format(final_loss))
+            print("fcm loss:   {}\n".format(fcm_loss))
+            print("final loss:    {} \n".format(final_loss))
+            segments_pred = X_out_intermediate.argmax(1)
+            wmh_segment_pred = segments_pred == 1
+            with torch.no_grad():
+                print("dice score is {}\n".format(dice_coef(y_true=batch['label'].reshape(wmh_segment_pred.shape), y_pred=wmh_segment_pred)))
 
     return wnet
+
+def open_net(net):
+    s = torch.nn.BatchNorm2d(3)
+
+    h = [module for module in net.modules() if type(module) != torch.nn.Sequential]
+
+    for m in h:
+        if type(m) == type(Wnet.Unet) or type(m) == type(torch.nn.ModuleList) or type(m) ==  type(torch.nn.Sequential):
+            open_net(m)
+        elif type(m) == type(s):
+            print("here")
+            m.track_running_stats=False
+            m.momentum=0
+            m.training=True
+            print(m)
+        else:
+            print(type(m))
 
 
 if __name__ == '__main__':

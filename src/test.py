@@ -2,6 +2,24 @@ import torch
 from utils import utils
 from evaluation_metrics import dice_coef
 import numpy as np
+import Wnet
+
+def open_net(net):
+    s = torch.nn.BatchNorm2d(3)
+
+    h = [module for module in net.modules() if type(module) != torch.nn.Sequential]
+
+    for m in h:
+        if type(m) == type(Wnet.Unet) or type(m) == type(torch.nn.ModuleList) or type(m) ==  type(torch.nn.Sequential):
+            open_net(m)
+        elif type(m) == type(s):
+            print("here")
+            m.track_running_stats=False
+            m.momentum=0
+            m.training=True
+            print(m)
+        else:
+            print(type(m))
 
 def test(dataset, model_path):
     testset = utils.get_testset(dataset,True)
@@ -23,6 +41,8 @@ def test(dataset, model_path):
     wnet = utils.load_model(model_path)
     wnet.to(device)
     wnet.eval()
+    # open_net(wnet)
+
     print("here1  ")
     with torch.no_grad():
         for batch in testset:
@@ -34,7 +54,7 @@ def test(dataset, model_path):
             print("here2")
             segmentation = wnet.softmax(X_in_intermediate)
             segments = segmentation.argmax(1)
-            wmh_segment = segments == 2
+            wmh_segment = segments == 1
             dice_score = dice_coef(y_true.reshape(wmh_segment.shape), wmh_segment)
             dice_arr  = dice_score.numpy()
             text = np.array2string(dice_arr)
@@ -62,4 +82,4 @@ def test(dataset, model_path):
 
 
 if __name__ == '__main__':
-    test(utils.Constants.Datasets.PittLocalFull, '../models_enc_withoutMask/model_epoch_200_.model')
+    test(utils.Constants.Datasets.PittLocalFull, '../models_enc_withoutMask/model_epoch_600_.model')

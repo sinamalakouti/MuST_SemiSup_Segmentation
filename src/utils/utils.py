@@ -74,6 +74,7 @@ def get_testset(dataset,intensity_rescale) -> torch.utils.data.DataLoader:
 
 
 def load_model(path) -> Wnet.Wnet:
+    # wnet = torch.load(path,map_location=torch.device('cpu'))
     wnet = torch.load(path)
 
     return wnet

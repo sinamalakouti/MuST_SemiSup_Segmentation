@@ -3,7 +3,7 @@ import torch
 
 # dice coefficient for predicted class
 def dice_coef(y_true, y_pred, smooth=1):
-  intersection = torch.multiply(y_true, y_pred)
+  intersection = torch.mul(y_true, y_pred)
   n_intersection = torch.sum(intersection,(1,2))
   n_y_true = torch.sum(y_true,(1,2))
   n_y_pred = torch.sum(y_pred,(1,2))

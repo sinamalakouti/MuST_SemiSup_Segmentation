@@ -57,14 +57,28 @@ def removing_hyper_intense():
 
 
 if __name__ == '__main__':
+    from evaluation_metrics import  dice_coef
     utils.Constants.FCM = True
     dataset = utils.Constants.Datasets.PittLocalFull
-    trainset = utils.get_trainset(dataset, False)
-    for i in range(0,10):
-        j = 0
-        for batch in trainset:
-            b = batch['data']
-            j +=1
+    trainset = utils.get_testset(   dataset, True)
+    score = 0
+    counter = 0
+    # for i in range(0,10):
+    j = 0
+    for batch in trainset:
+        b = batch['data'].clone()
+        j +=1
+        y_pred = batch['wmh_cluster'].clone()
+        batch['label'] = batch['label'].reshape(y_pred.shape)
+
+        scores = dice_coef(y_true=batch['label'], y_pred=y_pred)
+        print(scores)
+        score += scores.mean()
+        counter += 1
+
+    print(score)
+    print(counter)
+    print('result   ', str(score / counter))
             # for e in b:
             #     pri   nt("here")
             #     example = e[0].numpy()
