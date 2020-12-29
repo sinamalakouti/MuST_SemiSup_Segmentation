@@ -625,7 +625,8 @@ def train_with_fcm(dataset):
             with torch.no_grad():
                 for p in wnet.linear_combination.parameters():
                     p.data.clamp_(0.0)
-            print(final_loss)
+            print("fcm loss is   {}\n".format(fcm_loss))
+            print("final losst :    {} \n".format(final_loss))
 
     return wnet
 

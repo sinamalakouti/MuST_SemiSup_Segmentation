@@ -228,7 +228,16 @@ class PittLocalFull(torch.utils.data.Dataset):
             WMH_cluster = None
             if self.is_FCM:
                 import matplotlib.pyplot as plt
-                WMH_cluster = fcm.fcm_WMH_segmentation(x[0],2,0.03,1)
+                if 'fcm_seg' not in self.data[index]:
+                    WMH_cluster = fcm.fcm_WMH_segmentation(x[0],2,0.03,1)
+
+                    WMH_cluster = torch.Tensor(WMH_cluster)
+                    self.data[index]['fcm_seg'] = WMH_cluster.type(torch.DoubleTensor)
+                else:
+                    WMH_cluster = self.data[index]['fcm_seg']
+
+
+
                 # plt.imshow(WMH_cluster, 'gray')
                 # image_path =  "../images/wmh_{}.png".format(self.iter)
                 # plt.savefig(image_path)
