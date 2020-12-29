@@ -53,6 +53,6 @@ def soft_dice_loss(y_true, y_pred, epsilon=1e-6):
     # skip the batch and class axis for calculating Dice score
     axes = tuple(range(1, len(y_pred.shape) - 1))
     numerator = 2. * torch.sum(y_pred * y_true, axes)
-    denominator = torch.sum(torch.square(y_pred) + torch.square(y_true), axes)
+    denominator = torch.sum(y_pred ** 2 + y_true ** 2, axes)
 
     return 1 - torch.mean((numerator + epsilon) / (denominator + epsilon))  # average over classes and batch
