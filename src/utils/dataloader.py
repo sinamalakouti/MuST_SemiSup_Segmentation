@@ -12,6 +12,7 @@ from utils.soft_n_cut_loss import *
 import fcm
 from utils import utils
 
+
 class DataLoader():
     # initialization
     # datapath : the data folder of bsds500
@@ -91,8 +92,8 @@ class DataLoader():
 
 class PittLocalFull(torch.utils.data.Dataset):
 
-    def __init__(self,ws, T1, mixup_threshold, intensity_aug, intensity_rescale, data_paths, label_paths, mask_paths,
-                 is_ncut = False, is_FCM = False,  is_train =True, augment=False, data_paths_t1=None):
+    def __init__(self, ws, T1, mixup_threshold, intensity_aug, intensity_rescale, data_paths, label_paths, mask_paths,
+                 is_ncut=False, is_FCM=False, is_train=True, augment=False, data_paths_t1=None):
         super(PittLocalFull, self).__init__()
 
         # NOTE: if dataloader does not shuffle
@@ -229,14 +230,12 @@ class PittLocalFull(torch.utils.data.Dataset):
             if self.is_FCM:
                 import matplotlib.pyplot as plt
                 if 'fcm_seg' not in self.data[index]:
-                    WMH_cluster = fcm.fcm_WMH_segmentation(x[0],2,0.03,1)
+                    WMH_cluster = fcm.fcm_WMH_segmentation(x[0], 2, 0.03, 1)
 
                     WMH_cluster = torch.Tensor(WMH_cluster)
                     self.data[index]['fcm_seg'] = WMH_cluster.type(torch.DoubleTensor)
                 else:
                     WMH_cluster = self.data[index]['fcm_seg']
-
-
 
                 # plt.imshow(WMH_cluster, 'gray')
                 # image_path =  "../images/wmh_{}.png".format(self.iter)
@@ -249,7 +248,8 @@ class PittLocalFull(torch.utils.data.Dataset):
                 # self.iter += 1
 
             if self.intensity_rescale:
-                x = rescale_intensity(x) #chg/
+                x = normalize_quantile(x, 0.99)
+                # x = rescale_intensity(x) #chg/
             #            y = rescale_intensity(y) #chg
 
             # if self.is_train and self.is_ncut:
@@ -261,7 +261,7 @@ class PittLocalFull(torch.utils.data.Dataset):
 
             if self.is_FCM:
                 return {'data': x, 'label': y, 'mask': m.bool(),
-                        'subject': self.order[index],'wmh_cluster': WMH_cluster}
+                        'subject': self.order[index], 'wmh_cluster': WMH_cluster}
             return {'data': x, 'label': y, 'mask': m.bool(),
                     'subject': self.order[index]}
 
@@ -274,3 +274,9 @@ def rescale_intensity(x):
     maximum = x.max()
     minimum = x.min()
     return (x - minimum + 0.01) / (maximum - minimum + 0.01)
+
+
+def normalize_quantile(x, threshold):
+    q = torch.quantile(x, threshold)
+    mask = x[x <= q]
+    return x / max(mask)
