@@ -1,0 +1,2 @@
+mean dice score subject wise:  0.1542215645313263
+ 

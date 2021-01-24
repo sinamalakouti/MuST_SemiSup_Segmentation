@@ -185,7 +185,7 @@ class PittLocalFull(torch.utils.data.Dataset):
             x_t1 = self.data[index]['data_t1']
             # x = rescale_intensity(x)  # chg
             #            y = rescale_intensity(y) #chg
-            x_t1 = rescale_intensity(x_t1)  # chg
+            #x_t1 = rescale_intensity(x_t1)  # chg
             if self.augment:
                 None
                 # x, y, m, x_t1 = augment(
@@ -211,7 +211,20 @@ class PittLocalFull(torch.utils.data.Dataset):
             # print(self.mixup_threshold)
             # print("mixup is none")
             # print(self.intensity_aug)
+            WMH_cluster = None
+            if self.is_FCM:
+                import matplotlib.pyplot as plt
+                if 'fcm_seg' not in self.data[index]:
+                    WMH_cluster = fcm.fcm_WMH_segmentation(x[0], 2, 0.03, 1)
 
+                    WMH_cluster = torch.Tensor(WMH_cluster)
+                    self.data[index]['fcm_seg'] = WMH_cluster.type(torch.DoubleTensor)
+                else:
+                    WMH_cluster = self.data[index]['fcm_seg']
+
+            if self.is_FCM:
+                return {'data': x_final, 'label': y, 'mask': m.bool(),
+                        'subject': self.order[index], 'wmh_cluster': WMH_cluster}
             return {'data': x_final, 'label': y, 'mask': m.bool(),
                     'subject': self.order[index]}
         else:
@@ -271,6 +284,7 @@ def tensorize(*args):
 
 
 def rescale_intensity(x):
+    return normalize_quantile(x,0.99)
     maximum = x.max()
     minimum = x.min()
     return (x - minimum + 0.01) / (maximum - minimum + 0.01)

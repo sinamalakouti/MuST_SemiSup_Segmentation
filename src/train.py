@@ -515,12 +515,12 @@ def train_with_two_reconstruction_old(dataset):
 
 
 def train_with_fcm(dataset):
-    utils.Constants.FCM = True
+    utils.Constants.FCM = False
     testset = utils.get_testset(dataset,5 ,True)
     trainset = utils.get_trainset(dataset,5, True)
 
     # TODO: preprocessing?
-    inputs_dim = [1, 64, 128, 256, 512, 1024, 512, 256, 128]
+    inputs_dim = [2, 64, 128, 256, 512, 1024, 512, 256, 128]
     outputs_dim = [64, 128, 256, 512, 1024, 512, 256, 128, 64]
     kernels = [3, 3, 3, 3, 3, 3, 3, 3, 3]
     paddings = [1, 1, 1, 1, 1, 1, 1, 1, 1]
@@ -532,7 +532,7 @@ def train_with_fcm(dataset):
 
 
     if torch.cuda.is_available() and utils.Constants.USE_CUDA:
-        dev = "cuda:0"
+        dev = "cuda:1"
     else:
         dev = "cpu"
     print("device is     ", dev)
@@ -545,16 +545,16 @@ def train_with_fcm(dataset):
 
     optimizer = torch.optim.Adam(wnet.parameters(), 0.001)
 
-    test = torch.tensor(testset.dataset.data[0]['data']).reshape((1, 1, 212, 256))
+    test = torch.cat((torch.tensor(testset.dataset.data[0]['data']).reshape((1, 1, 212, 256)), torch.tensor(testset.dataset.data[0]['data_t1']).reshape((1, 1, 212, 256))), dim= 1)
     test = utils.normalize_quantile(test,0.99)
-    plt.imshow(test.reshape((212, 256)))
-    plt.savefig("../images/image_original.png")
+    plt.imshow(test[0,0].reshape((212, 256)))
+    plt.savefig("../images1/image_original.png")
 
     for iter in range(utils.Constants.N_ITERATION):
         print("iteration: ", iter)
         print(iter)
         if iter % 200 == 0:
-            checkname = os.path.join("../models/")
+            checkname = os.path.join("../models1/")
             path = checkname + 'model_epoch_{}_.model'.format(iter)
             with open(path, 'wb') as f:
                 print(path)
@@ -566,15 +566,15 @@ def train_with_fcm(dataset):
                 wnet.eval()
                 open_net(wnet)
 
-                test.reshape((1, 1, 212, 256))
+                test.reshape((1, 2, 212, 256))
                 p = wnet(test.to(device))
-                p = p.reshape((test.shape[2], test.shape[3]))
+                p = p[0,0].reshape((test.shape[2], test.shape[3]))
                 p = p.cpu()
                 plt.imshow(p)
-                plt.savefig("../images/image_{}.png".format(iter))
+                plt.savefig("../images1/image_{}.png".format(iter))
                 X_out_intermediate = wnet.U_enc_fw(test.to(device))
 
-                sample_dir = '../images/segmentation/iter_{}'.format(iter)
+                sample_dir = '../images1/segmentation/iter_{}'.format(iter)
                 if not os.path.isdir(sample_dir):
                     try:
                         os.mkdir(sample_dir)
@@ -584,21 +584,21 @@ def train_with_fcm(dataset):
                     None
 
                 utils.save_segment_images(X_out_intermediate.cpu(),
-                                          "../images/segmentation/iter_{}".format(iter))
+                                          "../images1/segmentation/iter_{}".format(iter))
 
                 intermediate_pred = wnet.linear_combination(X_out_intermediate)
 
-                plt.imshow(intermediate_pred.cpu().reshape((212, 256)))
-                plt.savefig("../images/segmentation/iter_{}/linear_comb_{}.png".format(iter, iter))
-                utils.evaluate(dataset,wnet,"../images/segmentation/iter_{}".format(iter))
+                plt.imshow(intermediate_pred[0,0].cpu().reshape((212, 256)))
+                plt.savefig("../images1/segmentation/iter_{}/linear_comb_{}.png".format(iter, iter))
+                utils.evaluate(dataset,wnet,"../images1/segmentation/iter_{}".format(iter))
 
         # torch.autograd.set_detect_anomaly(True)
         wnet.train()
         for batch in trainset:
 
             b = batch['data']
-            mask = batch['mask']
-            mask = mask.to(device)
+           # mask = batch['mask']
+            #mask = mask.to(device)
             b = b.to(device)
 
             prior = batch['wmh_cluster']
@@ -606,28 +606,30 @@ def train_with_fcm(dataset):
             prior = prior.type(torch.DoubleTensor)
 
             X_out_intermediate = wnet.U_enc_fw(b)
-            X_out_intermediate = torch.mul(mask, X_out_intermediate)
+           # X_out_intermediate = torch.mul(mask, X_out_intermediate)
             intermediate_loss = torch.nn.MSELoss().to(device)
             intermediate_pred = wnet.linear_combination(X_out_intermediate)
-            intermediate_pred = torch.mul(intermediate_pred,mask)
+            # intermediate_pred = torch.mul(intermediate_pred,mask)
             intermediate_recon_loss = intermediate_loss(intermediate_pred, b)
 
             pred = wnet.U_dec_fw(X_out_intermediate)
-            pred = torch.mul(pred, mask)
+            #pred = torch.mul(pred, mask)
             loss = torch.nn.MSELoss().to(device)
             recon_loss = loss(pred, b)
-
-            regularization = reconstruction_loss.regularization(torch.mul(X_out_intermediate, mask))
+            regularization = reconstruction_loss.regularization((X_out_intermediate))
+            # regularization = reconstruction_loss.regularization(torch.mul(X_out_intermediate, mask))
             X_out_intermediate = X_out_intermediate.to(device)
             prior = prior.to(device)
             alpha = 1
-            if iter > 100:
-                fcm_loss = 0
-            else:
-                fcm_loss = reconstruction_loss.soft_dice_loss(torch.mul(mask, prior), torch.mul(X_out_intermediate[:, 1, :, :], mask))
+            # if iter > 300:
+            #     fcm_loss = 0
+            # else:
+            #     fcm_loss = reconstruction_loss.soft_dice_loss(prior,
+            #                                                   X_out_intermediate[:, 1, :, :])
+                #fcm_loss = reconstruction_loss.soft_dice_loss(torch.mul(mask, prior), torch.mul(X_out_intermediate[:, 1, :, :], mask))
 
-            fcm_loss = alpha * fcm_loss
-            final_loss = recon_loss + intermediate_recon_loss + fcm_loss + regularization
+            # fcm_loss = alpha * fcm_loss
+            final_loss = recon_loss + intermediate_recon_loss + regularization
 
             final_loss.backward()
             optimizer.step()
@@ -636,7 +638,7 @@ def train_with_fcm(dataset):
             with torch.no_grad():
                 for p in wnet.linear_combination.parameters():
                     p.data.clamp_(0.0)
-            print("fcm loss:   {}\n".format(fcm_loss))
+            # print("fcm loss:   {}\n".format(fcm_loss))
             print("first reconstruction loss: {}\n".format(intermediate_recon_loss))
             print("second reconstruction loss: {}\n".format(recon_loss))
             print("regularization:  {}\n".format(regularization))

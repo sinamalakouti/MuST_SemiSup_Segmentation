@@ -20,7 +20,7 @@ def get_trainset(dataset, batch_size, intensity_rescale) -> torch.utils.data.Dat
         train = torch.utils.data.DataLoader(
             PittLocalFull(
                 None,
-                None,
+                1,
                 None,
                 None,
                 intensity_rescale,
@@ -33,9 +33,9 @@ def get_trainset(dataset, batch_size, intensity_rescale) -> torch.utils.data.Dat
                  f'paths/fold-2/mask_paths.txt', f'paths/fold-3/mask_paths.txt'],
                 augment=False,
                 is_FCM=Constants.FCM,
-                data_paths_t1=[f'paths/fold-1/data_paths_ws_t1.txt',
-                               f'paths/fold-2/data_paths_ws_t1.txt', f'paths/fold-3/data_paths_ws_t1.txt',
-                               f'paths/fold-4/data_paths_ws_t1.txt']
+                data_paths_t1=[f'paths/fold-0/data_paths_t1.txt',
+                               f'paths/fold-1/data_paths_t1.txt', f'paths/fold-2/data_paths_t1.txt',
+                               f'paths/fold-3/data_paths_t1.txt']
             ),
             batch_size=batch_sz,
             drop_last=True,
@@ -55,7 +55,7 @@ def get_testset(dataset, batch_size, intensity_rescale) -> torch.utils.data.Data
         test = torch.utils.data.DataLoader(
             PittLocalFull(
                 None,
-                None,
+                1,
                 None,
                 None,
                 intensity_rescale,
@@ -64,7 +64,7 @@ def get_testset(dataset, batch_size, intensity_rescale) -> torch.utils.data.Data
                 [f'paths/fold-4/mask_paths.txt'],
                 augment=False,
                 is_FCM=Constants.FCM,
-                data_paths_t1=[f'paths/fold-4/data_paths_ws_t1.txt']
+                data_paths_t1=[f'paths/fold-4/data_paths_t1.txt']
             ),
             batch_size=batch_sz,
             drop_last=False,
