@@ -137,9 +137,9 @@ def _evaluate(y_true, predictions, segment_index):
     segments = predictions.argmax(1)
     wmh_segment = segments == segment_index
     dice_score = dice_coef(y_true.reshape(wmh_segment.shape), wmh_segment)
-    dice_arr = dice_score.numpy()
-    np.array2string(dice_arr)
-    return np.mean(dice_arr)
+    dice_arr = dice_score
+
+    return dice_arr.mean()
 
 
 def evaluate(dataset, wnet, output_path):
@@ -165,8 +165,8 @@ def evaluate(dataset, wnet, output_path):
             segmentation = torch.mul(x_mask, segmentation)
             score = _evaluate(y_true, segmentation, 1)
             dice_scores.append(score)
-
-    text = "mean dice score subject wise:  {}\n ".format(np.mean(dice_scores))
+    dice_scores = torch.tensor(dice_scores)
+    text = "mean dice score subject wise:  {}\n ".format(torch.mean(dice_scores))
     text_file = open(output_path + "/result.txt", "w")
     text_file.write(text)
     text_file.close()

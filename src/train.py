@@ -590,7 +590,7 @@ def train_with_fcm(dataset):
 
                 plt.imshow(intermediate_pred.cpu().reshape((212, 256)))
                 plt.savefig("../images/segmentation/iter_{}/linear_comb_{}.png".format(iter, iter))
-                utils.evaluate(dataset,wnet,"../images/segmentation/iter_{}")
+                utils.evaluate(dataset,wnet,"../images/segmentation/iter_{}".format(iter))
 
         # torch.autograd.set_detect_anomaly(True)
         wnet.train()
@@ -627,7 +627,7 @@ def train_with_fcm(dataset):
                 fcm_loss = reconstruction_loss.soft_dice_loss(torch.mul(mask, prior), torch.mul(X_out_intermediate[:, 1, :, :], mask))
 
             fcm_loss = alpha * fcm_loss
-            final_loss = recon_loss + intermediate_recon_loss + fcm_loss
+            final_loss = recon_loss + intermediate_recon_loss + fcm_loss + regularization
 
             final_loss.backward()
             optimizer.step()
@@ -637,7 +637,7 @@ def train_with_fcm(dataset):
                 for p in wnet.linear_combination.parameters():
                     p.data.clamp_(0.0)
             print("fcm loss:   {}\n".format(fcm_loss))
-            print("first reconstruction loss: {}\n".format(intermediate_loss))
+            print("first reconstruction loss: {}\n".format(intermediate_recon_loss))
             print("second reconstruction loss: {}\n".format(recon_loss))
             print("regularization:  {}\n".format(regularization))
             print("final loss:    {} \n".format(final_loss))
