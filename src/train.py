@@ -21,8 +21,8 @@ utils.Constants.N_ITERATION = 20000
 
 def train_reconstruction(dataset):
     # read data
-    trainset = utils.get_trainset(dataset, False)
-    testset = utils.get_testset(dataset, False)
+    trainset = utils.get_trainset(dataset,5, False)
+    testset = utils.get_testset(dataset,5, False)
 
     # TODO: preprocessing?
     inputs_dim = [1, 64, 128, 256, 512, 1024, 512, 256, 128]
@@ -87,8 +87,8 @@ def train_reconstruction(dataset):
 
 
 def train_with_ncut(dataset):
-    testset = utils.get_testset(dataset)
-    trainset = utils.get_trainset(dataset)
+    testset = utils.get_testset(dataset,5,True)
+    trainset = utils.get_trainset(dataset,5,True)
 
     # TODO: preprocessing?
     inputs_dim = [1, 64, 128, 256, 512, 1024, 512, 256, 128]
@@ -162,8 +162,8 @@ def train_with_ncut(dataset):
 
 def train_with_two_reconstruction(dataset):
     utils.Constants.FCM = False
-    testset = utils.get_testset(dataset, True)
-    trainset = utils.get_trainset(dataset, True)
+    testset = utils.get_testset(dataset,5, True)
+    trainset = utils.get_trainset(dataset,5, True)
 
     # TODO: preprocessing?
     inputs_dim = [1, 64, 128, 256, 512, 1024, 512, 256, 128]
@@ -269,7 +269,7 @@ def train_with_two_reconstruction(dataset):
 
             loss = torch.nn.MSELoss().to(device)
             recon_loss = loss(pred, b)
-            # regularization = reconstruction_loss.regularizaton(X_out_intermediate)
+            # regularization = reconstruction_loss.regularization(X_out_intermediate)
             final_loss = recon_loss + intermediate_recon_loss
             final_loss.backward()
             optimizer.step()
@@ -284,8 +284,8 @@ def train_with_two_reconstruction(dataset):
 
 
 def train_only_first_part(dataset):
-    trainset = utils.get_trainset(dataset, True)
-    testset = utils.get_testset(dataset, True)
+    trainset = utils.get_trainset(dataset,5, True)
+    testset = utils.get_testset(dataset,5, True)
 
     # TODO: preprocessing?
     inputs_dim = [1, 64, 128, 256, 512, 1024, 512, 256, 128]
@@ -403,7 +403,7 @@ def train_only_first_part(dataset):
             X_out_intermediate = torch.mul(X_out_intermediate, brain)
             X_out_intermediate = X_out_intermediate.type(torch.float)
             intermediate_pred = wnet.linear_combination(X_out_intermediate)
-            regularization = reconstruction_loss.regularizaton(X_out_intermediate)
+            regularization = reconstruction_loss.regularization(X_out_intermediate)
             intermediate_recon_loss = intermediate_loss(intermediate_pred, b) + regularization
             intermediate_recon_loss.backward()
             optimizer.step()
@@ -418,8 +418,8 @@ def train_only_first_part(dataset):
 
 
 def train_with_two_reconstruction_old(dataset):
-    testset = utils.get_testset(dataset, False)
-    trainset = utils.get_trainset(dataset, False)
+    testset = utils.get_testset(dataset, 5, False)
+    trainset = utils.get_trainset(dataset, 5, False)
 
     # TODO: preprocessing?
     inputs_dim = [1, 64, 128, 256, 512, 1024, 512, 256, 128]
@@ -516,8 +516,8 @@ def train_with_two_reconstruction_old(dataset):
 
 def train_with_fcm(dataset):
     utils.Constants.FCM = True
-    testset = utils.get_testset(dataset, True)
-    trainset = utils.get_trainset(dataset, True)
+    testset = utils.get_testset(dataset,5 ,True)
+    trainset = utils.get_trainset(dataset,5, True)
 
     # TODO: preprocessing?
     inputs_dim = [1, 64, 128, 256, 512, 1024, 512, 256, 128]
@@ -526,7 +526,7 @@ def train_with_fcm(dataset):
     paddings = [1, 1, 1, 1, 1, 1, 1, 1, 1]
     strides = [1, 1, 1, 1, 1, 1, 1, 1, 1]
     separables = [False, True, True, True, True, True, True, True, False]
-    k = 5
+    k = 4
     wnet = Wnet.Wnet(18, k, inputs_dim, outputs_dim, strides=strides, paddings=paddings, kernels=kernels,
                      separables=separables)
 
@@ -538,7 +538,7 @@ def train_with_fcm(dataset):
     print("device is     ", dev)
     device = torch.device(dev)
     wnet.build()
-    wnet = utils.load_model('../models/model_epoch_600_.model')
+    # wnet = utils.load_model('../models/model_epoch_600_.model')
 
     wnet.to(device)
     # linear_combination.to(device)
@@ -546,9 +546,9 @@ def train_with_fcm(dataset):
     optimizer = torch.optim.Adam(wnet.parameters(), 0.001)
 
     test = torch.tensor(testset.dataset.data[0]['data']).reshape((1, 1, 212, 256))
-    minim = test.min()
-    maxim = test.max()
-    test = (test - minim) / (maxim - minim)
+    test = utils.normalize_quantile(test,0.99)
+    plt.imshow(test.reshape((212, 256)))
+    plt.savefig("../images/image_original.png")
 
     for iter in range(utils.Constants.N_ITERATION):
         print("iteration: ", iter)
@@ -572,9 +572,6 @@ def train_with_fcm(dataset):
                 p = p.cpu()
                 plt.imshow(p)
                 plt.savefig("../images/image_{}.png".format(iter))
-                plt.imshow(test.reshape((212, 256)))
-                plt.savefig("../images/image_{}_original.png".format(iter))
-
                 X_out_intermediate = wnet.U_enc_fw(test.to(device))
 
                 sample_dir = '../images/segmentation/iter_{}'.format(iter)
@@ -593,7 +590,6 @@ def train_with_fcm(dataset):
 
                 plt.imshow(intermediate_pred.cpu().reshape((212, 256)))
                 plt.savefig("../images/segmentation/iter_{}/linear_comb_{}.png".format(iter, iter))
-
                 wnet.train()
 
         # torch.autograd.set_detect_anomaly(True)
@@ -601,6 +597,8 @@ def train_with_fcm(dataset):
         for batch in trainset:
 
             b = batch['data']
+            mask = batch['mask']
+            mask = mask.to(device)
             b = b.to(device)
 
             prior = batch['wmh_cluster']
@@ -610,17 +608,23 @@ def train_with_fcm(dataset):
             X_out_intermediate = wnet.U_enc_fw(b)
             intermediate_loss = torch.nn.MSELoss().to(device)
             intermediate_pred = wnet.linear_combination(X_out_intermediate)
+            intermediate_pred = torch.mul(intermediate_pred,mask)
             intermediate_recon_loss = intermediate_loss(intermediate_pred, b)
 
             pred = wnet.U_dec_fw(X_out_intermediate)
+            pred = torch.mul(pred, mask)
             loss = torch.nn.MSELoss().to(device)
             recon_loss = loss(pred, b)
 
-            # regularization = reconstruction_loss.regularizaton(X_out_intermediate)
+            regularization = reconstruction_loss.regularization(torch.mul(X_out_intermediate, mask))
             X_out_intermediate = X_out_intermediate.to(device)
             prior = prior.to(device)
-            fcm_loss = reconstruction_loss.soft_dice_loss(prior, X_out_intermediate[:, 1, :, :])
-            final_loss = recon_loss + intermediate_recon_loss + fcm_loss
+            fcm_loss = reconstruction_loss.soft_dice_loss(torch.mul(mask, prior), torch.mul(X_out_intermediate[:, 1, :, :], mask))
+            alpha = 1
+            if iter > 100:
+                alpha = alpha / 100
+            fcm_loss = alpha * fcm_loss
+            final_loss = recon_loss + intermediate_recon_loss + fcm_loss + regularization
 
             final_loss.backward()
             optimizer.step()
@@ -633,8 +637,8 @@ def train_with_fcm(dataset):
             print("final loss:    {} \n".format(final_loss))
             segments_pred = X_out_intermediate.argmax(1)
             wmh_segment_pred = segments_pred == 1
-            with torch.no_grad():
-                print("dice score is {}\n".format(dice_coef(y_true=batch['label'].reshape(wmh_segment_pred.shape), y_pred=wmh_segment_pred)))
+            # with torch.no_grad():
+            #     print("dice score is {}\n".format(dice_coef(y_true=batch['label'].reshape(wmh_segment_pred.shape), y_pred=wmh_segment_pred)))
 
     return wnet
 
@@ -647,13 +651,11 @@ def open_net(net):
         if type(m) == type(Wnet.Unet) or type(m) == type(torch.nn.ModuleList) or type(m) ==  type(torch.nn.Sequential):
             open_net(m)
         elif type(m) == type(s):
-            print("here")
+            #print("here")
             m.track_running_stats=False
             m.momentum=0
             m.training=True
-            print(m)
-        else:
-            print(type(m))
+        #   else:#rint(type(m))
 
 
 if __name__ == '__main__':

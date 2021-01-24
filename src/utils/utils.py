@@ -4,35 +4,38 @@ import Wnet
 import matplotlib.pyplot as plt
 import os
 import torch
+from evaluation_metrics import dice_coef
+import numpy as np
+
 
 # class Utils:
 #     def __init__(self, dataset):
 
-def get_trainset(dataset,intensity_rescale) -> torch.utils.data.DataLoader:
+def get_trainset(dataset, batch_size, intensity_rescale) -> torch.utils.data.DataLoader:
     mem_pin = False
     if Constants.USE_CUDA:
         mem_pin = True
     if dataset is Datasets.PittLocalFull:
-        batch_sz = 5
+        batch_sz = batch_size
         train = torch.utils.data.DataLoader(
             PittLocalFull(
-                1,
+                None,
                 None,
                 None,
                 None,
                 intensity_rescale,
-                [f'paths/fold-1/data_paths_ws.txt',
-                 f'paths/fold-2/data_paths_ws.txt', f'paths/fold-3/data_paths_ws.txt',
-                 f'paths/fold-4/data_paths_ws.txt'],
-                [f'paths/fold-1/label_paths.txt', f'paths/fold-2/label_paths.txt',
-                 f'paths/fold-3/label_paths.txt', f'paths/fold-4/label_paths.txt'],
-                [f'paths/fold-1/mask_paths.txt', f'paths/fold-2/mask_paths.txt',
-                 f'paths/fold-3/mask_paths.txt', f'paths/fold-4/mask_paths.txt'],
+                [f'paths/fold-0/data_paths.txt',
+                 f'paths/fold-1/data_paths.txt', f'paths/fold-2/data_paths.txt',
+                 f'paths/fold-3/data_paths.txt'],
+                [f'paths/fold-0/label_paths.txt', f'paths/fold-1/label_paths.txt',
+                 f'paths/fold-2/label_paths.txt', f'paths/fold-3/label_paths.txt'],
+                [f'paths/fold-0/mask_paths.txt', f'paths/fold-1/mask_paths.txt',
+                 f'paths/fold-2/mask_paths.txt', f'paths/fold-3/mask_paths.txt'],
                 augment=False,
                 is_FCM=Constants.FCM,
-                data_paths_t1 = [f'paths/fold-1/data_paths_ws_t1.txt',
-                 f'paths/fold-2/data_paths_ws_t1.txt', f'paths/fold-3/data_paths_ws_t1.txt',
-                 f'paths/fold-4/data_paths_ws_t1.txt']
+                data_paths_t1=[f'paths/fold-1/data_paths_ws_t1.txt',
+                               f'paths/fold-2/data_paths_ws_t1.txt', f'paths/fold-3/data_paths_ws_t1.txt',
+                               f'paths/fold-4/data_paths_ws_t1.txt']
             ),
             batch_size=batch_sz,
             drop_last=True,
@@ -43,30 +46,30 @@ def get_trainset(dataset,intensity_rescale) -> torch.utils.data.DataLoader:
     return train
 
 
-def get_testset(dataset,intensity_rescale) -> torch.utils.data.DataLoader:
+def get_testset(dataset, batch_size, intensity_rescale) -> torch.utils.data.DataLoader:
     mem_pin = False
     if Constants.USE_CUDA:
         mem_pin = True
     if dataset is Datasets.PittLocalFull:
-        batch_sz = 20
+        batch_sz = batch_size
         test = torch.utils.data.DataLoader(
             PittLocalFull(
-                1,
+                None,
                 None,
                 None,
                 None,
                 intensity_rescale,
-                [f'paths/fold-0/data_paths_ws.txt'],
-                [f'paths/fold-0/label_paths.txt'],
-                [f'paths/fold-0/mask_paths.txt'],
+                [f'paths/fold-4/data_paths.txt'],
+                [f'paths/fold-4/label_paths.txt'],
+                [f'paths/fold-4/mask_paths.txt'],
                 augment=False,
                 is_FCM=Constants.FCM,
-                data_paths_t1=[f'paths/fold-0/data_paths_ws_t1.txt']
+                data_paths_t1=[f'paths/fold-4/data_paths_ws_t1.txt']
             ),
             batch_size=batch_sz,
             drop_last=False,
             num_workers=0,
-            shuffle=True,
+            shuffle=False,
             pin_memory=mem_pin
         )
 
@@ -74,8 +77,8 @@ def get_testset(dataset,intensity_rescale) -> torch.utils.data.DataLoader:
 
 
 def load_model(path) -> Wnet.Wnet:
-    # wnet = torch.load(path,map_location=torch.device('cpu'))
-    wnet = torch.load(path)
+    wnet = torch.load(path, map_location=torch.device('cpu'))
+    # wnet = torch.load(path)
 
     return wnet
 
@@ -121,10 +124,6 @@ def save_images(input_images, reconstructed_images, path):
         plt.savefig(input_image_path)
 
 
-
-
-
-
 def save_label(y, path):
     n_imags = y.shape[0]
     for i in range(n_imags):
@@ -132,3 +131,39 @@ def save_label(y, path):
         label_image_path = path + "/label_image{}.png".format(i)
         plt.imshow(label_image)
         plt.savefig(label_image_path)
+
+
+def _evaluate(y_true, predictions, segment_index):
+    segments = predictions.argmax(1)
+    wmh_segment = segments == segment_index
+    dice_score = dice_coef(y_true.reshape(wmh_segment.shape), wmh_segment)
+    dice_arr = dice_score.numpy()
+    np.array2string(dice_arr)
+    return np.mean(dice_arr)
+
+
+def evaluate(dataset, wnet, output_path):
+    testset = utils.get_testset(dataset, 5, True)
+    if torch.cuda.is_available() and utils.Constants.USE_CUDA:
+        dev = "cuda:0"
+    else:
+        dev = "cpu"
+    device = torch.device(dev)
+
+    wnet.to(device)
+
+    dice_scores = []
+    with torch.no_grad():
+        for batch in testset:
+            x_test = batch['data']
+            y_true = batch['label']
+            x_test = x_test.to(device)
+            y_true = y_true.to(device)
+            segmentation = wnet.U_enc_fw(x_test)
+            score = _evaluate(y_true, segmentation, 1)
+            dice_scores.append(score)
+
+    text = "mean dice score subject wise:  {}\n ".format(np.mean(dice_scores))
+    text_file = open(output_path + "/result.txt", "w")
+    text_file.write(text)
+    text_file.close()

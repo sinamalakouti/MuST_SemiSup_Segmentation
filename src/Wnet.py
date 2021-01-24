@@ -152,7 +152,7 @@ class Wnet(nn.Module):
     def build(self):
         self.Uenc = Unet(self.n_modules // 2, self.dim_inputs, self.dim_outputs, self.strides, self.paddings,
                          self.kernels, self.separables)
-        self.conv1 = nn.Conv2d(self.dim_outputs[-1], self.k, kernel_size=1)
+        self.conv1 = nn.Conv2d(self.dim_outputs[-1], self.k, kernel_size=1, bias=False)
         dec_dim_inputs = [0] * len(self.dim_inputs)
         dec_dim_inputs[0] = self.k
         dec_dim_inputs[1:] = self.dim_inputs[1:]

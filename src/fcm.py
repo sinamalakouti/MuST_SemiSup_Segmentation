@@ -28,15 +28,15 @@ def fcm_WMH_segmentation(data, nclusters, csf_background_threshold, binwidth):
     csf_background_mask = data[csf_background]
 
     freq1, intensity1 = np.histogram(csf_background_mask,
-                                    bins=np.arange(csf_background_mask.min(), csf_background_mask.max() + binwidth,
-                                                   binwidth))
+                                     bins=np.arange(csf_background_mask.min(), csf_background_mask.max() + binwidth,
+                                                    binwidth))
     data = data.reshape(-1)
     freq2, intensity2 = np.histogram(data,
-                                    bins=np.arange(data.min(), data.max() + binwidth, binwidth))
+                                     bins=np.arange(data.min(), data.max() + binwidth, binwidth))
 
     n = len(freq1) - 1
     while (freq1[n] == freq2[n]):
-        if n <=0:
+        if n <= 0:
             print("************shooot shooot negative n     \n", n)
 
         n -= 1
@@ -57,35 +57,47 @@ def removing_hyper_intense():
 
 
 if __name__ == '__main__':
-    from evaluation_metrics import  dice_coef
-    utils.Constants.FCM = True
+    from evaluation_metrics import dice_coef
+
+    utils.Constants.FCM = False
     dataset = utils.Constants.Datasets.PittLocalFull
-    trainset = utils.get_testset(   dataset, True)
+    trainset = utils.get_testset(dataset, False)
     score = 0
     counter = 0
     # for i in range(0,10):
     j = 0
-    for batch in trainset:
-        b = batch['data'].clone()
-        j +=1
-        y_pred = batch['wmh_cluster'].clone()
-        batch['label'] = batch['label'].reshape(y_pred.shape)
+    for i in range(2):
+        counter = 0
+        print("i   ")
 
-        scores = dice_coef(y_true=batch['label'], y_pred=y_pred)
-        print(scores)
-        score += scores.mean()
-        counter += 1
+        for batch in trainset:
+            b = batch['data'].clone()
+            # print("min")
+            # print(b.min())
+            # print("max")
+            # print(b.max())
+            print(counter)
+            # print("min")
+            # print()
+            j += 1
+            # y_pred = batch['wmh_cluster'].clone()
+            # batch['label'] = batch['label'].reshape(y_pred.shape)
+
+            # scores = dice_coef(y_true=batch['label'], y_pred=y_pred)
+            # print(scores)
+            # score += scores.mean()
+            counter += 1
 
     print(score)
     print(counter)
     print('result   ', str(score / counter))
-            # for e in b:
-            #     pri   nt("here")
-            #     example = e[0].numpy()
-            #     # plt.imshow(example)
-            #     # plt.show()
-            #     wmh_seg = fcm_WMH_segmentation(example, 2, 0.05, 1)
-            #     wmh_seg = wmh_seg.astype('uint8')
-            #     plt.imshow(wmh_seg)
-            #     plt.show()
-            #     print("nooo")
+    # for e in b:
+    #     pri   nt("here")
+    #     example = e[0].numpy()
+    #     # plt.imshow(example)
+    #     # plt.show()
+    #     wmh_seg = fcm_WMH_segmentation(example, 2, 0.05, 1)
+    #     wmh_seg = wmh_seg.astype('uint8')
+    #     plt.imshow(wmh_seg)
+    #     plt.show()
+    #     print("nooo")
