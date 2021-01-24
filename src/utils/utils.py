@@ -156,10 +156,13 @@ def evaluate(dataset, wnet, output_path):
     with torch.no_grad():
         for batch in testset:
             x_test = batch['data']
+            x_mask = batch['mask']
             y_true = batch['label']
             x_test = x_test.to(device)
             y_true = y_true.to(device)
+            x_mask = x_mask.to(device)
             segmentation = wnet.U_enc_fw(x_test)
+            segmentation = torch.mul(x_mask, segmentation)
             score = _evaluate(y_true, segmentation, 1)
             dice_scores.append(score)
 

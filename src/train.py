@@ -606,6 +606,7 @@ def train_with_fcm(dataset):
             prior = prior.type(torch.DoubleTensor)
 
             X_out_intermediate = wnet.U_enc_fw(b)
+            X_out_intermediate = torch.mul(mask, X_out_intermediate)
             intermediate_loss = torch.nn.MSELoss().to(device)
             intermediate_pred = wnet.linear_combination(X_out_intermediate)
             intermediate_pred = torch.mul(intermediate_pred,mask)
@@ -619,10 +620,12 @@ def train_with_fcm(dataset):
             regularization = reconstruction_loss.regularization(torch.mul(X_out_intermediate, mask))
             X_out_intermediate = X_out_intermediate.to(device)
             prior = prior.to(device)
-            fcm_loss = reconstruction_loss.soft_dice_loss(torch.mul(mask, prior), torch.mul(X_out_intermediate[:, 1, :, :], mask))
             alpha = 1
             if iter > 100:
-                alpha = alpha / 100
+                fcm_loss = 0
+            else:
+                fcm_loss = reconstruction_loss.soft_dice_loss(torch.mul(mask, prior), torch.mul(X_out_intermediate[:, 1, :, :], mask))
+
             fcm_loss = alpha * fcm_loss
             final_loss = recon_loss + intermediate_recon_loss + fcm_loss
 
