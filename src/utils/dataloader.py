@@ -6,9 +6,7 @@ import glob
 import numpy as cp
 import nibabel as nib
 import numpy as np
-from utils import soft_n_cut_loss
 from utils import Constants
-from utils.soft_n_cut_loss import *
 import fcm
 from utils import utils
 
@@ -177,43 +175,48 @@ class PittLocalFull(torch.utils.data.Dataset):
         slices = np.array(slices)
         return x[:, :, slices].astype('float32')
 
+    def perform_fcm(self, index, x):
+        WMH_cluster = None
+        if 'fcm_seg' not in self.data[index]:
+            WMH_cluster = fcm.fcm_WMH_segmentation(x[0], 2, 0.03, 1)
+
+            WMH_cluster = torch.Tensor(WMH_cluster)
+            self.data[index]['fcm_seg'] = WMH_cluster.type(torch.DoubleTensor)
+        else:
+            WMH_cluster = self.data[index]['fcm_seg']
+        return WMH_cluster
+
     def __getitem__(self, index):
         if self.T1 is not None:
             x = self.data[index]['data']
             y = self.data[index]['label']
             m = self.data[index]['mask']  # mask no need to do intensity rescale
             x_t1 = self.data[index]['data_t1']
-            # x = rescale_intensity(x)  # chg
-            #            y = rescale_intensity(y) #chg
-            #x_t1 = rescale_intensity(x_t1)  # chg
+
             if self.augment:
                 None
                 # x, y, m, x_t1 = augment(
                 #     x=x, y=y, m=m, t1=x_t1, intensity_aug=self.intensity_aug)
             else:
                 x, y, m, x_t1 = tensorize(x, y, m, x_t1)
+
             output_arr = []
             output_arr.append(x)
             output_arr.append(x_t1)
+
             # lamda * output_arr[0] + (1-lamda)*output_arr[1]
             if self.mixup_threshold is not None:  # chg
-                x_final = self.mixup_threshold * output_arr[0] + (1 - self.mixup_threshold) * output_arr[1]
-                # print("mixup is not, none")
-                # print(self.mixup_threshold)
-                # print("mixup is not, none")
-                # print(self.intensity_aug)
+                x_mixup = self.mixup_threshold * output_arr[0] + (1 - self.mixup_threshold) * output_arr[1]
+                output_arr.append(x_mixup)
 
-            else:
-                if self.intensity_rescale:
-                    output_arr[0] = rescale_intensity(output_arr[0])  # chg/
-                    output_arr[1] = rescale_intensity(output_arr[1])
-                x_final = np.concatenate(output_arr[0:2], axis=0)
-            # print(self.mixup_threshold)
-            # print("mixup is none")
-            # print(self.intensity_aug)
-            WMH_cluster = None
+            if self.intensity_rescale:
+                output_arr[0] = rescale_intensity(output_arr[0])
+                output_arr[1] = rescale_intensity(output_arr[1])
+                if len(output_arr) == 3:
+                    output_arr[2] = rescale_intensity(output_arr[2])
+                x_final = np.concatenate(output_arr[0:], axis=0)
+
             if self.is_FCM:
-                import matplotlib.pyplot as plt
                 if 'fcm_seg' not in self.data[index]:
                     WMH_cluster = fcm.fcm_WMH_segmentation(x[0], 2, 0.03, 1)
 
@@ -223,7 +226,7 @@ class PittLocalFull(torch.utils.data.Dataset):
                     WMH_cluster = self.data[index]['fcm_seg']
 
             if self.is_FCM:
-                return {'data': x_final, 'label': y, 'mask': m.bool(),
+                return {'data': x_final , 'label': y, 'mask': m.bool(),
                         'subject': self.order[index], 'wmh_cluster': WMH_cluster}
             return {'data': x_final, 'label': y, 'mask': m.bool(),
                     'subject': self.order[index]}
@@ -241,36 +244,8 @@ class PittLocalFull(torch.utils.data.Dataset):
 
             WMH_cluster = None
             if self.is_FCM:
-                import matplotlib.pyplot as plt
-                if 'fcm_seg' not in self.data[index]:
-                    WMH_cluster = fcm.fcm_WMH_segmentation(x[0], 2, 0.03, 1)
-
-                    WMH_cluster = torch.Tensor(WMH_cluster)
-                    self.data[index]['fcm_seg'] = WMH_cluster.type(torch.DoubleTensor)
-                else:
-                    WMH_cluster = self.data[index]['fcm_seg']
-
-                # plt.imshow(WMH_cluster, 'gray')
-                # image_path =  "../images/wmh_{}.png".format(self.iter)
-                # plt.savefig(image_path)
-                #
-                # plt.imshow(y.reshape(212,256), 'gray')
-                # image_path = "../images/label_{}.png".format(self.iter)
-                # plt.savefig(image_path)
-
-                # self.iter += 1
-
-            if self.intensity_rescale:
-                x = normalize_quantile(x, 0.99)
-                # x = rescale_intensity(x) #chg/
-            #            y = rescale_intensity(y) #chg
-
-            # if self.is_train and self.is_ncut:
-            #     if index not in self.weights:
-            #
-            #         r = x.shape[1]
-            #         c = x.shape[2]
-            #         self.weights[index] = compute_weigths(x.flatten(),r,c)
+                WMH_cluster = self.perform_fcm(index, x)
+            x = rescale_intensity(x)
 
             if self.is_FCM:
                 return {'data': x, 'label': y, 'mask': m.bool(),
@@ -281,6 +256,7 @@ class PittLocalFull(torch.utils.data.Dataset):
 
 def tensorize(*args):
     return tuple(torch.Tensor(arg).float().unsqueeze(0) for arg in args)
+
 
 
 def rescale_intensity(x):

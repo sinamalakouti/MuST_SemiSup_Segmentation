@@ -11,7 +11,7 @@ import numpy as np
 # class Utils:
 #     def __init__(self, dataset):
 
-def get_trainset(dataset, batch_size, intensity_rescale) -> torch.utils.data.DataLoader:
+def get_trainset(dataset, batch_size, intensity_rescale, has_t1, mixup_threshold) -> torch.utils.data.DataLoader:
     mem_pin = False
     if Constants.USE_CUDA:
         mem_pin = True
@@ -20,8 +20,8 @@ def get_trainset(dataset, batch_size, intensity_rescale) -> torch.utils.data.Dat
         train = torch.utils.data.DataLoader(
             PittLocalFull(
                 None,
-                1,
-                None,
+                has_t1,
+                mixup_threshold,
                 None,
                 intensity_rescale,
                 [f'paths/fold-0/data_paths.txt',
@@ -46,7 +46,7 @@ def get_trainset(dataset, batch_size, intensity_rescale) -> torch.utils.data.Dat
     return train
 
 
-def get_testset(dataset, batch_size, intensity_rescale) -> torch.utils.data.DataLoader:
+def get_testset(dataset, batch_size, intensity_rescale, has_t1, mixup_threshold) -> torch.utils.data.DataLoader:
     mem_pin = False
     if Constants.USE_CUDA:
         mem_pin = True
@@ -55,8 +55,8 @@ def get_testset(dataset, batch_size, intensity_rescale) -> torch.utils.data.Data
         test = torch.utils.data.DataLoader(
             PittLocalFull(
                 None,
-                1,
-                None,
+                has_t1,
+                mixup_threshold,
                 None,
                 intensity_rescale,
                 [f'paths/fold-4/data_paths.txt'],
@@ -98,9 +98,9 @@ def save_segment_images(segments, path):
                 print("Successfully created the directory %s " % path)
 
         for j in range(n_segments):
-            maximum = torch.max(segments[:, j, :, :])
-            minimum = torch.min(segments[:, j, :, :])
-            segments[:, j, :, :] = (segments[:, j, :, :] - minimum) / (maximum - minimum)
+            # maximum = torch.max(segments[:, j, :, :])
+            # minimum = torch.min(segments[:, j, :, :])
+            # segments[:, j, :, :] = (segments[:, j, :, :] - minimum) / (maximum - minimum)
 
             plt.imshow(segments[i, j])
             image_path = sample_dir + "/segment_{}.png".format(j)
@@ -108,6 +108,11 @@ def save_segment_images(segments, path):
             sgm = max_images == j
             plt.imshow(sgm[i].reshape(segments.shape[2], segments.shape[3]), 'gray')
             image_path = sample_dir + "/segment_argmax_{}.png".format(j)
+            plt.savefig(image_path)
+
+            threshold = 0.85
+            plt.imshow(segments[i, j] > threshold, 'gray')
+            image_path = sample_dir + "/segment_threshold_{}_{}.png".format(threshold,j)
             plt.savefig(image_path)
 
 
