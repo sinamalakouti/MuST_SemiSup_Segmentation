@@ -28,7 +28,6 @@ parser = argparse.ArgumentParser()
 def trainPGS(dataset, model, optimizer, device):
     model.train()
     train_loader = utils.get_trainset(dataset, 5, True, None, None)
-    scheduler = lr_scheduler.StepLR(optimizer, step_size=3, gamma=0.1)
 
     for batch in train_loader:
         optimizer.zero_grad()
@@ -38,16 +37,24 @@ def trainPGS(dataset, model, optimizer, device):
         model.to(device)
 
         outputs = model(b)
-
-        loss_functions = (reconstruction_loss.soft_dice_loss, nn.MSELoss())
+        lossf = nn.MSELoss()
+        sup_loss = torch.nn.BCELoss()
+        loss_functions = (sup_loss, lossf)
         is_supervised = True
+
+        # print(nn.Softmax2d(outputs))
+        # print("SUSUDUFSDFDFSFFSDFSFFFFDSFSFDFS")
+        # print(outputs.sum())
         total_loss = model.compute_loss(outputs, target, loss_functions, is_supervised)
+        print("****** LOSSS  *********   ", total_loss)
 
+        # print(list(model.parameters())[2])
         total_loss.backward()
+        # print(a.grad)
         optimizer.step()
-
-    scheduler.step()
-
+        # aprim = list(model.parameters())[2]
+        # print("check check")
+        # print(aprim.data)
     return model
 
 
@@ -55,14 +62,17 @@ def evaluatePGS(model, dataset, device, threshold):
     testset = utils.get_testset(dataset, 5, True, None, None)
 
     model.eval()
+    model = model.to(device)
     dice_arr = []
+
     with torch.no_grad():
         for batch in testset:
             b = batch['data']
             b = b.to(device)
             target = batch['label']
             outputs = model(b)
-            y_pred = outputs[-1] >= threshold
+
+            y_pred = outputs >= threshold
             y_pred = y_pred.reshape(y_pred.shape[0], y_pred.shape[2], y_pred.shape[3])
             dice_score = dice_coef(target.reshape(y_pred.shape), y_pred).mean()
             dice_arr.append(dice_score.item())
@@ -96,17 +106,20 @@ def train_val(dataset, n_epochs, device, wmh_threshold, output_dir, learning_rat
         None
 
     pgsnet = Pgs.PGS(inputs_dim, outputs_dim, kernels, strides)
-    optimizer = torch.optim.Adam(pgsnet.parameters(), learning_rate)
+    print(learning_rate)
+    optimizer = torch.optim.SGD(pgsnet.parameters(), learning_rate,momentum=0.9, weight_decay=1e-4)
+    # print(pgsnet)
+    print(pgsnet.parameters())
+    # scheduler = lr_scheduler.StepLR(optimizer, step_size=3, gamma=0.1)
+
     best_score = 0
     for epoch in range(n_epochs):
         print("iteration:  ", epoch)
-        score = evaluatePGS(pgsnet, dataset, device, wmh_threshold)
         pgsnet = trainPGS(dataset, pgsnet, optimizer, device)
-
-        if epoch % 5 == 0:
-            score = evaluatePGS(pgsnet, dataset, device, wmh_threshold)
-            if epoch % 10 == 0:
-                print("** SCORE @ Iteration {} is {} **".format(epoch, score))
+        # scheduler.step()
+        if epoch % 1 == 0:
+            score = evaluatePGS(pgsnet, dataset, device, 0.5)
+            print("** SCORE @ Iteration {} is {} **".format(epoch, score))
             if score > best_score:
                 print("****************** BEST SCORE @ ITERATION {} is {} ******************".format(epoch, score))
                 best_score = score
@@ -114,12 +127,13 @@ def train_val(dataset, n_epochs, device, wmh_threshold, output_dir, learning_rat
                 with open(path, 'wb') as f:
                     torch.save(pgsnet, f)
 
-                save_predictions(wmh_threshold, wmh_threshold, output_image_dir, score, epoch)
+
+                # save_predictions(wmh_threshold, wmh_threshold, output_image_dir, score, epoch)
 
 
 def save_predictions(y_pred, threshold, dir_path, score, iter):
     dir_path = os.path.join(dir_path, "results_iter{}".format(iter))
-    output_score_path = os.join(dir_path, "result.txt")
+    output_score_path = os.path.join(dir_path, "result.txt")
     with open(output_score_path, "w") as f:
         f.write("average dice score per subject (5 image) at iter {}  :   {}".format(iter, score))
     if not os.path.isdir(dir_path):
@@ -175,7 +189,7 @@ def main():
         "--optimizer",
         default="SGD",
         type=str,
-        help="SGD or MOMENTUM"
+        help="SGD or ADAM"
     )
     parser.add_argument(
         "--output_dir",
