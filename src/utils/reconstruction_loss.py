@@ -31,7 +31,7 @@ def __cos_sim_all_channels(segments, alpha=0.013):
     return err
 
 
-def soft_dice_loss(y_true, y_pred, epsilon=1e-6):
+def soft_dice_loss(y_pred, y_true, epsilon=1e-6):
     '''
     Soft dice loss calculation for arbitrary batch size, number of classes, and number of spatial dimensions.
     Assumes the `channels_last` format.

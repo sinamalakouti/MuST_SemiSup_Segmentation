@@ -147,7 +147,7 @@ def _evaluate(y_true, predictions, segment_index):
     return dice_arr.mean()
 
 
-def evaluate(dataset, wnet, output_path):
+def evaluate(dataset, model, output_path):
     testset = utils.get_testset(dataset, 5, True)
     if torch.cuda.is_available() and utils.Constants.USE_CUDA:
         dev = "cuda:0"
@@ -155,7 +155,7 @@ def evaluate(dataset, wnet, output_path):
         dev = "cpu"
     device = torch.device(dev)
 
-    wnet.to(device)
+    model.to(device)
 
     dice_scores = []
     with torch.no_grad():
@@ -166,7 +166,7 @@ def evaluate(dataset, wnet, output_path):
             x_test = x_test.to(device)
             y_true = y_true.to(device)
             x_mask = x_mask.to(device)
-            segmentation = wnet.U_enc_fw(x_test)
+            segmentation = model.U_enc_fw(x_test)
             segmentation = torch.mul(x_mask, segmentation)
             score = _evaluate(y_true, segmentation, 1)
             dice_scores.append(score)
