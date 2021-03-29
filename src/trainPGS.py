@@ -32,7 +32,7 @@ def trainPGS(dataset, model, optimizer, device):
     for batch in train_loader:
         optimizer.zero_grad()
         b = batch['data']
-        target = batch['label']
+        target = batch['label'].to(device)
         b = b.to(device)
         model.to(device)
 
@@ -70,9 +70,9 @@ def evaluatePGS(model, dataset, device, threshold):
             b = batch['data']
             b = b.to(device)
             target = batch['label']
-            outputs = model(b)
+            outputs = model(b).to(device)
 
-            y_pred = outputs >= threshold
+            y_pred = outputs[-1] >= threshold
             y_pred = y_pred.reshape(y_pred.shape[0], y_pred.shape[2], y_pred.shape[3])
             dice_score = dice_coef(target.reshape(y_pred.shape), y_pred).mean()
             dice_arr.append(dice_score.item())

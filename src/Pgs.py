@@ -132,10 +132,10 @@ class PGS(nn.Module):
 
         # classifiers
         print(self.dim_outputs[4])
-        # self.cls5 = CLS(self.dim_outputs[4], self.dim_inputs[0])
-        # self.cls6 = CLS(self.dim_outputs[5], self.dim_inputs[0])
-        # self.cls7 = CLS(self.dim_outputs[6], self.dim_inputs[0])
-        # self.cls8 = CLS(self.dim_outputs[7], self.dim_inputs[0])
+        self.cls5 = CLS(self.dim_outputs[4], self.dim_inputs[0])
+        self.cls6 = CLS(self.dim_outputs[5], self.dim_inputs[0])
+        self.cls7 = CLS(self.dim_outputs[6], self.dim_inputs[0])
+        self.cls8 = CLS(self.dim_outputs[7], self.dim_inputs[0])
         self.cls9 = CLS(self.dim_outputs[8], self.dim_inputs[0])  #main classifier
 
     def forward(self, X):
@@ -153,51 +153,51 @@ class PGS(nn.Module):
         # bottleneck
 
         c5 = self.conv5(d4)
-        # output5 = self.cls5(c5)
+        output5 = self.cls5(c5)
 
         # expanding path
 
         u1 = self.up1((c5, c4))
         c6 = self.conv6(u1)
-        # output6 = self.cls6(c6)
+        output6 = self.cls6(c6)
 
         u2 = self.up2((c6, c3))
         c7 = self.conv7(u2)
-        # output7 = self.cls7(c7)
+        output7 = self.cls7(c7)
 
         u3 = self.up3((c7, c2))
         c8 = self.conv8(u3)
-        # output8 = self.cls8(c8)
+        output8 = self.cls8(c8)
 
         u4 = self.up4((c8, c1))
         c9 = self.conv9(u4)
         output9 = self.cls9(c9)
-        return output9
+        return output5, output6, output7, output8, output9
 
     def compute_loss(self, y_preds, y_true, loss_functions,  is_supervised):
         (sup_loss, unsup_loss) = loss_functions
         total_loss = 0
         if is_supervised:
 
-            return sup_loss(y_preds, y_true)
+            # return sup_loss(y_preds, y_true)
 
-            # for output in y_preds:
-            #     ratio = int(np.round(y_true.shape[2] / output.shape[2]))
-            #     maxpool = nn.MaxPool2d(kernel_size=2, stride=ratio, padding=0)
+            for output in y_preds:
+                ratio = int(np.round(y_true.shape[2] / output.shape[2]))
+                maxpool = nn.MaxPool2d(kernel_size=2, stride=ratio, padding=0)
             #
-            #     target = maxpool(y_true)
-            #     if target.shape != output.shape:
-            #         h_diff = output.size()[2] - target.size()[2]
-            #         w_diff = output.size()[3] - target.size()[3]
+                target = maxpool(y_true)
+                if target.shape != output.shape:
+                    h_diff = output.size()[2] - target.size()[2]
+                    w_diff = output.size()[3] - target.size()[3]
             #
-            #         target = F.pad(target, (w_diff // 2, w_diff - w_diff // 2,
-            #                                                         h_diff // 2, h_diff - h_diff // 2))
+                    target = F.pad(target, (w_diff // 2, w_diff - w_diff // 2,
+                                                                    h_diff // 2, h_diff - h_diff // 2))
             #
-            #         print("SUPERVISED : padded target!!!")
+                    # print("SUPERVISED : padded target!!!")
             #
             #
-            #     assert output.shape == target.shape, "output and target shape is not similar!!"
-            #     total_loss += sup_loss(output, target)
+                assert output.shape == target.shape, "output and target shape is not similar!!"
+                total_loss += sup_loss(output, target)
         else:
             main_output = y_preds[-1].detach()
 
