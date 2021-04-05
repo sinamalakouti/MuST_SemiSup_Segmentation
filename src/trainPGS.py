@@ -29,7 +29,7 @@ def trainPGS(dataset, model, optimizer, device):
     model.train()
     train_loader = utils.get_trainset(dataset, 5, True, None, None)
 
-    for batch in train_loader:
+    for step, batch in enumerate(train_loader):
         optimizer.zero_grad()
         b = batch['data']
         target = batch['label'].to(device)
@@ -41,20 +41,19 @@ def trainPGS(dataset, model, optimizer, device):
         sup_loss = torch.nn.BCELoss()
         loss_functions = (sup_loss, lossf)
         is_supervised = True
+        if step % 4 == 0:
+            is_supervised = True
+        else:
+            is_supervised = False
+        if is_supervised:
+            total_loss = model.compute_loss(outputs, target, loss_functions, is_supervised)
+        else:
+            total_loss = model.compute_loss(outputs, outputs, loss_functions, is_supervised)
 
-        # print(nn.Softmax2d(outputs))
-        # print("SUSUDUFSDFDFSFFSDFSFFFFDSFSFDFS")
-        # print(outputs.sum())
-        total_loss = model.compute_loss(outputs, target, loss_functions, is_supervised)
         print("****** LOSSS  *********   ", total_loss)
 
-        # print(list(model.parameters())[2])
         total_loss.backward()
-        # print(a.grad)
         optimizer.step()
-        # aprim = list(model.parameters())[2]
-        # print("check check")
-        # print(aprim.data)
     return model
 
 
@@ -64,20 +63,23 @@ def evaluatePGS(model, dataset, device, threshold):
     model.eval()
     model = model.to(device)
     dice_arr = []
-
+    res = []
     with torch.no_grad():
         for batch in testset:
             b = batch['data']
             b = b.to(device)
-            target = batch['label']
-            outputs = model(b).to(device)
+            target = batch['label'].to(device)
+            outputs = model(b)
 
             y_pred = outputs[-1] >= threshold
             y_pred = y_pred.reshape(y_pred.shape[0], y_pred.shape[2], y_pred.shape[3])
+
             dice_score = dice_coef(target.reshape(y_pred.shape), y_pred).mean()
             dice_arr.append(dice_score.item())
+            if len(res) == 0:
+                res.append(y_pred[-1][0])
 
-    return np.mean(np.array(dice_arr))
+    return np.mean(np.array(dice_arr)), res
 
 
 def train_val(dataset, n_epochs, device, wmh_threshold, output_dir, learning_rate):
@@ -110,15 +112,15 @@ def train_val(dataset, n_epochs, device, wmh_threshold, output_dir, learning_rat
     optimizer = torch.optim.SGD(pgsnet.parameters(), learning_rate,momentum=0.9, weight_decay=1e-4)
     # print(pgsnet)
     print(pgsnet.parameters())
-    # scheduler = lr_scheduler.StepLR(optimizer, step_size=3, gamma=0.1)
+    scheduler = lr_scheduler.StepLR(optimizer, step_size=3, gamma=0.1)
 
     best_score = 0
     for epoch in range(n_epochs):
         print("iteration:  ", epoch)
         pgsnet = trainPGS(dataset, pgsnet, optimizer, device)
-        # scheduler.step()
+        scheduler.step()
         if epoch % 1 == 0:
-            score = evaluatePGS(pgsnet, dataset, device, 0.5)
+            score, _ = evaluatePGS(pgsnet, dataset, device, 0.5)
             print("** SCORE @ Iteration {} is {} **".format(epoch, score))
             if score > best_score:
                 print("****************** BEST SCORE @ ITERATION {} is {} ******************".format(epoch, score))
@@ -127,9 +129,22 @@ def train_val(dataset, n_epochs, device, wmh_threshold, output_dir, learning_rat
                 with open(path, 'wb') as f:
                     torch.save(pgsnet, f)
 
-
+                save_score(output_image_dir, score, epoch)
                 # save_predictions(wmh_threshold, wmh_threshold, output_image_dir, score, epoch)
 
+
+def save_score(dir_path, score, iter):
+    dir_path = os.path.join(dir_path, "results_iter{}".format(iter))
+    if not os.path.isdir(dir_path):
+        try:
+            os.mkdir(dir_path)
+        except OSError:
+            print("Creation of the directory %s failed" % dir_path)
+    else:
+        None
+    output_score_path = os.path.join(dir_path, "result.txt")
+    with open(output_score_path, "w") as f:
+        f.write("average dice score per subject (5 image) at iter {}  :   {}".format(iter, score))
 
 def save_predictions(y_pred, threshold, dir_path, score, iter):
     dir_path = os.path.join(dir_path, "results_iter{}".format(iter))
