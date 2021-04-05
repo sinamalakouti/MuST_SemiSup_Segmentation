@@ -217,8 +217,8 @@ class PGS(nn.Module):
 
                         pooled_main_output = F.pad(pooled_main_output, (w_diff // 2, w_diff - w_diff // 2,
                                                                         h_diff // 2, h_diff - h_diff // 2))
-                        print(pooled_main_output)
-                        print("Unsupervised: Padded OUTPUT!!!")
+                        # print(pooled_main_output)
+                        # print("Unsupervised: Padded OUTPUT!!!")
 
 
 

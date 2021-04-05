@@ -50,7 +50,7 @@ def trainPGS(dataset, model, optimizer, device):
         else:
             total_loss = model.compute_loss(outputs, outputs, loss_functions, is_supervised)
 
-        print("****** LOSSS  *********   ", total_loss)
+        print("****** LOSSS  : Is_supervised: {} *********   :  ".format(is_supervised), total_loss)
 
         total_loss.backward()
         optimizer.step()
