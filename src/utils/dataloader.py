@@ -10,6 +10,119 @@ from utils import Constants
 import fcm
 from utils import utils
 
+import torchvision.transforms.functional as augmentor
+
+
+def adjust_contrast(x, c_factor):
+    x_np = x - x.mean()
+    x_np = np.multiply(x_np, c_factor)
+    x_np = x_np + x.mean()
+    return x_np
+
+
+def augment(x, y, m=None, t1=None, intensity_aug=None):
+    # NOTE: method expects numpy float arrays
+    # to_pil_image makes assumptions based on input when mode = None
+    # i.e. it should infer that mode = 'F'
+    # manually setting mode to 'F' in this function
+
+    # print(x.shape); exit()
+    # NOTE: accepts np.ndarray of size H x W x C
+    # x.shape = 64x64
+    # torch implicitly expands last dim as below:
+    # elif pic.ndim == 2:
+    # if 2D image, add channel dimension (HWC)
+    # pic = np.expand_dims(pic, 2)
+    # BUT!!!!!!!
+    # if x was a tensor this would be different:
+    # elif pic.ndimension() == 2:
+    # if 2D image, add channel dimension (CHW)
+    # pic = pic.unsqueeze(0)
+
+    angle = np.random.uniform(-180, 180)
+    scale = np.random.uniform(.8, 1.2)
+    shear = np.random.uniform(-30, 30)
+    c_factor = np.random.uniform(.5, 1.5)  # contrast factor
+    # c_factor = 1.2  # contrast factor
+
+    ori_x = x
+    ori_t1 = None
+    # import matplotlib.pyplot as plt
+    # fig, ax = plt.subplots(1, 3)
+    # ax.flat[0].imshow(x)
+    if intensity_aug is not None:
+        x = adjust_contrast(x, c_factor)
+
+    x = augmentor.to_pil_image(x, mode='F')
+    # ax.flat[1].imshow(x)
+    y = augmentor.to_pil_image(y, mode='F')
+    if m is not None:
+        m = augmentor.to_pil_image(m, mode='F')
+    if t1 is not None:
+        ori_t1 = t1
+        if intensity_aug is not None:
+            t1 = adjust_contrast(t1, c_factor)
+        t1 = augmentor.to_pil_image(t1, mode='F')
+
+    x = augmentor.affine(x,
+                         angle=angle, translate=(0, 0), shear=shear, scale=scale)
+    y = augmentor.affine(y,
+                         angle=angle, translate=(0, 0), shear=shear, scale=scale)
+    if m is not None:
+        m = augmentor.affine(m,
+                             angle=angle, translate=(0, 0), shear=shear, scale=scale)
+    if t1 is not None:
+        t1 = augmentor.affine(t1,
+                              angle=angle, translate=(0, 0), shear=shear, scale=scale)
+    x = augmentor.to_tensor(x).float()
+    # ax.flat[2].imshow(x.squeeze(0))
+    # plt.show(); exit()
+    y = augmentor.to_tensor(y).float()
+    y = (y > 0).float()
+
+    if m is not None:
+        m = augmentor.to_tensor(m).float()
+        m = (m > 0).float()
+
+    if t1 is not None:
+        t1 = augmentor.to_tensor(t1).float()
+
+        # returns 1xHxW
+
+    # x_numpy = x.numpy()
+    # y_numpy = y.numpy()
+    # if m is not None:
+    #     m_numpy = m.numpy()
+    # if t1 is not None:
+    #     t1_numpy = t1.numpy()
+    # plt.rcParams.update({'figure.max_open_warning': 0})
+    # fig, ax = plt.subplots(1, 2)
+    # ax.flat[0].imshow(np.rot90(x_numpy.squeeze(0), 3), vmin=0, vmax=800,
+    #                   interpolation='none', origin='lower', cmap='gray')
+    # ax.flat[1].imshow(np.rot90(ori_x, 3), vmin=0, vmax=800,
+    #                   interpolation='none', origin='lower', cmap='gray')
+    # # ax.flat[2].imshow(np.rot90(y_numpy.squeeze(0), 3),
+    # #                   interpolation='none', origin='lower', cmap='gray')
+    # # if m is not None:
+    # #     ax.flat[3].imshow(np.rot90(m_numpy.squeeze(0), 3),
+    # #                       interpolation='none', origin='lower', cmap='gray')
+    # # if t1 is not None:
+    # #     ax.flat[4].imshow(np.rot90(t1_numpy.squeeze(0), 3), vmin=0, vmax=800,
+    # #                       interpolation='none', origin='lower', cmap='gray')
+    # #     ax.flat[5].imshow(np.rot90(ori_t1, 3), vmin=0, vmax=800,
+    # #                       interpolation='none', origin='lower', cmap='gray')
+    # fig.savefig('temp_fig/fig.jpg')
+
+    if m is not None and t1 is not None:
+        return x, y, m, t1
+    elif m is not None and t1 is None:
+        return x, y, m
+    elif m is None and t1 is not None:
+        return x, y, t1
+    else:
+        return x, y
+
+
 
 class DataLoader():
     # initialization
@@ -237,8 +350,8 @@ class PittLocalFull(torch.utils.data.Dataset):
 
             if self.augment:
                 None
-                # x, y, m = augment(
-                #     x=x, y=y, m=m, intensity_aug=self.intensity_aug)
+                x, y, m = augment(
+                    x=x, y=y, m=m, intensity_aug=self.intensity_aug)
             else:
                 x, y, m = tensorize(x, y, m)
 

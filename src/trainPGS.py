@@ -45,6 +45,7 @@ def trainPGS(dataset, model, optimizer, device):
             is_supervised = True
         else:
             is_supervised = False
+
         if is_supervised:
             total_loss = model.compute_loss(outputs, target, loss_functions, is_supervised)
         else:
@@ -87,8 +88,9 @@ def train_val(dataset, n_epochs, device, wmh_threshold, output_dir, learning_rat
     outputs_dim = [64, 96, 128, 256, 512, 256, 128, 96, 64]
     kernels = [5, 3, 3, 3, 3, 3, 3, 3, 3]
     strides = [1, 1, 1, 1, 1, 1, 1, 1, 1]
-
-    output_model_dir = os.path.join(output_dir, "/best_model")
+    print("output_dir is    ", output_dir)
+    output_model_dir = os.path.join(output_dir, "best_model")
+    print("output_model_dir is   ", output_model_dir)
     if not os.path.isdir(output_model_dir):
         try:
             os.mkdir(output_model_dir)
@@ -97,7 +99,7 @@ def train_val(dataset, n_epochs, device, wmh_threshold, output_dir, learning_rat
     else:
         None
 
-    output_image_dir = os.path.join(output_dir, "/result_images/")
+    output_image_dir = os.path.join(output_dir, "result_images/")
 
     if not os.path.isdir(output_image_dir):
         try:
