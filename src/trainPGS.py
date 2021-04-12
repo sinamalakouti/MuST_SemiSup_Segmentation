@@ -36,7 +36,7 @@ def trainPGS(dataset, model, optimizer, device, epochid):
         b = b.to(device)
         model.to(device)
 
-        outputs = model(b)
+
         lossf = nn.MSELoss()
         sup_loss = torch.nn.BCELoss()
         loss_functions = (sup_loss, lossf)
@@ -45,9 +45,10 @@ def trainPGS(dataset, model, optimizer, device, epochid):
             is_supervised = True
         else:
             is_supervised = False
-            if epochid < 2:
+            if epochid < 5:
                 continue
 
+        outputs = model(b, is_supervised)
         if is_supervised:
             total_loss = model.compute_loss(outputs, target, loss_functions, is_supervised)
         else:
