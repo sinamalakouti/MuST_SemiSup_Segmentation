@@ -121,7 +121,7 @@ def train_val(dataset, n_epochs, device, wmh_threshold, output_dir, learning_rat
     best_score = 0
     for epoch in range(n_epochs):
         print("iteration:  ", epoch)
-        pgsnet = trainPGS(dataset, pgsnet, optimizer, device)
+        pgsnet = trainPGS(dataset, pgsnet, optimizer, device, epoch)
         scheduler.step()
         if epoch % 1 == 0:
             score, _ = evaluatePGS(pgsnet, dataset, device, 0.5)
