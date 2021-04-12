@@ -73,7 +73,7 @@ def evaluatePGS(model, dataset, device, threshold):
             b = batch['data']
             b = b.to(device)
             target = batch['label'].to(device)
-            outputs = model(b)
+            outputs = model(b,True)
 
             y_pred = outputs[-1] >= threshold
             y_pred = y_pred.reshape(y_pred.shape[0], y_pred.shape[2], y_pred.shape[3])
