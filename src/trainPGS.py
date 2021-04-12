@@ -25,7 +25,7 @@ utils.Constants.N_ITERATION = 20000
 parser = argparse.ArgumentParser()
 
 
-def trainPGS(dataset, model, optimizer, device):
+def trainPGS(dataset, model, optimizer, device, epochid):
     model.train()
     train_loader = utils.get_trainset(dataset, 5, True, None, None)
 
@@ -45,6 +45,8 @@ def trainPGS(dataset, model, optimizer, device):
             is_supervised = True
         else:
             is_supervised = False
+            if epochid < 2:
+                continue
 
         if is_supervised:
             total_loss = model.compute_loss(outputs, target, loss_functions, is_supervised)
