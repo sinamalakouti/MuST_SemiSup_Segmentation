@@ -7,6 +7,8 @@ import matplotlib.pyplot as plt
 import torch.nn as nn
 import torch.nn.functional as F
 
+from torch.distributions.uniform import Uniform
+
 
 
 class ConvBlock(nn.Module):
@@ -47,7 +49,7 @@ class CLS (nn.Module):
 
         return nn.Sequential(
             nn.Conv2d(self.dim_in, self.dim_out, 1),
-            nn.Sigmoid()
+            nn.Softmax2d()
         )
     
     def forward(self, X):
@@ -136,9 +138,10 @@ class PGS(nn.Module):
         self.cls6 = CLS(self.dim_outputs[5], self.dim_inputs[0])
         self.cls7 = CLS(self.dim_outputs[6], self.dim_inputs[0])
         self.cls8 = CLS(self.dim_outputs[7], self.dim_inputs[0])
-        self.cls9 = CLS(self.dim_outputs[8], self.dim_inputs[0])  #main classifier
+        self.cls9 = CLS(self.dim_outputs[8], self.dim_inputs[0])
+        #main classifier
 
-    def forward(self, X):
+    def forward(self, X , is_supervised):
         # contracting path
 
         c1 = self.conv1(X)
@@ -151,6 +154,14 @@ class PGS(nn.Module):
         d4 = self.down4(c4)
 
         # bottleneck
+
+        # if it is unsupervised loss add some noise
+        from torch.distributions.uniform import Uniform
+
+        if not is_supervised:
+            uni_dist = Uniform(-0.3, 0.3)
+            noise_vector = uni_dist.sample(d4.shape[1:]).to(d4.device).unsqueeze(0)
+            d4 = d4.mul(noise_vector) + d4
 
         c5 = self.conv5(d4)
         output5 = self.cls5(c5)
