@@ -43,7 +43,7 @@ def augment(x, y, m=None, t1=None, intensity_aug=None):
     scale = np.random.uniform(.8, 1.2)
     shear = np.random.uniform(-30, 30)
     c_factor = np.random.uniform(.5, 1.5)  # contrast factor
-    # c_factor = 1.2  # contrast factor
+    # c_factor = 1.2     ' # contrast factor
 
     ori_x = x
     ori_t1 = None
