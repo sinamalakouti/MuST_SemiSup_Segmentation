@@ -35,18 +35,28 @@ def trainPGS(dataset, model, optimizer, device, epochid):
         target = batch['label'].to(device)
         b = b.to(device)
         model.to(device)
+        if step == 0:
+            print(batch['subject'])
 
 
         lossf = nn.MSELoss()
         sup_loss = torch.nn.BCELoss()
-        loss_functions = (sup_loss, lossf)
+        loss_functions = (    sup_loss, lossf)
         is_supervised = True
-        if step % 4 == 0:
-            is_supervised = True
-        else:
+        if "0332AG" in batch['subject'][0] or '0097RS' in batch['subject'][0] :
             is_supervised = False
-            if epochid < 5:
-                continue
+            continue
+        else:
+            is_supervised = True
+        if step <= 5 and not is_supervised:
+            continue
+
+        # if step % 4 == 0:
+        #     is_supervised = True
+        # else:
+        #     is_supervised = False
+        #     if epochid < 5:
+        #         continue
 
         outputs = model(b, is_supervised)
         if is_supervised:
@@ -117,24 +127,24 @@ def train_val(dataset, n_epochs, device, wmh_threshold, output_dir, learning_rat
     optimizer = torch.optim.SGD(pgsnet.parameters(), learning_rate,momentum=0.9, weight_decay=1e-4)
     # print(pgsnet)
     print(pgsnet.parameters())
-    scheduler = lr_scheduler.StepLR(optimizer, step_size=3, gamma=0.1)
+    # scheduler = lr_scheduler.StepLR(optimizer, step_size=3, gamma=0.1)
 
     best_score = 0
     for epoch in range(n_epochs):
         print("iteration:  ", epoch)
         pgsnet = trainPGS(dataset, pgsnet, optimizer, device, epoch)
-        scheduler.step()
-        if epoch % 1 == 0:
-            score, _ = evaluatePGS(pgsnet, dataset, device, 0.5)
-            print("** SCORE @ Iteration {} is {} **".format(epoch, score))
-            if score > best_score:
-                print("****************** BEST SCORE @ ITERATION {} is {} ******************".format(epoch, score))
-                best_score = score
-                path = os.path.join(output_model_dir, 'psgnet_best_lr{}.model'.format(learning_rate))
-                with open(path, 'wb') as f:
-                    torch.save(pgsnet, f)
-
-                save_score(output_image_dir, score, epoch)
+        # # scheduler.step()
+        # if epoch % 1 == 0:
+        #     score, _ = evaluatePGS(pgsnet, dataset, device, 0.5)
+        #     print("** SCORE @ Iteration {} is {} **".format(epoch, score))
+        #     if score > best_score:
+        #         print("****************** BEST SCORE @ ITERATION {} is {} ******************".format(epoch, score))
+        #         best_score = score
+        #         path = os.path.join(output_model_dir, 'psgnet_best_lr{}.model'.format(learning_rate))
+        #         with open(path, 'wb') as f:
+        #             torch.save(pgsnet, f)
+        #
+        #         save_score(output_image_dir, score, epoch)
                 # save_predictions(wmh_threshold, wmh_threshold, output_image_dir, score, epoch)
 
 
