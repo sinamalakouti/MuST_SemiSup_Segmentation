@@ -127,24 +127,24 @@ def train_val(dataset, n_epochs, device, wmh_threshold, output_dir, learning_rat
     optimizer = torch.optim.SGD(pgsnet.parameters(), learning_rate,momentum=0.9, weight_decay=1e-4)
     # print(pgsnet)
     print(pgsnet.parameters())
-    # scheduler = lr_scheduler.StepLR(optimizer, step_size=3, gamma=0.1)
+    # scheduler = lr_scheduler.StepLR(optimizer, step_size=3, gamma=0.1) don't use it
 
     best_score = 0
     for epoch in range(n_epochs):
         print("iteration:  ", epoch)
         pgsnet = trainPGS(dataset, pgsnet, optimizer, device, epoch)
-        # # scheduler.step()
-        # if epoch % 1 == 0:
-        #     score, _ = evaluatePGS(pgsnet, dataset, device, 0.5)
-        #     print("** SCORE @ Iteration {} is {} **".format(epoch, score))
-        #     if score > best_score:
-        #         print("****************** BEST SCORE @ ITERATION {} is {} ******************".format(epoch, score))
-        #         best_score = score
-        #         path = os.path.join(output_model_dir, 'psgnet_best_lr{}.model'.format(learning_rate))
-        #         with open(path, 'wb') as f:
-        #             torch.save(pgsnet, f)
-        #
-        #         save_score(output_image_dir, score, epoch)
+
+        if epoch % 1 == 0:
+            score, _ = evaluatePGS(pgsnet, dataset, device, 0.5)
+            print("** SCORE @ Iteration {} is {} **".format(epoch, score))
+            if score > best_score:
+                print("****************** BEST SCORE @ ITERATION {} is {} ******************".format(epoch, score))
+                best_score = score
+                path = os.path.join(output_model_dir, 'psgnet_best_lr{}.model'.format(learning_rate))
+                with open(path, 'wb') as f:
+                    torch.save(pgsnet, f)
+
+                save_score(output_image_dir, score, epoch)
                 # save_predictions(wmh_threshold, wmh_threshold, output_image_dir, score, epoch)
 
 
