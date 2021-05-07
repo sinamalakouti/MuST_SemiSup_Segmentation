@@ -43,8 +43,10 @@ def trainPGS(dataset, model, optimizer, device, epochid):
 
 
         lossf = nn.MSELoss()
-        sup_loss = torch.nn.BCELoss()
-        loss_functions = (    sup_loss, lossf)
+        # sup_loss = torch.nn.BCELoss()
+        sup_loss = reconstruction_loss.soft_dice_loss
+        # sup_loss = torch.nn.w
+        loss_functions = (sup_loss, lossf)
         is_supervised = True
         if "0332AG" in batch['subject'][0] or '0097RS' in batch['subject'][0] :
             is_supervised = True
@@ -146,7 +148,7 @@ def train_val(dataset, n_epochs, device, wmh_threshold, output_dir, learning_rat
     optimizer = torch.optim.SGD(pgsnet.parameters(), learning_rate,momentum=0.9, weight_decay=1e-4)
     # print(pgsnet)
     print(pgsnet.parameters())
-    scheduler = lr_scheduler.StepLR(optimizer, step_size=30, gamma=0.1)# don't use it
+    scheduler = lr_scheduler.StepLR(optimizer, step_size=50, gamma=0.1)# don't use it
 
     best_score = 0
     for epoch in range(n_epochs):

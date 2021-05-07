@@ -49,7 +49,8 @@ class CLS (nn.Module):
 
         return nn.Sequential(
             nn.Conv2d(self.dim_in, self.dim_out, 1),
-            nn.Softmax2d()
+            nn.Sigmoid(),
+            # nn.Softmax2d()
         )
     
     def forward(self, X):
