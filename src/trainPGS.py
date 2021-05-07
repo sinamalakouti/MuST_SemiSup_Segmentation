@@ -44,12 +44,15 @@ def trainPGS(dataset, model, optimizer, device, epochid):
         loss_functions = (    sup_loss, lossf)
         is_supervised = True
         if "0332AG" in batch['subject'][0] or '0097RS' in batch['subject'][0] :
-            is_supervised = False
-            continue
+            is_supervised = True
+            #continue
         else:
             is_supervised = True
+   #         continue
         if step <= 5 and not is_supervised:
             continue
+
+        print(batch['subject'])
 
         # if step % 4 == 0:
         #     is_supervised = True
@@ -123,11 +126,11 @@ def train_val(dataset, n_epochs, device, wmh_threshold, output_dir, learning_rat
         None
 
     pgsnet = Pgs.PGS(inputs_dim, outputs_dim, kernels, strides)
-    print(learning_rate)
+    print("learning_rate is    " , learning_rate)
     optimizer = torch.optim.SGD(pgsnet.parameters(), learning_rate,momentum=0.9, weight_decay=1e-4)
     # print(pgsnet)
     print(pgsnet.parameters())
-    # scheduler = lr_scheduler.StepLR(optimizer, step_size=3, gamma=0.1) don't use it
+    scheduler = lr_scheduler.StepLR(optimizer, step_size=30, gamma=0.1)# don't use it
 
     best_score = 0
     for epoch in range(n_epochs):
@@ -146,7 +149,7 @@ def train_val(dataset, n_epochs, device, wmh_threshold, output_dir, learning_rat
 
                 save_score(output_image_dir, score, epoch)
                 # save_predictions(wmh_threshold, wmh_threshold, output_image_dir, score, epoch)
-
+        scheduler.step()
 
 def save_score(dir_path, score, iter):
     dir_path = os.path.join(dir_path, "results_iter{}".format(iter))
