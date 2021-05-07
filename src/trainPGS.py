@@ -2,13 +2,16 @@ import torch
 import sys
 import os
 import torch
+from torch.utils.tensorboard import SummaryWriter
+import torch.nn as nn
+from torch.optim import lr_scheduler
+
 from utils import utils
 from evaluation_metrics import dice_coef
 import Pgs
 import matplotlib.pyplot as plt
 from utils import reconstruction_loss
-import torch.nn as nn
-from torch.optim import lr_scheduler
+
 import numpy as np
 
 import argparse
@@ -71,7 +74,7 @@ def trainPGS(dataset, model, optimizer, device, epochid):
 
         total_loss.backward()
         optimizer.step()
-    return model
+    return model, total_loss
 
 
 def evaluatePGS(model, dataset, device, threshold):
@@ -81,6 +84,7 @@ def evaluatePGS(model, dataset, device, threshold):
     model = model.to(device)
     dice_arr = []
     res = []
+
     with torch.no_grad():
         for batch in testset:
             b = batch['data']
@@ -104,9 +108,11 @@ def train_val(dataset, n_epochs, device, wmh_threshold, output_dir, learning_rat
     outputs_dim = [64, 96, 128, 256, 512, 256, 128, 96, 64]
     kernels = [5, 3, 3, 3, 3, 3, 3, 3, 3]
     strides = [1, 1, 1, 1, 1, 1, 1, 1, 1]
+
     print("output_dir is    ", output_dir)
     output_model_dir = os.path.join(output_dir, "best_model")
     print("output_model_dir is   ", output_model_dir)
+
     if not os.path.isdir(output_model_dir):
         try:
             os.mkdir(output_model_dir)
@@ -114,6 +120,16 @@ def train_val(dataset, n_epochs, device, wmh_threshold, output_dir, learning_rat
             print("Creation of the directory %s failed" % output_model_dir)
     else:
         None
+
+    if not os.path.isdir(os.path.join(output_model_dir, "runs")):
+        try:
+            os.mkdir(os.path.join(output_model_dir, "runs"))
+        except OSError:
+            print("Creation of the directory %s failed" % os.path.join(output_model_dir, "runs"))
+    else:
+        None
+
+    writer = SummaryWriter(log_dir=os.path.join(output_dir, "runs"))
 
     output_image_dir = os.path.join(output_dir, "result_images/")
 
@@ -135,10 +151,12 @@ def train_val(dataset, n_epochs, device, wmh_threshold, output_dir, learning_rat
     best_score = 0
     for epoch in range(n_epochs):
         print("iteration:  ", epoch)
-        pgsnet = trainPGS(dataset, pgsnet, optimizer, device, epoch)
+        pgsnet, loss = trainPGS(dataset, pgsnet, optimizer, device, epoch)
+        writer.add_scalar("Loss/train", loss, epoch)
 
         if epoch % 1 == 0:
             score, _ = evaluatePGS(pgsnet, dataset, device, 0.5)
+            writer.add_scalar("dice_score/test", score, epoch)
             print("** SCORE @ Iteration {} is {} **".format(epoch, score))
             if score > best_score:
                 print("****************** BEST SCORE @ ITERATION {} is {} ******************".format(epoch, score))
@@ -150,6 +168,8 @@ def train_val(dataset, n_epochs, device, wmh_threshold, output_dir, learning_rat
                 save_score(output_image_dir, score, epoch)
                 # save_predictions(wmh_threshold, wmh_threshold, output_image_dir, score, epoch)
         scheduler.step()
+    writer.flush()
+    writer.close()
 
 def save_score(dir_path, score, iter):
     dir_path = os.path.join(dir_path, "results_iter{}".format(iter))
