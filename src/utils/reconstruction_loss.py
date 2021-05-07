@@ -35,7 +35,7 @@ def dice_coef_loss(y_pred,y_true, smooth=1):
     y_true = y_true.view(1, -1)
     numer = 2 * y_true @ y_pred
     denom = y_true.sum() + y_pred.sum()
-    dsc_score = (numer + smooth / denom + smooth)
+    dsc_score = (numer + smooth)/ (denom + smooth)
     return 1 - dsc_score
 
 #

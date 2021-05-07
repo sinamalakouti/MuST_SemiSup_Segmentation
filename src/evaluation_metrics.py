@@ -7,7 +7,7 @@ def dice_coef(y_true, y_pred, smooth =1 ):
   y_true = y_true.float().view(1, -1)
   numer = 2 * y_true @ y_pred
   denom = y_true.sum() + y_pred.sum()
-  dsc_score = (numer + smooth / denom + smooth)
+  dsc_score = (numer + smooth) / (denom + smooth)
   return dsc_score
 
 # def dice_coef(y_true, y_pred, smooth=1):
