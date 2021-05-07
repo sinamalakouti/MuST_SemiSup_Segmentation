@@ -112,7 +112,17 @@ def train_val(dataset, n_epochs, device, wmh_threshold, output_dir, learning_rat
     strides = [1, 1, 1, 1, 1, 1, 1, 1, 1]
 
     print("output_dir is    ", output_dir)
+    if not os.path.isdir(output_dir):
+        try:
+            os.mkdir(output_dir)
+        except OSError:
+            print("Creation of the directory %s failed" % output_dir)
+    else:
+        None
+
     output_model_dir = os.path.join(output_dir, "best_model")
+
+
     print("output_model_dir is   ", output_model_dir)
 
     if not os.path.isdir(output_model_dir):
@@ -123,11 +133,11 @@ def train_val(dataset, n_epochs, device, wmh_threshold, output_dir, learning_rat
     else:
         None
 
-    if not os.path.isdir(os.path.join(output_model_dir, "runs")):
+    if not os.path.isdir(os.path.join(output_dir, "runs")):
         try:
-            os.mkdir(os.path.join(output_model_dir, "runs"))
+            os.mkdir(os.path.join(output_dir, "runs"))
         except OSError:
-            print("Creation of the directory %s failed" % os.path.join(output_model_dir, "runs"))
+            print("Creation of the directory %s failed" % os.path.join(output_dir, "runs"))
     else:
         None
 
