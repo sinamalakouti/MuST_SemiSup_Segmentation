@@ -44,7 +44,7 @@ def trainPGS(dataset, model, optimizer, device, epochid):
 
         lossf = nn.MSELoss()
         # sup_loss = torch.nn.BCELoss()
-        sup_loss = reconstruction_loss.soft_dice_loss
+        sup_loss = reconstruction_loss.dice_coef_loss
         # sup_loss = torch.nn.w
         loss_functions = (sup_loss, lossf)
         is_supervised = True
