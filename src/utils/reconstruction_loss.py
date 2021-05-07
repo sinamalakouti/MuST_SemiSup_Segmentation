@@ -31,14 +31,25 @@ def __cos_sim_all_channels(segments, alpha=0.013):
     return err
 
 def dice_coef_loss(y_pred,y_true, smooth=1):
-  intersection = torch.mul(y_true, y_pred)
-  n_intersection = torch.sum(intersection,(1,2))
-  n_y_true = torch.sum(y_true,(1,2))
-  n_y_pred = torch.sum(y_pred,(1,2))
-  union = n_y_true + n_y_pred
-  dice = ( 2. *  n_intersection + smooth) / (union + smooth)
-  return 1 - dice
+    y_pred = y_pred.view(-1, 1)
+    y_true = y_true.view(1, -1)
+    numer = 2 * y_true @ y_pred
+    denom = y_true.sum() + y_pred.sum()
+    dsc_score = (numer + smooth / denom + smooth)
+    return 1 - dsc_score
 
+#
+# dsc_loss = 0
+#
+# return base - dsc_loss
+#   intersection = torch.mul(y_true, y_pred)
+#   n_intersection = torch.sum(intersection,(1,2))
+#   n_y_true = torch.sum(y_true,(1,2))
+#   n_y_pred = torch.sum(y_pred,(1,2))
+#   union = n_y_true + n_y_pred
+#   dice = ( 2. *  n_intersection + smooth) / (union + smooth)
+#   return 1 - dice
+#
 
 def soft_dice_loss(y_pred, y_true, epsilon=1e-6):
     '''
