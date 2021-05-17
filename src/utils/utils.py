@@ -14,22 +14,22 @@ import numpy as np
 #     def __init__(self, dataset):
 
 
-def get_subjects(dataset : utils.dataloader.PittLocalFull):
-    subjects = set()
-    for item in  dataset.order:
-        id = item.strip('_')[0]
-        subjects.add(id)
-    subjects = list(subjects)
-
-    return subjects
-
-def get_random_subjects(subjects, n):
-    if n > len(subjects):
-        raise ("n is bigger than lenght of list")
-    if n == len(subjects):
-        raise ("n = len(array)")
-
-    return random.sample(subjects, n)
+# def get_subjects(dataset : utils.dataloader.PittLocalFull):
+#     subjects = set()
+#     for item in  dataset.order:
+#         id = item.strip('_')[0]
+#         subjects.add(id)
+#     subjects = list(subjects)
+#
+#     return subjects
+#
+# def get_random_subjects(subjects, n):
+#     if n > len(subjects):
+#         raise ("n is bigger than lenght of list")
+#     if n == len(subjects):
+#         raise ("n = len(array)")
+#
+#     return random.sample(subjects, n)
 
 
 def get_trainset(dataset, batch_size, intensity_rescale, has_t1, mixup_threshold) -> torch.utils.data.DataLoader:

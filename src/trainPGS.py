@@ -246,7 +246,7 @@ def main():
     )
     parser.add_argument(
         '--lr',
-        default=0.0001,
+        default=0.001,
         type=float,
         help="learning rate"
     )
