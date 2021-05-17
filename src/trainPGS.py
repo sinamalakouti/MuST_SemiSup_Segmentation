@@ -51,9 +51,9 @@ def trainPGS(dataset, model, optimizer, device, epochid):
             #continue
         else:
             is_supervised = False
+            # continue
+        if epochid < 5 and not is_supervised:
             continue
-   #      if epochid <= 5 and not is_supervised:
-   #          continue
 
         print("subject is : ", batch['subject'])
 
