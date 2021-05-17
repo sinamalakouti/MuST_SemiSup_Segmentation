@@ -32,35 +32,33 @@ def trainPGS(dataset, model, optimizer, device, epochid):
     model.train()
     train_loader = utils.get_trainset(dataset, 5, True, None, None)
 
+
     for step, batch in enumerate(train_loader):
         optimizer.zero_grad()
         b = batch['data']
         target = batch['label'].to(device)
         b = b.to(device)
         model.to(device)
-        if step == 0:
-            print(batch['subject'])
-
 
         lossf = nn.MSELoss()
-        # sup_loss = torch.nn.BCELoss()
-        sup_loss = reconstruction_loss.dice_coef_loss
+        sup_loss = torch.nn.BCELoss()
+        # sup_loss = reconstruction_loss.dice_coef_loss
         # sup_loss = torch.nn.w
         loss_functions = (sup_loss, lossf)
-        is_supervised = True
-        if "0332AG" in batch['subject'][0] or '0097RS' in batch['subject'][0] :
+
+        if "0177CR" in batch['subject'][0] or '0064KW' in batch['subject'][0]:
             is_supervised = True
             #continue
         else:
             is_supervised = True
    #         continue
-        if step <= 5 and not is_supervised:
-            continue
+   #      if epochid <= 5 and not is_supervised:
+   #          continue
 
-        print(batch['subject'])
+        print("subject is : ", batch['subject'])
 
-        # if step % 4 == 0:
-        #     is_supervised = True
+        # if epochid % 4 == 0:
+        #     is_supervised =    True
         # else:
         #     is_supervised = False
         #     if epochid < 5:
@@ -70,9 +68,10 @@ def trainPGS(dataset, model, optimizer, device, epochid):
         if is_supervised:
             total_loss = model.compute_loss(outputs, target, loss_functions, is_supervised)
         else:
+            raise ("unsupervised is false")
             total_loss = model.compute_loss(outputs, outputs, loss_functions, is_supervised)
 
-        print("****** LOSSS  : Is_supervised: {} *********   :  ".format(is_supervised), total_loss)
+        print("****** LOSSS  : Is_supervised: {} *********   :".format(is_supervised), total_loss)
 
         total_loss.backward()
         optimizer.step()
@@ -97,7 +96,7 @@ def evaluatePGS(model, dataset, device, threshold):
             y_pred = outputs[-1] >= threshold
             y_pred = y_pred.reshape(y_pred.shape[0], y_pred.shape[2], y_pred.shape[3])
 
-            dice_score = dice_coef(target.reshape(y_pred.shape), y_pred).mean()
+            dice_score = dice_coef(target.reshape(y_pred.shape), y_pred)
             dice_arr.append(dice_score.item())
             if len(res) == 0:
                 res.append(y_pred[-1][0])
@@ -156,18 +155,19 @@ def train_val(dataset, n_epochs, device, wmh_threshold, output_dir, learning_rat
     pgsnet = Pgs.PGS(inputs_dim, outputs_dim, kernels, strides)
     print("learning_rate is    " , learning_rate)
     optimizer = torch.optim.SGD(pgsnet.parameters(), learning_rate,momentum=0.9, weight_decay=1e-4)
-    # print(pgsnet)
     print(pgsnet.parameters())
-    scheduler = lr_scheduler.StepLR(optimizer, step_size=50, gamma=0.1)# don't use it
+    scheduler = lr_scheduler.StepLR(optimizer, step_size=30, gamma=0.1)# don't use it
 
     best_score = 0
+
+
     for epoch in range(n_epochs):
         print("iteration:  ", epoch)
         pgsnet, loss = trainPGS(dataset, pgsnet, optimizer, device, epoch)
         writer.add_scalar("Loss/train", loss, epoch)
 
         if epoch % 1 == 0:
-            score, _ = evaluatePGS(pgsnet, dataset, device, 0.5)
+            score, _ = evaluatePGS(pgsnet, dataset, device, wmh_threshold)
             writer.add_scalar("dice_score/test", score, epoch)
             print("** SCORE @ Iteration {} is {} **".format(epoch, score))
             if score > best_score:
@@ -246,7 +246,7 @@ def main():
     )
     parser.add_argument(
         '--lr',
-        default=0.001,
+        default=0.0001,
         type=float,
         help="learning rate"
     )
@@ -272,9 +272,16 @@ def main():
 
     parser.add_argument(
         "--wmh_threshold",
-        default=0.8,
+        default=0.5,
         type=float,
         help=" wmh mask threshold between 0 and 1"
+    )
+
+    parser.add_argument(
+        "--num_supervised",
+        default= 2,
+        type = int,
+        help = "number of supervised samples"
     )
 
     dataset = utils.Constants.Datasets.PittLocalFull
