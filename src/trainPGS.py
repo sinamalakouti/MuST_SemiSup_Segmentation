@@ -46,11 +46,11 @@ def trainPGS(dataset, model, optimizer, device, epochid):
         # sup_loss = torch.nn.w
         loss_functions = (sup_loss, lossf)
 
-        if "0177CR" in batch['subject'][0] or '0064KW' in batch['subject'][0]:
+        if "0588NC24" in batch['subject'][0] or '0204BP' in batch['subject'][0]:
             is_supervised = True
             #continue
         else:
-            is_supervised = False
+            is_supervised = True
             # continue
         if epochid < 5 and not is_supervised:
             continue
@@ -163,6 +163,7 @@ def train_val(dataset, n_epochs, device, wmh_threshold, output_dir, learning_rat
 
     for epoch in range(n_epochs):
         print("iteration:  ", epoch)
+        score, _ = evaluatePGS(pgsnet, dataset, device, wmh_threshold)
         pgsnet, loss = trainPGS(dataset, pgsnet, optimizer, device, epoch)
         writer.add_scalar("Loss/train", loss, epoch)
 

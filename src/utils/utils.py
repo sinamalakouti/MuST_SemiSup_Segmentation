@@ -49,7 +49,7 @@ def get_trainset(dataset, batch_size, intensity_rescale, has_t1, mixup_threshold
                  f'paths/fold-2/data_paths.txt', f'paths/fold-3/data_paths.txt',
                  f'paths/fold-4/data_paths.txt'],
                 [f'paths/fold-0/label_paths.txt', f'paths/fold-2/label_paths.txt',
-                 f'paths/fold-4/label_paths.txt', f'paths/fold-4/label_paths.txt'],
+                 f'paths/fold-3/label_paths.txt', f'paths/fold-4/label_paths.txt'],
                 [f'paths/fold-0/mask_paths.txt', f'paths/fold-2/mask_paths.txt',
                  f'paths/fold-3/mask_paths.txt', f'paths/fold-4/mask_paths.txt'],
                 augment=True,
