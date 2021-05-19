@@ -51,7 +51,7 @@ def trainPGS(dataset, model, optimizer, device, epochid):
 
         else:
             is_supervised = False
-            continue
+            # continue
         if epochid < 5 and not is_supervised:
             continue
 
@@ -68,7 +68,7 @@ def trainPGS(dataset, model, optimizer, device, epochid):
         if is_supervised:
             total_loss = model.compute_loss(outputs, target, loss_functions, is_supervised)
         else:
-            raise Exception("unsupervised is false")
+            # raise Exception("unsupervised is false")
             total_loss = model.compute_loss(outputs, outputs, loss_functions, is_supervised)
 
         print("****** LOSSS  : Is_supervised: {} *********   :".format(is_supervised), total_loss)
@@ -156,8 +156,9 @@ def train_val(dataset, n_epochs, device, wmh_threshold, output_dir, learning_rat
     print("learning_rate is    " , learning_rate)
     optimizer = torch.optim.SGD(pgsnet.parameters(), learning_rate,momentum=0.9, weight_decay=1e-4)
     print(pgsnet.parameters())
-    scheduler = lr_scheduler.StepLR(optimizer, step_size=30, gamma=0.1)# don't use it
-
+    step_size = 50
+    scheduler = lr_scheduler.StepLR(optimizer, step_size=step_size, gamma=0.1)# don't use it
+    print("scheduler step size is :   ",step_size)
     best_score = 0
 
 
