@@ -46,12 +46,12 @@ def trainPGS(dataset, model, optimizer, device, epochid):
         # sup_loss = torch.nn.w
         loss_functions = (sup_loss, unsup_loss)
 
-        if "0588NC24" in batch['subject'][0] or '0204BP' in batch['subject'][0]:
+        if "0286MR72" in batch['subject'][0] or '0120LB' in batch['subject'][0]:
             is_supervised = True
             #continue
         else:
-            is_supervised = False
-            continue
+            is_supervised = True
+            # continue
         if epochid < 5 and not is_supervised:
             continue
 
@@ -68,7 +68,7 @@ def trainPGS(dataset, model, optimizer, device, epochid):
         if is_supervised:
             total_loss = model.compute_loss(outputs, target, loss_functions, is_supervised)
         else:
-            raise ("unsupervised is false")
+            raise Exception("unsupervised is false")
             total_loss = model.compute_loss(outputs, outputs, loss_functions, is_supervised)
 
         print("****** LOSSS  : Is_supervised: {} *********   :".format(is_supervised), total_loss)
