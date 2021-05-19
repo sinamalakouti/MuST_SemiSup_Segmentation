@@ -48,10 +48,10 @@ def trainPGS(dataset, model, optimizer, device, epochid):
 
         if "0286MR72" in batch['subject'][0] or '0120LB' in batch['subject'][0]:
             is_supervised = True
-            #continue
+
         else:
-            is_supervised = True
-            # continue
+            is_supervised = False
+            continue
         if epochid < 5 and not is_supervised:
             continue
 
