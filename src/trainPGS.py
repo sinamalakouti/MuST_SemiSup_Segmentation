@@ -40,18 +40,18 @@ def trainPGS(dataset, model, optimizer, device, epochid):
         b = b.to(device)
         model.to(device)
 
-        lossf = nn.MSELoss()
+        unsup_loss = nn.MSELoss()
         sup_loss = torch.nn.BCELoss()
         # sup_loss = reconstruction_loss.dice_coef_loss
         # sup_loss = torch.nn.w
-        loss_functions = (sup_loss, lossf)
+        loss_functions = (sup_loss, unsup_loss)
 
         if "0588NC24" in batch['subject'][0] or '0204BP' in batch['subject'][0]:
             is_supervised = True
             #continue
         else:
-            is_supervised = True
-            # continue
+            is_supervised = False
+            continue
         if epochid < 5 and not is_supervised:
             continue
 
