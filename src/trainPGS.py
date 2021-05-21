@@ -46,7 +46,7 @@ def trainPGS(dataset, model, optimizer, device, epochid):
         # sup_loss = torch.nn.w
         loss_functions = (sup_loss, unsup_loss)
 
-        if "0286MR72" in batch['subject'][0] or '0120LB' in batch['subject'][0]:
+        if "0177CR" in batch['subject'][0] or '0064KW' in batch['subject'][0]:
             is_supervised = True
 
         else:

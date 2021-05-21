@@ -159,10 +159,10 @@ class PGS(nn.Module):
         # if it is unsupervised loss add some noise
         from torch.distributions.uniform import Uniform
 
-        if not is_supervised:
-            uni_dist = Uniform(-0.3, 0.3)
-            noise_vector = uni_dist.sample(d4.shape[1:]).to(d4.device).unsqueeze(0)
-            d4 = d4.mul(noise_vector) + d4
+        # if not is_supervised:
+        #     uni_dist = Uniform(-0.3, 0.3)
+        #     noise_vector = uni_dist.sample(d4.shape[1:]).to(d4.device).unsqueeze(0)
+        #     d4 = d4.mul(noise_vector) + d4
 
         c5 = self.conv5(d4)
         output5 = self.cls5(c5)
