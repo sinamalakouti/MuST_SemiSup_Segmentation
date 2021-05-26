@@ -140,7 +140,7 @@ class PGS(nn.Module):
     def forward(self, X, is_supervised):
 
         if is_supervised:
-            sup_outputs = zip(self.__fw_supervised(X))
+            sup_outputs = self.__fw_supervised(X)
             return sup_outputs, None
 
         else:
@@ -149,12 +149,12 @@ class PGS(nn.Module):
 
             self.training = False
             with torch.no_grad():
-                sup_outputs = zip(self.__fw_supervised(X))
+                sup_outputs = self.__fw_supervised(X)
 
             # get unsupervised outputs
 
             self.training = True
-            unsup_outputs = zip(self.__fw_unsupervised(X))
+            unsup_outputs = self.__fw_unsupervised(X)
             return sup_outputs, unsup_outputs
 
     def __fw_supervised(self, X):

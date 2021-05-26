@@ -113,7 +113,7 @@ def train_val(dataset, n_epochs, device, wmh_threshold, output_dir, learning_rat
     print("output_dir is    ", output_dir)
     if not os.path.isdir(output_dir):
         try:
-            os.mkdir(output_dir)
+            os.mkdir(output_dir,7777)
         except OSError:
             print("Creation of the directory %s failed" % output_dir)
     else:
@@ -125,7 +125,7 @@ def train_val(dataset, n_epochs, device, wmh_threshold, output_dir, learning_rat
 
     if not os.path.isdir(output_model_dir):
         try:
-            os.mkdir(output_model_dir)
+            os.mkdir(output_model_dir,7777)
         except OSError:
             print("Creation of the directory %s failed" % output_model_dir)
     else:
@@ -133,7 +133,7 @@ def train_val(dataset, n_epochs, device, wmh_threshold, output_dir, learning_rat
 
     if not os.path.isdir(os.path.join(output_dir, "runs")):
         try:
-            os.mkdir(os.path.join(output_dir, "runs"))
+            os.mkdir(os.path.join(output_dir, "runs"), 7777)
         except OSError:
             print("Creation of the directory %s failed" % os.path.join(output_dir, "runs"))
     else:
@@ -146,7 +146,7 @@ def train_val(dataset, n_epochs, device, wmh_threshold, output_dir, learning_rat
 
     if not os.path.isdir(output_image_dir):
         try:
-            os.mkdir(output_image_dir)
+            os.mkdir(output_image_dir, 7777)
         except OSError:
             print("Creation of the directory %s failed" % output_image_dir)
     else:
@@ -192,7 +192,7 @@ def save_score(dir_path, score, iter):
     dir_path = os.path.join(dir_path, "results_iter{}".format(iter))
     if not os.path.isdir(dir_path):
         try:
-            os.mkdir(dir_path)
+            os.mkdir(dir_path, 7777)
         except OSError:
             print("Creation of the directory %s failed" % dir_path)
     else:
@@ -209,7 +209,7 @@ def save_predictions(y_pred, threshold, dir_path, score, iter):
         f.write("average dice score per subject (5 image) at iter {}  :   {}".format(iter, score))
     if not os.path.isdir(dir_path):
         try:
-            os.mkdir(dir_path)
+            os.mkdir(dir_path, 7777)
         except OSError:
             print("Creation of the directory %s failed" % dir_path)
     else:
