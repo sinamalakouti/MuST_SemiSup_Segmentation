@@ -2,7 +2,6 @@ import torch
 import sys
 import os
 import torch
-from torch.utils.tensorboard import SummaryWriter
 import torch.nn as nn
 from torch.optim import lr_scheduler
 
@@ -15,6 +14,8 @@ from utils import reconstruction_loss
 import numpy as np
 
 import argparse
+from torch.utils.tensorboard import SummaryWriter
+import wandb
 
 sys.path.append('src')
 sys.path.append('src/utils/Constants')
@@ -24,14 +25,12 @@ for p in sys.path:
     print("path  ", p)
 
 utils.Constants.USE_CUDA = True
-utils.Constants.N_ITERATION = 20000
 parser = argparse.ArgumentParser()
 
 
 def trainPGS(dataset, model, optimizer, device, epochid):
     model.train()
     train_loader = utils.get_trainset(dataset, 5, True, None, None)
-
 
     for step, batch in enumerate(train_loader):
         optimizer.zero_grad()
@@ -64,12 +63,13 @@ def trainPGS(dataset, model, optimizer, device, epochid):
         #     if epochid < 5:
         #         continue
 
-        outputs = model(b, is_supervised)
+        sup_outputs, unsup_outputs = model(b, is_supervised)
         if is_supervised:
-            total_loss = model.compute_loss(outputs, target, loss_functions, is_supervised)
+            total_loss = model.compute_loss(sup_outputs, target, loss_functions, is_supervised)
         else:
+
             # raise Exception("unsupervised is false")
-            total_loss = model.compute_loss(outputs, outputs, loss_functions, is_supervised)
+            total_loss = model.compute_loss(unsup_outputs, sup_outputs, loss_functions, is_supervised)
 
         print("****** LOSSS  : Is_supervised: {} *********   :".format(is_supervised), total_loss)
 
@@ -91,7 +91,7 @@ def evaluatePGS(model, dataset, device, threshold):
             b = batch['data']
             b = b.to(device)
             target = batch['label'].to(device)
-            outputs = model(b,True)
+            outputs, _ = model(b, True)
 
             y_pred = outputs[-1] >= threshold
             y_pred = y_pred.reshape(y_pred.shape[0], y_pred.shape[2], y_pred.shape[3])
@@ -104,7 +104,7 @@ def evaluatePGS(model, dataset, device, threshold):
     return np.mean(np.array(dice_arr)), res
 
 
-def train_val(dataset, n_epochs, device, wmh_threshold, output_dir, learning_rate):
+def train_val(dataset, n_epochs, device, wmh_threshold, output_dir, learning_rate, args):
     inputs_dim = [1, 64, 96, 128, 256, 768, 384, 224, 160]
     outputs_dim = [64, 96, 128, 256, 512, 256, 128, 96, 64]
     kernels = [5, 3, 3, 3, 3, 3, 3, 3, 3]
@@ -120,7 +120,6 @@ def train_val(dataset, n_epochs, device, wmh_threshold, output_dir, learning_rat
         None
 
     output_model_dir = os.path.join(output_dir, "best_model")
-
 
     print("output_model_dir is   ", output_model_dir)
 
@@ -141,7 +140,8 @@ def train_val(dataset, n_epochs, device, wmh_threshold, output_dir, learning_rat
         None
 
     writer = SummaryWriter(log_dir=os.path.join(output_dir, "runs"))
-
+    wandb.init(project="semi_supervised_wmh", config=args)
+    wandb.run.name = wandb.run.id
     output_image_dir = os.path.join(output_dir, "result_images/")
 
     if not os.path.isdir(output_image_dir):
@@ -153,14 +153,13 @@ def train_val(dataset, n_epochs, device, wmh_threshold, output_dir, learning_rat
         None
 
     pgsnet = Pgs.PGS(inputs_dim, outputs_dim, kernels, strides)
-    print("learning_rate is    " , learning_rate)
-    optimizer = torch.optim.SGD(pgsnet.parameters(), learning_rate,momentum=0.9, weight_decay=1e-4)
+    print("learning_rate is    ", learning_rate)
+    optimizer = torch.optim.SGD(pgsnet.parameters(), learning_rate, momentum=0.9, weight_decay=1e-4)
     print(pgsnet.parameters())
     step_size = 50
-    scheduler = lr_scheduler.StepLR(optimizer, step_size=step_size, gamma=0.1)# don't use it
-    print("scheduler step size is :   ",step_size)
+    scheduler = lr_scheduler.StepLR(optimizer, step_size=step_size, gamma=0.1)  # don't use it
+    print("scheduler step size is :   ", step_size)
     best_score = 0
-
 
     for epoch in range(n_epochs):
         print("iteration:  ", epoch)
@@ -182,8 +181,12 @@ def train_val(dataset, n_epochs, device, wmh_threshold, output_dir, learning_rat
                 save_score(output_image_dir, score, epoch)
                 # save_predictions(wmh_threshold, wmh_threshold, output_image_dir, score, epoch)
         scheduler.step()
+
+    wandb.log({"train_loss": loss, "dev_dsc": score})
+
     writer.flush()
     writer.close()
+
 
 def save_score(dir_path, score, iter):
     dir_path = os.path.join(dir_path, "results_iter{}".format(iter))
@@ -197,6 +200,7 @@ def save_score(dir_path, score, iter):
     output_score_path = os.path.join(dir_path, "result.txt")
     with open(output_score_path, "w") as f:
         f.write("average dice score per subject (5 image) at iter {}  :   {}".format(iter, score))
+
 
 def save_predictions(y_pred, threshold, dir_path, score, iter):
     dir_path = os.path.join(dir_path, "results_iter{}".format(iter))
@@ -216,7 +220,6 @@ def save_predictions(y_pred, threshold, dir_path, score, iter):
         plt.imshow(segment)
         image_path = os.path.join(dir_path, "image_id_{}.jpg".format(image_id))
         plt.savefig(image_path)
-
 
 
 def main():
@@ -267,7 +270,7 @@ def main():
 
     parser.add_argument(
         "--n_epochs",
-        default = 1000,
+        default=400,
         type=int,
         help="number of epochs"
     )
@@ -281,11 +284,23 @@ def main():
 
     parser.add_argument(
         "--num_supervised",
-        default= 2,
-        type = int,
-        help = "number of supervised samples"
+        default=2,
+        type=int,
+        help="number of supervised samples"
     )
 
+    parser.add_argument(
+        "--training_mode",
+        default = "semi_sup",
+        type = str,
+        help = "training mode supervised (sup), n subject supervised (n_sup), all supervised (all_sup)"
+    )
+
+    parser.add_argument(
+        "--supervised_subjects",
+        type = str,
+        help = "<subject1>_<subject2> ... <subjectn> or all for all subjects"
+    )
     dataset = utils.Constants.Datasets.PittLocalFull
     args = parser.parse_args()
 
@@ -297,9 +312,8 @@ def main():
 
     device = torch.device(dev)
     output_dir = '/Users/sinamalakouti/Desktop/alaki'
-    train_val(dataset, args.n_epochs, device, args.wmh_threshold, args.output_dir, args.lr)
+    train_val(dataset, args.n_epochs, device, args.wmh_threshold, args.output_dir, args.lr, args)
 
 
 if __name__ == '__main__':
-
     main()

@@ -1,5 +1,3 @@
-
-
 import torch
 import torchvision
 import numpy as np
@@ -8,7 +6,6 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from torch.distributions.uniform import Uniform
-
 
 
 class ConvBlock(nn.Module):
@@ -37,8 +34,9 @@ class ConvBlock(nn.Module):
     def forward(self, X):
         return self.net(X)
 
-class CLS (nn.Module):
-    def  __init__(self, dim_in, dim_out):
+
+class CLS(nn.Module):
+    def __init__(self, dim_in, dim_out):
         super(CLS, self).__init__()
         self.dim_in = dim_in
         self.dim_out = dim_out
@@ -46,13 +44,12 @@ class CLS (nn.Module):
         self.net = self.__build_module()
 
     def __build_module(self):
-
         return nn.Sequential(
             nn.Conv2d(self.dim_in, self.dim_out, 1),
             nn.Sigmoid(),
             # nn.Softmax2d()
         )
-    
+
     def forward(self, X):
         return self.net(X)
 
@@ -63,16 +60,16 @@ class Up(torch.nn.Module):
 
         ic = in_channels
         oc = out_channels
-        super(Up,self).__init__()
+        super(Up, self).__init__()
 
         # if bilinear, use the normal convolutions to reduce the number of channels
+
         if bilinear:
             self.up = torch.nn.Upsample(scale_factor=2,
                                         mode='bilinear', align_corners=True)
         else:
             self.up = torch.nn.ConvTranspose2d(ic, oc,
                                                kernel_size=3, stride=2, padding=1, output_padding=1)
-
 
     def forward(self, X):
         x1, x2 = X
@@ -86,6 +83,7 @@ class Up(torch.nn.Module):
 
         return torch.cat([x2, x1], dim=1)
 
+
 class Down(nn.Module):
     def __init__(self):
         super(Down, self).__init__()
@@ -93,7 +91,6 @@ class Down(nn.Module):
 
     def forward(self, X):
         return self.net(X)
-
 
 
 class PGS(nn.Module):
@@ -105,8 +102,8 @@ class PGS(nn.Module):
         self.strides = strides
         self.__build_net()
 
-
     def __build_net(self):
+
         # contracting path
         self.conv1 = ConvBlock(self.dim_inputs[0], self.dim_outputs[0], self.strides[0], self.kernel_sizes[0])
         self.down1 = Down()
@@ -124,7 +121,7 @@ class PGS(nn.Module):
         # Expanding path
 
         self.up1 = Up(self.dim_outputs[4], self.dim_outputs[4], False)
-        self.conv6  = ConvBlock(self.dim_inputs[5], self.dim_outputs[5], self.strides[5], self.kernel_sizes[5])
+        self.conv6 = ConvBlock(self.dim_inputs[5], self.dim_outputs[5], self.strides[5], self.kernel_sizes[5])
         self.up2 = Up(self.dim_outputs[5], self.dim_outputs[5], False)
         self.conv7 = ConvBlock(self.dim_inputs[6], self.dim_outputs[6], self.strides[6], self.kernel_sizes[6])
         self.up3 = Up(self.dim_outputs[6], self.dim_outputs[6], False)
@@ -132,19 +129,121 @@ class PGS(nn.Module):
         self.up4 = Up(self.dim_outputs[7], self.dim_outputs[7], False)
         self.conv9 = ConvBlock(self.dim_inputs[8], self.dim_outputs[8], self.strides[8], self.kernel_sizes[8])
 
-
         # classifiers
         print(self.dim_outputs[4])
         self.cls5 = CLS(self.dim_outputs[4], self.dim_inputs[0])
         self.cls6 = CLS(self.dim_outputs[5], self.dim_inputs[0])
         self.cls7 = CLS(self.dim_outputs[6], self.dim_inputs[0])
         self.cls8 = CLS(self.dim_outputs[7], self.dim_inputs[0])
-        self.cls9 = CLS(self.dim_outputs[8], self.dim_inputs[0])
-        #main classifier
+        self.cls9 = CLS(self.dim_outputs[8], self.dim_inputs[0])         # main classifier
 
-    def forward(self, X , is_supervised):
+    def forward(self, X, is_supervised):
+
+        if is_supervised:
+            sup_outputs = zip(self.__fw_supervised(X))
+            return sup_outputs, None
+
+        else:
+
+            # get supervised outputs
+
+            self.training = False
+            with torch.no_grad():
+                sup_outputs = zip(self.__fw_supervised(X))
+
+            # get unsupervised outputs
+
+            self.training = True
+            unsup_outputs = zip(self.__fw_unsupervised(X))
+            return sup_outputs, unsup_outputs
+
+    def __fw_supervised(self, X):
+
         # contracting path
 
+        # c1 = self.conv1(X)
+        # d1 = self.down1(c1)
+        # c2 = self.conv2(d1)
+        # d2 = self.down2(c2)
+        # c3 = self.conv3(d2)
+        # d3 = self.down3(c3)
+        # c4 = self.conv4(d3)
+        # d4 = self.down4(c4)
+
+        c1, d1, c2, d2, c3, d3, c4, d4 = self.__fw_contracting_path(X)
+
+        # bottleneck
+
+        # if it is unsupervised loss add some noise
+
+        # if not is_supervised:
+        #     uni_dist = Uniform(-0.3, 0.3)
+        #     noise_vector = uni_dist.sample(d4.shape[1:]).to(d4.device).unsqueeze(0)
+        #     d4 = d4.mul(noise_vector) + d4
+
+        # c5 = self.conv5(d4)
+        # output5 = self.cls5(c5)
+
+        c5, output5 = self.__fw_bottleneck(d4)
+
+        # expanding path
+
+        # u1 = self.up1((c5, c4))
+        # c6 = self.conv6(u1)
+        # output6 = self.cls6(c6)
+        # 4th expanding layer
+        c6, output6 = self.__fw_expand_4layer(c5, c4)
+
+        # 3rd expanding layer
+
+        # u2 = self.up2((c6, c3))
+        # c7 = self.conv7(u2)
+        # output7 = self.cls7(c7)
+
+        c7, output7 = self.__fw_expand_3layer(c6, c3)
+
+        # 2nd expanding layer
+
+        # u3 = self.up3((c7, c2))
+        # c8 = self.conv8(u3)
+        # output8 = self.cls8(c8)
+
+        c8, output8 = self.__fw_expand_2layer(c7, c2)
+
+        # 1st expanding layer
+        # output9 is the main output of the netowrk
+        c9, output9 = self.__fw_expand_1layer(c8, c1)
+
+        # u4 = self.up4((c8, c1))
+        # c9 = self.conv9(u4)
+        # output9 = self.cls9(c9)
+
+        return output5, output6, output7, output8, output9
+
+    def __fw_unsupervised(self, X):
+
+        # contracting path
+        c1, d1, c2, d2, c3, d3, c4, d4 = self.__fw_contracting_path(X)
+
+        # bottleneck
+        #  add some noise
+
+        uni_dist = Uniform(-0.3, 0.3)
+        noise_vector = uni_dist.sample(d4.shape[1:]).to(d4.device).unsqueeze(0)
+        d4 = d4.mul(noise_vector) + d4
+
+        c5, output5 = self.__fw_bottleneck(d4)
+
+        # expanding path
+
+        c6, output6 = self.__fw_expand_4layer(c5, c4)
+        c7, output7 = self.__fw_expand_3layer(c6, c3)
+        c8, output8 = self.__fw_expand_2layer(c7, c2)
+        c9, output9 = self.__fw_expand_1layer(c8, c1)  # output9 is the main output of the network
+
+        return output5, output6, output7, output8, output9
+
+    def __fw_contracting_path(self, X):
         c1 = self.conv1(X)
         d1 = self.down1(c1)
         c2 = self.conv2(d1)
@@ -154,92 +253,116 @@ class PGS(nn.Module):
         c4 = self.conv4(d3)
         d4 = self.down4(c4)
 
-        # bottleneck
+        return c1, d1, c2, d2, c3, d3, c4, d4
 
-        # if it is unsupervised loss add some noise
-        from torch.distributions.uniform import Uniform
+    def __fw_bottleneck(self, X):
+        conv_out = self.conv5(X)
+        out = self.cls5(conv_out)
+        return conv_out, out
 
-        # if not is_supervised:
-        #     uni_dist = Uniform(-0.3, 0.3)
-        #     noise_vector = uni_dist.sample(d4.shape[1:]).to(d4.device).unsqueeze(0)
-        #     d4 = d4.mul(noise_vector) + d4
-
-        c5 = self.conv5(d4)
-        output5 = self.cls5(c5)
-
-        # expanding path
-
-        u1 = self.up1((c5, c4))
+    def __fw_expand_4layer(self, X_expand, X_contract):
+        u1 = self.up1((X_expand, X_contract))
         c6 = self.conv6(u1)
         output6 = self.cls6(c6)
+        return c6, output6
 
-        u2 = self.up2((c6, c3))
+    def __fw_expand_3layer(self, X_expand, X_contract):
+
+        u2 = self.up2((X_expand, X_contract))
         c7 = self.conv7(u2)
         output7 = self.cls7(c7)
+        return c7, output7
 
-        u3 = self.up3((c7, c2))
+    def __fw_expand_2layer(self, X_expand, X_contract):
+        u3 = self.up3((X_expand, X_contract))
         c8 = self.conv8(u3)
         output8 = self.cls8(c8)
+        return c8, output8
 
-        u4 = self.up4((c8, c1))
+    def __fw_expand_1layer(self, X_expand, X_contract):
+        u4 = self.up4((X_expand, X_contract))
         c9 = self.conv9(u4)
         output9 = self.cls9(c9)
-        return output5, output6, output7, output8, output9
+        return c9, output9
 
-    def compute_loss(self, y_preds, y_true, loss_functions,  is_supervised):
+    def __fw_sup_loss(self, y_preds, y_true, loss_functions):
         (sup_loss, unsup_loss) = loss_functions
         total_loss = 0
-        if is_supervised:
 
-            # return sup_loss(y_preds, y_true)
-
-            for output in y_preds:
-                ratio = int(np.round(y_true.shape[2] / output.shape[2]))
-                maxpool = nn.MaxPool2d(kernel_size=2, stride=ratio, padding=0)
+        for output in y_preds:
+            ratio = int(np.round(y_true.shape[2] / output.shape[2]))
+            maxpool = nn.MaxPool2d(kernel_size=2, stride=ratio, padding=0)
             #
-                target = maxpool(y_true)
-                if target.shape != output.shape:
-                    h_diff = output.size()[2] - target.size()[2]
-                    w_diff = output.size()[3] - target.size()[3]
+            target = maxpool(y_true)
+            if target.shape != output.shape:
+                h_diff = output.size()[2] - target.size()[2]
+                w_diff = output.size()[3] - target.size()[3]
+                #
+                target = F.pad(target, (w_diff // 2, w_diff - w_diff // 2,
+                                        h_diff // 2, h_diff - h_diff // 2))
             #
-                    target = F.pad(target, (w_diff // 2, w_diff - w_diff // 2,
-                                                                    h_diff // 2, h_diff - h_diff // 2))
-            #
-                    # print("SUPERVISED : padded target!!!")
+            # print("SUPERVISED : padded target!!!")
             #
             #
-                assert output.shape == target.shape, "output and target shape is not similar!!"
-                total_loss += sup_loss(output, target)
-        else:
-            main_output = y_preds[-1].detach()
-
-            for i in range(len(y_preds) - 1):
-                # if out
-                assert not (main_output.shape == y_preds[i].shape), "Wrong output: comparing main output with itself"
-                with torch.no_grad():
-                    ratio = int(np.round(main_output.shape[2] / y_preds[i].shape[2]))
-
-                    maxpool = nn.MaxPool2d(kernel_size=2, stride=ratio, padding=0)
-
-                    
-                    pooled_main_output = maxpool(main_output)
-                    if pooled_main_output.shape != y_preds[i].shape:
-                        h_diff = y_preds[i].size()[2] - pooled_main_output.size()[2]
-                        w_diff = y_preds[i].size()[3] - pooled_main_output.size()[3]
-
-                        pooled_main_output = F.pad(pooled_main_output, (w_diff // 2, w_diff - w_diff // 2,
-                                                                        h_diff // 2, h_diff - h_diff // 2))
-                        # print(pooled_main_output)
-                        # print("Unsupervised: Padded OUTPUT!!!")
-
-
-
-                    assert pooled_main_output.shape == y_preds[i].shape, \
-                        "Error! shapes has to be equal but got {} and {}".format(pooled_main_output.shape, y_preds[i].shape)
-                total_loss += unsup_loss(y_preds[i], pooled_main_output)
-
+            assert output.shape == target.shape, "output and target shape is not similar!!"
+            total_loss += sup_loss(output, target)
         return total_loss
 
+    def __fw_self_unsup_loss(self, y_preds, loss_functions):
+        main_output = y_preds[-1].detach()
+        (_, unsup_loss) = loss_functions
+        total_loss = 0
+
+        for i in range(len(y_preds) - 1):
+            # if out
+            assert not (main_output.shape == y_preds[i].shape), "Wrong output: comparing main output with itself"
+            with torch.no_grad():
+                ratio = int(np.round(main_output.shape[2] / y_preds[i].shape[2]))
+
+                maxpool = nn.MaxPool2d(kernel_size=2, stride=ratio, padding=0)
+
+                pooled_main_output = maxpool(main_output)
+                if pooled_main_output.shape != y_preds[i].shape:
+                    h_diff = y_preds[i].size()[2] - pooled_main_output.size()[2]
+                    w_diff = y_preds[i].size()[3] - pooled_main_output.size()[3]
+
+                    pooled_main_output = F.pad(pooled_main_output, (w_diff // 2, w_diff - w_diff // 2,
+                                                                    h_diff // 2, h_diff - h_diff // 2))
+                    # print(pooled_main_output)
+                    # print("Unsupervised: Padded OUTPUT!!!")
+
+                assert pooled_main_output.shape == y_preds[i].shape, \
+                    "Error! shapes has to be equal but got {} and {}".format(pooled_main_output.shape,
+                                                                             y_preds[i].shape)
+            total_loss += unsup_loss(y_preds[i], pooled_main_output)
+        return total_loss
+
+    def __fw_outpuwise_unsup_loss(self, y_noisy, y_orig, loss_functions):
+        (_, unsup_loss) = loss_functions
+        total_loss = 0
+        assert len(y_orig) == len(y_noisy), "Error! unsup_preds and sup_preds have to have same length"
+        num_preds = len(y_orig)
+
+        for i in range(num_preds):
+            orig_pred = y_orig[i]
+            noisy_pred = y_noisy[i]
+            assert orig_pred.shape == noisy_pred.shape, "Error! for preds number {}, supervised and unsupervised" \
+                                                 " prediction shape is not similar!".format(i)
+            total_loss += unsup_loss(noisy_pred, orig_pred)
+        return total_loss
+
+    def compute_loss(self, y_preds, y_true, loss_functions, is_supervised):
+
+        if is_supervised:
+            total_loss = self.__fw_sup_loss(y_preds, y_true, loss_functions)
+        else:
+            # for comparing outputs together!
+            #total_loss = self.__fw_self_unsup_loss(y_preds, loss_functions)
+
+            # consistency of original output and noisy output
+            total_loss = self.__fw_outpuwise_unsup_loss(y_preds, y_true, loss_functions)
+
+        return total_loss
 
 
 if __name__ == '__main__':
@@ -261,6 +384,6 @@ if __name__ == '__main__':
     for y in Y:
         print(y.shape)
 
-    loss = wnet.compute_loss(Y, Y, (nn.MSELoss(),nn.MSELoss()),  False)
+    loss = wnet.compute_loss(Y, Y, (nn.MSELoss(), nn.MSELoss()), False)
     print("loss")
     print(loss)
