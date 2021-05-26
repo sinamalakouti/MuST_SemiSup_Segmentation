@@ -182,7 +182,7 @@ def train_val(dataset, n_epochs, device, wmh_threshold, output_dir, learning_rat
                 # save_predictions(wmh_threshold, wmh_threshold, output_image_dir, score, epoch)
         scheduler.step()
 
-    wandb.log({"train_loss": loss, "dev_dsc": score})
+        wandb.log({"train_loss": loss, "dev_dsc": score})
 
     writer.flush()
     writer.close()
