@@ -300,7 +300,7 @@ class PGS(nn.Module):
 
         rand_thresh = random.uniform(0, 1)
         uni_dist = Uniform(-1 * rand_thresh, rand_thresh)
-        up4 = self.__fw_up(c6, c3, self.up4, uni_dist, False)
+        up4 = self.__fw_up(c8, c1, self.up4, uni_dist, False)
 
         c9, output9 = self.__fw_expand_1layer(up4)  # output9 is the main output of the network
 
