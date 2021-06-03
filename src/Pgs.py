@@ -7,6 +7,8 @@ import torch.nn.functional as F
 
 from torch.distributions.uniform import Uniform
 
+from torch.distributions.normal import Normal
+import random
 
 class ConvBlock(nn.Module):
     def __init__(self, dim_in, dim_out, stride, kernel_size=3):
@@ -148,13 +150,14 @@ class PGS(nn.Module):
             # get supervised outputs
 
             self.training = False
-            with torch.no_grad():
-                sup_outputs = self.__fw_supervised(X)
+            # with torch.no_grad():
+            sup_outputs = self.__fw_supervised(X)
 
             # get unsupervised outputs
 
             self.training = True
             unsup_outputs = self.__fw_unsupervised(X)
+
             return sup_outputs, unsup_outputs
 
     def __fw_supervised(self, X):
@@ -192,27 +195,30 @@ class PGS(nn.Module):
         # c6 = self.conv6(u1)
         # output6 = self.cls6(c6)
         # 4th expanding layer
-        c6, output6 = self.__fw_expand_4layer(c5, c4)
+
+        up1 = self.__fw_up(c5, c4, self.up1)
+        c6, output6 = self.__fw_expand_4layer(up1)
 
         # 3rd expanding layer
 
         # u2 = self.up2((c6, c3))
         # c7 = self.conv7(u2)
         # output7 = self.cls7(c7)
-
-        c7, output7 = self.__fw_expand_3layer(c6, c3)
+        up2= self.__fw_up(c6, c3, self.up2)
+        c7, output7 = self.__fw_expand_3layer(up2)
 
         # 2nd expanding layer
 
         # u3 = self.up3((c7, c2))
         # c8 = self.conv8(u3)
         # output8 = self.cls8(c8)
-
-        c8, output8 = self.__fw_expand_2layer(c7, c2)
+        up3 = self.__fw_up(c7, c2, self.up3)
+        c8, output8 = self.__fw_expand_2layer(up3)
 
         # 1st expanding layer
         # output9 is the main output of the netowrk
-        c9, output9 = self.__fw_expand_1layer(c8, c1)
+        up4 = self.__fw_up(c8, c1, self.up4)
+        c9, output9 = self.__fw_expand_1layer(up4)
 
         # u4 = self.up4((c8, c1))
         # c9 = self.conv9(u4)
@@ -228,18 +234,75 @@ class PGS(nn.Module):
         # bottleneck
         #  add some noise
 
-        uni_dist = Uniform(-0.3, 0.3)
-        noise_vector = uni_dist.sample(d4.shape[1:]).to(d4.device).unsqueeze(0)
+        # uni_dist = Uniform(-0.3, 0.3)
+        # uni_dist = Normal(torch.tensor([0.0]), torch.tensor([1.0]))
+
+        # noise_vector = uni_dist.sample(d4.shape[1:]).to(d4.device)#.unsqueeze(0)
+        # noise_vector = noise_vector.reshape(d4.shape[1:])
+        # d4 = d4.mul(noise_vector) + d4
+
+        # noise_vector = uni_dist.sample(c1.shape[1:]).to(c1.device)#.unsqueeze(0)
+        # noise_vector = noise_vector.reshape(c1.shape[1:])
+        # c1 = c1.mul(noise_vector) + c1
+
+        # noise_vector = uni_dist.sample(c2.shape[1:]).to(c2.device)#.unsqueeze(0)
+        # noise_vector = noise_vector.reshape(c2.shape[1:])
+        # c2 = c2.mul(noise_vector) + c2
+
+        # noise_vector = uni_dist.sample(c3.shape[1:]).to(c3.device)#.unsqueeze(0)
+        # noise_vector = noise_vector.reshape(c3.shape[1:])
+        # c3 = c3.mul(noise_vector) + c3
+
+        # noise_vector = uni_dist.sample(c4.shape[1:]).to(c4.device)# .unsqueeze(0)
+        # noise_vector = noise_vector.reshape(c4.shape[1:])
+        # c4 = c4.mul(noise_vector) + c4
+        rand_thresh = random.uniform(0, 1)
+        uni_dist = Uniform(-1 * rand_thresh, rand_thresh)
+        noise_vector = uni_dist.sample(d4.shape[1:]).to(d4.device)  # .unsqueeze(0)
+        noise_vector = noise_vector.reshape(d4.shape[1:])
         d4 = d4.mul(noise_vector) + d4
 
         c5, output5 = self.__fw_bottleneck(d4)
 
-        # expanding path
+        # noise_vector = uni_dist.sample(c5.shape[1:]).to(c5.device)  # .unsqueeze(0)
+        # noise_vector = noise_vector.reshape(c5.shape[1:])
+        # c5 = c5.mul(noise_vector) + c5
 
-        c6, output6 = self.__fw_expand_4layer(c5, c4)
-        c7, output7 = self.__fw_expand_3layer(c6, c3)
-        c8, output8 = self.__fw_expand_2layer(c7, c2)
-        c9, output9 = self.__fw_expand_1layer(c8, c1)  # output9 is the main output of the network
+        # expanding path
+        rand_thresh = random.uniform(0, 1)
+        uni_dist = Uniform(-1 * rand_thresh, rand_thresh)
+        up1 = self.__fw_up(c5, c4, self.up1, uni_dist, False)
+        c6, output6 = self.__fw_expand_4layer(up1)
+
+        # noise_vector = uni_dist.sample(c6.shape[1:]).to(c6.device)  # .unsqueeze(0)
+        # noise_vector = noise_vector.reshape(c6.shape[1:])
+        # c6 = c6.mul(noise_vector) + c6
+
+        rand_thresh = random.uniform(0, 1)
+        uni_dist = Uniform(-1 * rand_thresh, rand_thresh)
+        up2 = self.__fw_up(c6, c3, self.up2, uni_dist, False)
+        c7, output7 = self.__fw_expand_3layer(up2)
+
+
+        # noise_vector = uni_dist.sample(c7.shape[1:]).to(c7.device)  # .unsqueeze(0)
+        # noise_vector = noise_vector.reshape(c7.shape[1:])
+        # c7 = c7.mul(noise_vector) + c7
+
+        rand_thresh = random.uniform(0, 1)
+        uni_dist = Uniform(-1 * rand_thresh, rand_thresh)
+        up3 = self.__fw_up(c7, c2, self.up3, uni_dist, False)
+
+        c8, output8 = self.__fw_expand_2layer(up3)
+
+        # noise_vector = uni_dist.sample(c8.shape[1:]).to(c8.device)  # .unsqueeze(0)
+        # noise_vector = noise_vector.reshape(c8.shape[1:])
+        # c8 = c8.mul(noise_vector) + c8
+
+        rand_thresh = random.uniform(0, 1)
+        uni_dist = Uniform(-1 * rand_thresh, rand_thresh)
+        up4 = self.__fw_up(c6, c3, self.up4, uni_dist, False)
+
+        c9, output9 = self.__fw_expand_1layer(up4)  # output9 is the main output of the network
 
         return output5, output6, output7, output8, output9
 
@@ -259,29 +322,38 @@ class PGS(nn.Module):
         conv_out = self.conv5(X)
         out = self.cls5(conv_out)
         return conv_out, out
+    def __fw_up(self, X_expand, X_contract, up_module, noise_dist=None,  is_supervised= True):
+        if is_supervised:
+            return up_module((X_expand, X_contract))
+        else:
+            up = up_module((X_expand, X_contract))
+            noise_vector = noise_dist.sample(up.shape[1:]).to(up.device)  # .unsqueeze(0)
+            noise_vector = noise_vector.reshape(up.shape[1:])
+            up = up.mul(noise_vector) + up
+            return up
 
-    def __fw_expand_4layer(self, X_expand, X_contract):
-        u1 = self.up1((X_expand, X_contract))
-        c6 = self.conv6(u1)
+    def __fw_expand_4layer(self, X):
+        # u1 = self.up1((X_expand, X_contract))
+        c6 = self.conv6(X)
         output6 = self.cls6(c6)
         return c6, output6
 
-    def __fw_expand_3layer(self, X_expand, X_contract):
+    def __fw_expand_3layer(self,X):
 
-        u2 = self.up2((X_expand, X_contract))
-        c7 = self.conv7(u2)
+        # u2 = self.up2((X_expand, X_contract))
+        c7 = self.conv7(X)
         output7 = self.cls7(c7)
         return c7, output7
 
-    def __fw_expand_2layer(self, X_expand, X_contract):
-        u3 = self.up3((X_expand, X_contract))
-        c8 = self.conv8(u3)
+    def __fw_expand_2layer(self, X):
+        # u3 = self.up3((X_expand, X_contract))
+        c8 = self.conv8(X)
         output8 = self.cls8(c8)
         return c8, output8
 
-    def __fw_expand_1layer(self, X_expand, X_contract):
-        u4 = self.up4((X_expand, X_contract))
-        c9 = self.conv9(u4)
+    def __fw_expand_1layer(self,X):
+        # u4 = self.up4((X_expand, X_contract))
+        c9 = self.conv9(X)
         output9 = self.cls9(c9)
         return c9, output9
 
@@ -337,7 +409,7 @@ class PGS(nn.Module):
             total_loss += unsup_loss(y_preds[i], pooled_main_output)
         return total_loss
 
-    def __fw_outpuwise_unsup_loss(self, y_noisy, y_orig, loss_functions):
+    def __fw_outputwise_unsup_loss(self, y_noisy, y_orig, loss_functions):
         (_, unsup_loss) = loss_functions
         total_loss = 0
         assert len(y_orig) == len(y_noisy), "Error! unsup_preds and sup_preds have to have same length"
@@ -360,7 +432,7 @@ class PGS(nn.Module):
             #total_loss = self.__fw_self_unsup_loss(y_preds, loss_functions)
 
             # consistency of original output and noisy output
-            total_loss = self.__fw_outpuwise_unsup_loss(y_preds, y_true, loss_functions)
+            total_loss = self.__fw_outputwise_unsup_loss(y_preds, y_true, loss_functions)
 
         return total_loss
 
