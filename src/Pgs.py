@@ -257,7 +257,7 @@ class PGS(nn.Module):
         # noise_vector = noise_vector.reshape(c4.shape[1:])
         # c4 = c4.mul(noise_vector) + c4
         rand_thresh = random.uniform(0, 1)
-        rand_thresh = 0.3
+        # rand_thresh = 0.3
         uni_dist = Uniform(-1 * rand_thresh, rand_thresh)
         noise_vector = uni_dist.sample(d4.shape[1:]).to(d4.device)  # .unsqueeze(0)
         noise_vector = noise_vector.reshape(d4.shape[1:])
@@ -271,7 +271,7 @@ class PGS(nn.Module):
 
         # expanding path
         rand_thresh = random.uniform(0, 1)
-        rand_thresh = 0.3
+        # rand_thresh = 0.3
         uni_dist = Uniform(-1 * rand_thresh, rand_thresh)
         up1 = self.__fw_up(c5, c4, self.up1, uni_dist, False)
         c6, output6 = self.__fw_expand_4layer(up1)
@@ -281,7 +281,7 @@ class PGS(nn.Module):
         # c6 = c6.mul(noise_vector) + c6
 
         rand_thresh = random.uniform(0, 1)
-        rand_thresh = 0.3
+        # rand_thresh = 0.3
         uni_dist = Uniform(-1 * rand_thresh, rand_thresh)
         up2 = self.__fw_up(c6, c3, self.up2, uni_dist, False)
         c7, output7 = self.__fw_expand_3layer(up2)
@@ -292,7 +292,7 @@ class PGS(nn.Module):
         # c7 = c7.mul(noise_vector) + c7
 
         rand_thresh = random.uniform(0, 1)
-        rand_thresh = 0.3
+        # rand_thresh = 0.3
         uni_dist = Uniform(-1 * rand_thresh, rand_thresh)
         up3 = self.__fw_up(c7, c2, self.up3, uni_dist, False)
 
@@ -303,7 +303,7 @@ class PGS(nn.Module):
         # c8 = c8.mul(noise_vector) + c8
 
         rand_thresh = random.uniform(0, 1)
-        rand_thresh = 0.3
+        # rand_thresh = 0.3
         uni_dist = Uniform(-1 * rand_thresh, rand_thresh)
         up4 = self.__fw_up(c8, c1, self.up4, uni_dist, False)
 
@@ -331,10 +331,21 @@ class PGS(nn.Module):
         if is_supervised:
             return up_module((X_expand, X_contract))
         else:
+            # 1st augmentation
+            noise_vector = noise_dist.sample(X_expand.shape[1:]).to(X_expand.device)  # .unsqueeze(0)
+            noise_vector = noise_vector.reshape(X_expand.shape[1:])
+            X_expand = X_expand.mul(noise_vector) + X_expand
+
+            #2nd augmentation
+
+            noise_vector = noise_dist.sample(X_contract.shape[1:]).to(X_contract.device)  # .unsqueeze(0)
+            noise_vector = noise_vector.reshape(X_contract.shape[1:])
+            X_contract = X_contract.mul(noise_vector) + X_contract
+            
             up = up_module((X_expand, X_contract))
-            noise_vector = noise_dist.sample(up.shape[1:]).to(up.device)  # .unsqueeze(0)
-            noise_vector = noise_vector.reshape(up.shape[1:])
-            up = up.mul(noise_vector) + up
+            # noise_vector = noise_dist.sample(up.shape[1:]).to(up.device)  # .unsqueeze(0)
+            # noise_vector = noise_vector.reshape(up.shape[1:])
+            # up = up.mul(noise_vector) + up
             return up
 
     def __fw_expand_4layer(self, X):
