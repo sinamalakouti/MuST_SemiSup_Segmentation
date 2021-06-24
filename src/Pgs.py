@@ -247,8 +247,8 @@ class PGS(nn.Module):
         # c5 = self.conv5(d4)
         # output5 = self.cls5(c5)
 
-        c5, output5 = self.__fw_bottleneck(d4)
-
+        c5 = self.__fw_bottleneck(d4)
+        output5 = self.cls5(c5)
         # expanding path
 
         # u1 = self.up1((c5, c4))
@@ -257,28 +257,30 @@ class PGS(nn.Module):
         # 4th expanding layer
 
         up1 = self.__fw_up(c5, c4, self.up1)
-        c6, output6 = self.__fw_expand_4layer(up1)
-
+        c6 = self.__fw_expand_4layer(up1)
+        output6 = self.cls6(c6)
         # 3rd expanding layer
 
         # u2 = self.up2((c6, c3))
         # c7 = self.conv7(u2)
         # output7 = self.cls7(c7)
         up2= self.__fw_up(c6, c3, self.up2)
-        c7, output7 = self.__fw_expand_3layer(up2)
-
+        c7 = self.__fw_expand_3layer(up2)
+        output7 = self.cls7(c7)
         # 2nd expanding layer
 
         # u3 = self.up3((c7, c2))
         # c8 = self.conv8(u3)
         # output8 = self.cls8(c8)
         up3 = self.__fw_up(c7, c2, self.up3)
-        c8, output8 = self.__fw_expand_2layer(up3)
+        c8 = self.__fw_expand_2layer(up3)
+        output8 = self.cls8(c8)
 
         # 1st expanding layer
         # output9 is the main output of the netowrk
         up4 = self.__fw_up(c8, c1, self.up4)
-        c9, output9 = self.__fw_expand_1layer(up4)
+        c9 = self.__fw_expand_1layer(up4)
+        output9 = self.cls9(c9)
 
         # u4 = self.up4((c8, c1))
         # c9 = self.conv9(u4)
