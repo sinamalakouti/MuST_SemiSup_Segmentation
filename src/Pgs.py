@@ -6,9 +6,10 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from torch.distributions.uniform import Uniform
-from  utils.Augmentation import augment as transormer
+from utils.Augmentation import augment as transformer
 from torch.distributions.normal import Normal
 import random
+
 
 class ConvBlock(nn.Module):
     def __init__(self, dim_in, dim_out, stride, kernel_size=3):
@@ -137,7 +138,7 @@ class PGS(nn.Module):
         self.cls6 = CLS(self.dim_outputs[5], self.dim_inputs[0])
         self.cls7 = CLS(self.dim_outputs[6], self.dim_inputs[0])
         self.cls8 = CLS(self.dim_outputs[7], self.dim_inputs[0])
-        self.cls9 = CLS(self.dim_outputs[8], self.dim_inputs[0])         # main classifier
+        self.cls9 = CLS(self.dim_outputs[8], self.dim_inputs[0])  # main classifier
 
     def forward(self, X, is_supervised):
         type_unsup = 'layerwise'
@@ -150,7 +151,7 @@ class PGS(nn.Module):
 
         else:
 
-                # get supervised outputs
+            # get supervised outputs
 
             self.training = False
             # with torch.no_grad():
@@ -165,7 +166,6 @@ class PGS(nn.Module):
 
     def __fw_unsupervised_layerwise(self, X):
 
-
         # contracting path
         c1, d1, c2, d2, c3, d3, c4, d4 = self.__fw_contracting_path(X)
 
@@ -174,7 +174,7 @@ class PGS(nn.Module):
         c5_sup = self.__fw_bottleneck(d4)
         output5_sup = self.cls5(c5_sup)
 
-        d4_unsup, output5_sup = transormer(d4,output5_sup)
+        d4_unsup, output5_sup = transformer(d4, output5_sup, cascade=True)
         c5_unsup = self.__fw_bottleneck(d4_unsup)
         output5_unsup = self.cls5(c5_unsup)
 
@@ -184,41 +184,40 @@ class PGS(nn.Module):
         c6 = self.__fw_expand_4layer(up1)
         output6_sup = self.cls6(c6)
 
-        up1, output6_sup = transormer(up1, output6_sup)
+        up1, output6_sup = transformer(up1, output6_sup, cascade=True)
         c6_unsup = self.__fw_expand_4layer(up1)
-        output6_unsup = self.cls5(c6_unsup)
-######
+        output6_unsup = self.cls6(c6_unsup)
+        ######
         up2 = self.__fw_up(c6, c3, self.up2)
         c7 = self.__fw_expand_3layer(up2)
         output7_sup = self.cls7(c7)
 
-        up2, output7_sup = transormer(up2, output7_sup)
-        c7_unsup =  self.__fw_expand_3layer(up2)
+        up2, output7_sup = transformer(up2, output7_sup, cascade=True)
+        c7_unsup = self.__fw_expand_3layer(up2)
         output7_unsup = self.cls7(c7_unsup)
 
-#####
+        #####
         up3 = self.__fw_up(c7, c2, self.up3)
         c8 = self.__fw_expand_2layer(up3)
         output8_sup = self.cls8(c8)
 
-        up3, output8_sup = transormer(up3, output8_sup)
+        up3, output8_sup = transformer(up3, output8_sup,cascade=True)
         c8_unsup = self.__fw_expand_2layer(up3)
         output8_unsup = self.cls8(c8_unsup)
 
-####
+        ####
 
         up4 = self.__fw_up(c8, c1, self.up4)
         c9 = self.__fw_expand_1layer(up4)  # output9 is the main output of the network
         output9_sup = self.cls9(c9)
 
-        up4, output9_sup = transormer(up4, output9_sup)
+        up4, output9_sup = transformer(up4, output9_sup,cascade=True)
         c9_unsup = self.__fw_expand_1layer(up4)
         output9_unsup = self.cls9(c9_unsup)
 
         supervised_outputs = output5_sup, output6_sup, output7_sup, output8_sup, output9_sup
         unsupervised_outputs = output5_unsup, output6_unsup, output7_unsup, output8_unsup, output9_unsup
         return supervised_outputs, unsupervised_outputs
-
 
     def __fw_supervised(self, X):
 
@@ -264,7 +263,7 @@ class PGS(nn.Module):
         # u2 = self.up2((c6, c3))
         # c7 = self.conv7(u2)
         # output7 = self.cls7(c7)
-        up2= self.__fw_up(c6, c3, self.up2)
+        up2 = self.__fw_up(c6, c3, self.up2)
         c7 = self.__fw_expand_3layer(up2)
         output7 = self.cls7(c7)
         # 2nd expanding layer
@@ -288,7 +287,7 @@ class PGS(nn.Module):
 
         return output5, output6, output7, output8, output9
 
-    def     __fw_unsupervised(self, X):
+    def __fw_unsupervised(self, X):
 
         # contracting path
         c1, d1, c2, d2, c3, d3, c4, d4 = self.__fw_contracting_path(X)
@@ -392,7 +391,8 @@ class PGS(nn.Module):
         c5 = self.conv5(X)
         # out = self.cls5(c5)
         return c5
-    def __fw_up(self, X_expand, X_contract, up_module, noise_dist=None,  is_supervised= True):
+
+    def __fw_up(self, X_expand, X_contract, up_module, noise_dist=None, is_supervised=True):
         if is_supervised:
             return up_module((X_expand, X_contract))
         else:
@@ -401,7 +401,7 @@ class PGS(nn.Module):
             noise_vector = noise_vector.reshape(X_expand.shape[1:])
             X_expand = X_expand.mul(noise_vector) + X_expand
 
-            #2nd augmentation
+            # 2nd augmentation
 
             noise_vector = noise_dist.sample(X_contract.shape[1:]).to(X_contract.device)  # .unsqueeze(0)
             noise_vector = noise_vector.reshape(X_contract.shape[1:])
@@ -419,7 +419,7 @@ class PGS(nn.Module):
         # output6 = self.cls6(c6)
         return c6
 
-    def __fw_expand_3layer(self,X):
+    def __fw_expand_3layer(self, X):
 
         # u2 = self.up2((X_expand, X_contract))
         c7 = self.conv7(X)
@@ -432,10 +432,10 @@ class PGS(nn.Module):
         # output8 = self.cls8(c8)
         return c8
 
-    def __fw_expand_1layer(self,X):
+    def __fw_expand_1layer(self, X):
         # u4 = self.up4((X_expand, X_contract))
         c9 = self.conv9(X)
-        #output9 = self.cls9(c9)
+        # output9 = self.cls9(c9)
         return c9
 
     def __fw_sup_loss(self, y_preds, y_true, loss_functions):
@@ -500,7 +500,7 @@ class PGS(nn.Module):
             orig_pred = y_orig[i]
             noisy_pred = y_noisy[i]
             assert orig_pred.shape == noisy_pred.shape, "Error! for preds number {}, supervised and unsupervised" \
-                                                 " prediction shape is not similar!".format(i)
+                                                        " prediction shape is not similar!".format(i)
             total_loss += unsup_loss(noisy_pred, orig_pred.detach())
         return total_loss
 
@@ -510,7 +510,7 @@ class PGS(nn.Module):
             total_loss = self.__fw_sup_loss(y_preds, y_true, loss_functions)
         else:
             # for comparing outputs together!
-            #total_loss = self.__fw_self_unsup_loss(y_preds, loss_functions)
+            # total_loss = self.__fw_self_unsup_loss(y_preds, loss_functions)
 
             # consistency of original output and noisy output
             total_loss = self.__fw_outputwise_unsup_loss(y_preds, y_true, loss_functions)
