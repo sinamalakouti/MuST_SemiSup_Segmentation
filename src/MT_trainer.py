@@ -286,6 +286,7 @@ def save_predictions(y_pred, threshold, dir_path, score, iter):
 
     for image_id, image in enumerate(y_pred):
         image = image >= threshold
+        image = image.to('cpu')
         plt.imshow(image)
         image_path = os.path.join(dir_path, "image_id_{}.jpg".format(image_id))
         plt.savefig(image_path)

@@ -55,10 +55,10 @@ def trainPGS(dataset, model, optimizer, device, epochid):
         else:
             is_supervised = False
             # continue
-        if epochid < 5 and not is_supervised:
+        if epochid < 20 and not is_supervised:
             continue
 
-            print("subject is : ", batch['subject'])
+        print("subject is : ", batch['subject'])
 
         # if epochid % 4 == 0:
         #     is_supervised =    True
@@ -233,6 +233,7 @@ def save_predictions(y_pred, threshold, dir_path, score, iter):
 
     for image_id, image in enumerate(y_pred):
         image = image >= threshold
+        image = image.to('cpu')
         plt.imshow(image)
         image_path = os.path.join(dir_path, "image_id_{}.jpg".format(image_id))
         plt.savefig(image_path)
