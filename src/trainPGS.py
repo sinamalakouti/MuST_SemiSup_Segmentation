@@ -26,7 +26,8 @@ sys.path.append('srs/utils')
 
 for p in sys.path:
     print("path  ", p)
-
+torch.manual_seed(42)
+np.random.seed(42)
 utils.Constants.USE_CUDA = True
 parser = argparse.ArgumentParser()
 
