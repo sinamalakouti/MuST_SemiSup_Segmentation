@@ -10,12 +10,12 @@ from evaluation_metrics import dice_coef
 import Pgs
 import matplotlib.pyplot as plt
 from PIL import Image
-import torchvision.transforms.functional as augmentor
+from torch.distributions.normal import Normal
 
 from utils import reconstruction_loss
 
 import numpy as np
-
+import torchvision.transforms.functional as augmentor
 import argparse
 from torch.utils.tensorboard import SummaryWriter
 import wandb
@@ -31,7 +31,7 @@ utils.Constants.USE_CUDA = True
 parser = argparse.ArgumentParser()
 
 
-def trainPGS(dataset, model, optimizer, device, epochid):
+def train_supervised(dataset, model, optimizer, device):
     model.train()
     train_loader = utils.get_trainset(dataset, 5, True, None, None)
 
@@ -41,12 +41,46 @@ def trainPGS(dataset, model, optimizer, device, epochid):
         target = batch['label'].to(device)
         b = b.to(device)
         model.to(device)
+        sup_loss = torch.nn.BCELoss()
+        loss_functions = (sup_loss, None)
 
-        # unsup_loss = nn.MSELoss()
+        if "0177CR" in batch['subject'][0] or '0064KW' in batch['subject'][0]:
+            is_supervised = True
+        else:
+            continue
+
+        print("subject is : ", batch['subject'])
+
+        sup_outputs, unsup_outputs = model(b, is_supervised)
+        if is_supervised:
+            total_loss = model.compute_loss(sup_outputs, target, loss_functions, is_supervised)
+        else:
+            print("***** ERROR : unsupervised training in only supervised model!")
+            assert False, "***** ERROR : unsupervised training in only supervised model!"
+
+        print("****** LOSSS  : Is_supervised: {} *********   :".format(is_supervised), total_loss)
+
+        total_loss.backward()
+        optimizer.step()
+    return model, total_loss
+
+
+def train_MT(dataset, student_model, teacher_model, optimizer, device, cur_epoch):
+    student_model.train()
+    teacher_model.train()
+
+    train_loader = utils.get_trainset(dataset, 5, True, None, None)
+    total_num_batches = len(train_loader)
+    for step, batch in enumerate(train_loader):
+        optimizer.zero_grad()
+        b = batch['data']
+        target = batch['label'].to(device)
+        b = b.to(device)
+        student_model.to(device)
+        teacher_model.to(device)
+
         unsup_loss = nn.BCELoss()
         sup_loss = torch.nn.BCELoss()
-        # sup_loss = reconstruction_loss.dice_coef_loss
-        # sup_loss = torch.nn.w
         loss_functions = (sup_loss, unsup_loss)
 
         if "0177CR" in batch['subject'][0] or '0064KW' in batch['subject'][0]:
@@ -54,32 +88,40 @@ def trainPGS(dataset, model, optimizer, device, epochid):
 
         else:
             is_supervised = False
-            # continue
-        if epochid < 5 and not is_supervised:
-            continue
 
-            print("subject is : ", batch['subject'])
-
-        # if epochid % 4 == 0:
-        #     is_supervised =    True
-        # else:
-        #     is_supervised = False
-        #     if epochid < 5:
-        #         continue
-
-        sup_outputs, unsup_outputs = model(b, is_supervised)
+        print("subject is : ", batch['subject'])
+        unsup_err = 0
+        sup_err = 0
         if is_supervised:
-            total_loss = model.compute_loss(sup_outputs, target, loss_functions, is_supervised)
+            student_output, _ = student_model(b, is_supervised)
+            sup_err = student_model.compute_loss(student_output, target, loss_functions, is_supervised)
         else:
+            with torch.no_grad():
+                # todo apply noise twice to the input
+                additive_dist = Normal(torch.tensor([0.0]), torch.tensor([0.05]))
+                multiplicative_dist = Normal(torch.tensor([1.0]), torch.tensor([0.01]))
+                ns = additive_dist.sample(b.shape).reshape(b.shape).to(b.device)
+                nm = multiplicative_dist.sample(b.shape).reshape(b.shape).to(b.device)
 
-            # raise Exception("unsupervised is false")
-            total_loss = model.compute_loss(unsup_outputs, sup_outputs, loss_functions, is_supervised)
+                b_teacher = (b + ns) * nm
 
+                ns = additive_dist.sample(b.shape).reshape(b.shape).to(b.device)
+                nm = multiplicative_dist.sample(b.shape).reshape(b.shape).to(b.device)
+
+                b_student = (b + ns) * nm
+                teacher_output, _ = teacher_model(b_teacher, True)
+
+            student_output, _ = student_model(b_student, True)
+
+            unsup_err = student_model.compute_loss(student_output, teacher_output, loss_functions, is_supervised)
+        total_loss = sup_err + unsup_err * utils.update_adaptiveRate(total_num_batches * cur_epoch + step, 400)
         print("****** LOSSS  : Is_supervised: {} *********   :".format(is_supervised), total_loss)
 
         total_loss.backward()
         optimizer.step()
-    return model, total_loss
+        student_model, teacher_model = utils.ema_update(student_model, teacher_model,
+                                                        cur_epoch * total_num_batches + step, 400)
+    return student_model, teacher_model, total_loss
 
 
 def evaluatePGS(model, dataset, device, threshold):
@@ -118,7 +160,7 @@ def train_val(dataset, n_epochs, device, wmh_threshold, output_dir, learning_rat
     print("output_dir is    ", output_dir)
     if not os.path.isdir(output_dir):
         try:
-            os.mkdir(output_dir,0o777)
+            os.mkdir(output_dir, 0o777)
         except OSError:
             print("Creation of the directory %s failed" % output_dir)
     else:
@@ -130,7 +172,7 @@ def train_val(dataset, n_epochs, device, wmh_threshold, output_dir, learning_rat
 
     if not os.path.isdir(output_model_dir):
         try:
-            os.mkdir(output_model_dir,0o777)
+            os.mkdir(output_model_dir, 0o777)
         except OSError:
             print("Creation of the directory %s failed" % output_model_dir)
     else:
@@ -144,7 +186,7 @@ def train_val(dataset, n_epochs, device, wmh_threshold, output_dir, learning_rat
     else:
         None
 
-    writer = SummaryWriter(log_dir=os.path.join(output_dir, "runs"))
+    # writer = SummaryWriter(log_dir=os.path.join(output_dir, "runs"))
     wandb.init(project="semi_supervised_wmh", config=args)
     wandb.run.name = wandb.run.id
     output_image_dir = os.path.join(output_dir, "result_images/")
@@ -157,42 +199,54 @@ def train_val(dataset, n_epochs, device, wmh_threshold, output_dir, learning_rat
     else:
         None
 
-    pgsnet = Pgs.PGS(inputs_dim, outputs_dim, kernels, strides)
+    teacher_pgs = Pgs.PGS(inputs_dim, outputs_dim, kernels, strides)
+    student_pgs = Pgs.PGS(inputs_dim, outputs_dim, kernels, strides)
+
     print("learning_rate is    ", learning_rate)
-    optimizer = torch.optim.SGD(pgsnet.parameters(), learning_rate, momentum=0.9, weight_decay=1e-4)
-    step_size = 150
-    scheduler = lr_scheduler.StepLR(optimizer, step_size=step_size, gamma=0.1)  # don't use it
-    print("scheduler step size is :   ", step_size)
+    teacher_optimizer = torch.optim.RMSprop(teacher_pgs.parameters(), 0.0001, momentum=0.6, weight_decay=1e-5)
+    student_optimizer = torch.optim.RMSprop(student_pgs.parameters(), 0.0001, momentum=0.6, weight_decay=1e-5)
+    step_size = 80
+    scheduler = lr_scheduler.StepLR(student_optimizer, step_size=step_size, gamma=0.9)
     best_score = 0
 
-    for epoch in range(n_epochs):
+    # first train teacher model with only supervised sets
+
+    n_sup_epochs = 20
+    for epoch in range(n_sup_epochs):
+        teacher_pgs, loss = train_supervised(dataset, teacher_pgs, teacher_optimizer, device)
+
+        score, segmentations = evaluatePGS(teacher_pgs, dataset, device, wmh_threshold)
+        # writer.add_scalar("dice_score/test", score, epoch)
+        print("** SCORE @ Iteration {} is {} **".format(epoch, score))
+        if score > best_score:
+            print("****************** BEST SCORE @ ITERATION {} is {} ******************".format(epoch, score))
+            best_score = score
+            save_predictions(segmentations, wmh_threshold, output_image_dir, score, epoch)
+
+    best_score = 0
+    for epoch in range(n_sup_epochs, n_epochs + n_sup_epochs):
         print("iteration:  ", epoch)
-        # score, segmentations = evaluatePGS(pgsnet, dataset, device, wmh_threshold)
-        pgsnet, loss = trainPGS(dataset, pgsnet, optimizer, device, epoch)
-        writer.add_scalar("Loss/train", loss, epoch)
+        student_pgs, teacher_pgs, loss = train_MT(dataset, student_pgs, teacher_pgs, student_optimizer, device, epoch)
+        # writer.add_scalar("Loss/train", loss, epoch)
 
         if epoch % 1 == 0:
-            score, segmentations = evaluatePGS(pgsnet, dataset, device, wmh_threshold)
-            writer.add_scalar("dice_score/test", score, epoch)
+            score, segmentations = evaluatePGS(teacher_pgs, dataset, device, wmh_threshold)
+            # writer.add_scalar("dice_score/test", score, epoch)
             print("** SCORE @ Iteration {} is {} **".format(epoch, score))
             if score > best_score:
                 print("****************** BEST SCORE @ ITERATION {} is {} ******************".format(epoch, score))
                 best_score = score
                 path = os.path.join(output_model_dir, 'psgnet_best_lr{}.model'.format(learning_rate))
                 with open(path, 'wb') as f:
-                    torch.save(pgsnet, f)
+                    torch.save(teacher_pgs, f)
 
-                # save_score(output_image_dir, score, epoch)
                 save_predictions(segmentations, wmh_threshold, output_image_dir, score, epoch)
         scheduler.step()
-        example = segmentations[0]
-        example = example >= wmh_threshold
 
-        wandb.log({"train_loss": loss, "dev_dsc": score, "image":[wandb.Image(augmentor.to_pil_image(example.int())
-                                                                              , caption="output example")]})
-
-    writer.flush()
-    writer.close()
+        wandb.log({"train_loss": loss, "dev_dsc": score})
+    #
+    # writer.flush()
+    # writer.close()
 
 
 def save_score(dir_path, score, iter):
@@ -210,7 +264,6 @@ def save_score(dir_path, score, iter):
 
 
 def save_predictions(y_pred, threshold, dir_path, score, iter):
-
     dir_path = os.path.join(dir_path, "results_iter{}".format(iter))
     if not os.path.isdir(dir_path):
         try:
@@ -307,15 +360,15 @@ def main():
 
     parser.add_argument(
         "--training_mode",
-        default = "semi_sup",
-        type = str,
-        help = "training mode supervised (sup), n subject supervised (n_sup), all supervised (all_sup)"
+        default="semi_sup",
+        type=str,
+        help="training mode supervised (sup), n subject supervised (n_sup), all supervised (all_sup)"
     )
 
     parser.add_argument(
         "--supervised_subjects",
-        type = str,
-        help = "<subject1>_<subject2> ... <subjectn> or all for all subjects"
+        type=str,
+        help="<subject1>_<subject2> ... <subjectn> or all for all subjects"
     )
     dataset = utils.Constants.Datasets.PittLocalFull
     args = parser.parse_args()
@@ -350,17 +403,16 @@ def get_cluster_assumption(image):
     n_cols = image.shape[1]
     size = 1
     diff = torch.zeros(image.shape)
-    for r in range(2 + size,n_rows-2 - size):
-        for c in range(2 + size,n_cols-2 - size):
-            main_patch = image[r-1-size:r+1 +size, c-1-size:c+1 +size]
+    for r in range(2 + size, n_rows - 2 - size):
+        for c in range(2 + size, n_cols - 2 - size):
+            main_patch = image[r - 1 - size:r + 1 + size, c - 1 - size:c + 1 + size]
             for rd in range(-1, 2):
-                for cd in range(-1,2):
-                    patch = image[(r+rd)-1 -size:(r+rd) + 1 + size, (c+cd)-1 -size:(c+cd)+1 +size]
-                    diff[r,c] += torch.sqrt(torch.sum((main_patch - patch) ** 2))
-            diff[r,c] = diff[r,c] / 8
+                for cd in range(-1, 2):
+                    patch = image[(r + rd) - 1 - size:(r + rd) + 1 + size, (c + cd) - 1 - size:(c + cd) + 1 + size]
+                    diff[r, c] += torch.sqrt(torch.sum((main_patch - patch) ** 2))
+            diff[r, c] = diff[r, c] / 8
 
     return diff
-
 
 
 if __name__ == '__main__':

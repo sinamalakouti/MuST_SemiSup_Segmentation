@@ -30,6 +30,25 @@ import numpy as np
 #         raise ("n = len(array)")
 #
 #     return random.sample(subjects, n)
+def __ema(p1, p2, factor):
+    return factor * p1 + (1 - factor) * p2
+
+
+def ema_update(student, teacher, cur_step, L = 400):
+    if cur_step < L:
+        alpha = 0.99
+    else:
+        alpha = 0.999
+
+        for stud_p, teach_p in zip(student.parameters(), teacher.parameters()):
+            teacher.data = __ema(teach_p.data, stud_p.data, alpha)
+    return student, teacher
+
+
+def update_adaptiveRate(cur_step, L):
+    if cur_step > L:
+        return 1.0
+    return np.exp(-5 * (1 - cur_step / L) ** 2)
 
 
 def get_trainset(dataset, batch_size, intensity_rescale, has_t1, mixup_threshold) -> torch.utils.data.DataLoader:
@@ -133,7 +152,7 @@ def save_segment_images(segments, path):
 
             threshold = 0.85
             plt.imshow(segments[i, j] > threshold, 'gray')
-            image_path = sample_dir + "/segment_threshold_{}_{}.png".format(threshold,j)
+            image_path = sample_dir + "/segment_threshold_{}_{}.png".format(threshold, j)
             plt.savefig(image_path)
 
 
@@ -196,4 +215,3 @@ def evaluate(dataset, model, output_path):
     text_file = open(output_path + "/result.txt", "w")
     text_file.write(text)
     text_file.close()
-

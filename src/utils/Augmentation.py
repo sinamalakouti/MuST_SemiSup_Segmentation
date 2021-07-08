@@ -23,8 +23,8 @@ def augment(x, y, cascade = False):
                                angle=angle, translate=(0, 0), shear=0, scale=1)
         y_transform = F.affine(y_transform,
                                angle=angle, translate=(0, 0), shear=0, scale=1)
-        noise = uni_dist.sample(x.shape[1:]).to(x.device)
-        x_transform = x.mul(noise) + x
+        noise = uni_dist.sample(x_transform.shape[1:]).to(x_transform.device)
+        x_transform = x_transform.mul(noise) + x_transform
         y_transform = y_transform
 
         return x_transform, y_transform
