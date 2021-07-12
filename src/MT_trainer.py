@@ -21,12 +21,13 @@ from torch.utils.tensorboard import SummaryWriter
 import wandb
 
 sys.path.append('src')
-sys.path.append('src/utils/Constants')
+sys.path.append('src/utils/Constants')  
 sys.path.append('srs/utils')
 
 for p in sys.path:
     print("path  ", p)
-
+torch.manual_seed(42)
+np.random.seed(42)
 utils.Constants.USE_CUDA = True
 parser = argparse.ArgumentParser()
 
@@ -213,6 +214,8 @@ def train_val(dataset, n_epochs, device, wmh_threshold, output_dir, learning_rat
 
     n_sup_epochs = 20
     for epoch in range(n_sup_epochs):
+        teacher_pgs.train()
+        student_pgs.train()
         teacher_pgs, loss = train_supervised(dataset, teacher_pgs, teacher_optimizer, device)
 
         score, segmentations = evaluatePGS(teacher_pgs, dataset, device, wmh_threshold)
@@ -223,8 +226,14 @@ def train_val(dataset, n_epochs, device, wmh_threshold, output_dir, learning_rat
             best_score = score
             save_predictions(segmentations, wmh_threshold, output_image_dir, score, epoch)
 
+        wandb.log({"train_loss": loss, "dev_dsc": score})
+        student_pgs, teacher_pgs = utils.ema_update(student_pgs, teacher_pgs,
+                                                        epoch * 16 , 400)
+
     best_score = 0
     for epoch in range(n_sup_epochs, n_epochs + n_sup_epochs):
+        teacher_pgs.train()
+        student_pgs.train()
         print("iteration:  ", epoch)
         student_pgs, teacher_pgs, loss = train_MT(dataset, student_pgs, teacher_pgs, student_optimizer, device, epoch)
         # writer.add_scalar("Loss/train", loss, epoch)

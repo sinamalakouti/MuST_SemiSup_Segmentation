@@ -40,8 +40,8 @@ def ema_update(student, teacher, cur_step, L = 400):
     else:
         alpha = 0.999
 
-        for stud_p, teach_p in zip(student.parameters(), teacher.parameters()):
-            teacher.data = __ema(teach_p.data, stud_p.data, alpha)
+    for stud_p, teach_p in zip(student.parameters(), teacher.parameters()):
+        teach_p.data = __ema(teach_p.data, stud_p.data, alpha)
     return student, teacher
 
 
