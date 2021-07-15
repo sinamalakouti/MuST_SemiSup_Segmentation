@@ -1,5 +1,6 @@
 from utils.Constants import *
 from utils.dataloader import *
+from utils.Brat20  import *
 import Wnet
 import matplotlib.pyplot as plt
 import os
@@ -83,6 +84,21 @@ def get_trainset(dataset, batch_size, intensity_rescale, has_t1, mixup_threshold
             shuffle=False,
             pin_memory=mem_pin
         )
+    elif dataset is Datasets.Brat20:
+        batch_sz = batch_size
+        train = torch.utils.data.DataLoader(
+            Brat20(
+                dataroot_dir=f'data/brats20',
+                mode= 'train',
+                min_slice_index=50,
+                max_slice_index=110),
+            batch_size=batch_sz,
+            drop_last=True,
+            num_workers=0,
+            shuffle=True,
+            pin_memory=mem_pin
+        )
+
     return train
 
 
@@ -116,11 +132,11 @@ def get_testset(dataset, batch_size, intensity_rescale, has_t1, mixup_threshold)
         return test
 
 
-def load_model(path) -> Wnet.Wnet:
-    wnet = torch.load(path, map_location=torch.device('cpu'))
+def load_model(path):
+    model = torch.load(path, map_location=torch.device('cpu'))
     # wnet = torch.load(path)
 
-    return wnet
+    return model
 
 
 def save_segment_images(segments, path):

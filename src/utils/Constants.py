@@ -1,6 +1,7 @@
 from enum import Enum
 class Datasets(Enum):
     PittLocalFull = 1
+    Brat20 = 2
 
 
 #     network configure

@@ -20,6 +20,8 @@ import argparse
 from torch.utils.tensorboard import SummaryWriter
 import wandb
 
+
+
 sys.path.append('src')
 sys.path.append('src/utils/Constants')
 sys.path.append('srs/utils')
@@ -119,7 +121,7 @@ def train_val(dataset, n_epochs, device, wmh_threshold, output_dir, learning_rat
     print("output_dir is    ", output_dir)
     if not os.path.isdir(output_dir):
         try:
-            os.mkdir(output_dir,0o777)
+            os.mkdir(output_dir, 0o777)
         except OSError:
             print("Creation of the directory %s failed" % output_dir)
     else:
@@ -131,7 +133,7 @@ def train_val(dataset, n_epochs, device, wmh_threshold, output_dir, learning_rat
 
     if not os.path.isdir(output_model_dir):
         try:
-            os.mkdir(output_model_dir,0o777)
+            os.mkdir(output_model_dir, 0o777)
         except OSError:
             print("Creation of the directory %s failed" % output_model_dir)
     else:
@@ -189,8 +191,8 @@ def train_val(dataset, n_epochs, device, wmh_threshold, output_dir, learning_rat
         example = segmentations[0]
         example = example >= wmh_threshold
 
-        wandb.log({"train_loss": loss, "dev_dsc": score, "image":[wandb.Image(augmentor.to_pil_image(example.int())
-                                                                              , caption="output example")]})
+        wandb.log({"train_loss": loss, "dev_dsc": score, "image": [wandb.Image(augmentor.to_pil_image(example.int())
+                                                                               , caption="output example")]})
 
     writer.flush()
     writer.close()
@@ -211,7 +213,6 @@ def save_score(dir_path, score, iter):
 
 
 def save_predictions(y_pred, threshold, dir_path, score, iter):
-
     dir_path = os.path.join(dir_path, "results_iter{}".format(iter))
     if not os.path.isdir(dir_path):
         try:
@@ -309,17 +310,18 @@ def main():
 
     parser.add_argument(
         "--training_mode",
-        default = "semi_sup",
-        type = str,
-        help = "training mode supervised (sup), n subject supervised (n_sup), all supervised (all_sup)"
+        default="semi_sup",
+        type=str,
+        help="training mode supervised (sup), n subject supervised (n_sup), all supervised (all_sup)"
     )
 
     parser.add_argument(
         "--supervised_subjects",
-        type = str,
-        help = "<subject1>_<subject2> ... <subjectn> or all for all subjects"
+        type=str,
+        help="<subject1>_<subject2> ... <subjectn> or all for all subjects"
     )
     dataset = utils.Constants.Datasets.PittLocalFull
+    # dataset = utils.Constants.Datasets.Brat20
     args = parser.parse_args()
 
     if torch.cuda.is_available() and utils.Constants.USE_CUDA:
@@ -329,22 +331,43 @@ def main():
     print("device is     ", dev)
 
     device = torch.device(dev)
-    # output_dir = '/Users/sinamalakouti/Desktop/alaki'
-    train_val(dataset, args.n_epochs, device, args.wmh_threshold, args.output_dir, args.lr, args)
+    output_dir = '/Users/sinamalakouti/Desktop/WMH_PROJECT/clusterAssumption/'
+    # train_val(dataset, args.n_epochs, device, args.wmh_threshold, args.output_dir, args.lr, args)
 
-    # train_loader = utils.get_trainset(dataset, 5, True, None, None)
+    train_loader = utils.get_trainset(dataset, 60, True, None, None)
     #
-    # for step, batch in enumerate(train_loader):
-    #     data = batch['data']
-    #     print(step)
-    #     for i in range(data.shape[0]):
-    #         diff = get_cluster_assumption(data[i][0])
-    #         plt.imshow(data[i][0])
-    #         image_path = "cluster_assumption_res/" + batch['subject'][i] + "_input_{}.png".format(i)
-    #         plt.savefig(image_path)
-    #         plt.imshow(diff)
-    #         image_path = "cluster_assumption_res/" + batch['subject'][i] + "_{}.png".format(i)
-    #         plt.savefig(image_path)
+
+    model = utils.load_model('/Users/sinamalakouti/Desktop/WMH_PROJECT/psgnet_best_lr0.001.model')
+
+    for step, batch in enumerate(train_loader):
+        data = batch['data']
+        model.get_expanding_layers_outputs(data)
+        print(step)
+        for i in range(data.shape[0]):
+            diff = get_cluster_assumption(data[i][0])
+            plt.imshow(data[i][0])
+            image_path = "cluster_assumption_res/" + batch['subject'][i] + "_input_{}.png".format(i)
+            plt.savefig(image_path)
+            plt.imshow(diff)
+            image_path = "cluster_assumption_res/" + batch['subject'][i] + "_{}.png".format(i)
+            plt.savefig(image_path)
+
+
+def get_cluster_assumption_representation(h):
+    l_rep = h.shape[0]
+    n_rows = h.shape[1]
+    n_cols = h.shape[2]
+    diff = torch.zeros((n_rows, n_cols))
+
+    for r in range(1, n_rows - 1):
+        for c in range(1, n_cols - 1):
+            main_patch = h[:, r, c]
+            main_patch = main_patch.reshape(main_patch.shape[0], 1, 1)
+            patch = h[:, r - 1:r + 2, c - 1:c + 2]
+            d = torch.sqrt(torch.sum((main_patch - patch) ** 2, axis=0))
+
+            diff[r, c] = d.mean()
+    return diff
 
 
 def get_cluster_assumption(image):
@@ -352,17 +375,16 @@ def get_cluster_assumption(image):
     n_cols = image.shape[1]
     size = 1
     diff = torch.zeros(image.shape)
-    for r in range(2 + size,n_rows-2 - size):
-        for c in range(2 + size,n_cols-2 - size):
-            main_patch = image[r-1-size:r+1 +size, c-1-size:c+1 +size]
+    for r in range(2 + size, n_rows - 2 - size):
+        for c in range(2 + size, n_cols - 2 - size):
+            main_patch = image[r - 1 - size:r + 1 + size, c - 1 - size:c + 1 + size]
             for rd in range(-1, 2):
-                for cd in range(-1,2):
-                    patch = image[(r+rd)-1 -size:(r+rd) + 1 + size, (c+cd)-1 -size:(c+cd)+1 +size]
-                    diff[r,c] += torch.sqrt(torch.sum((main_patch - patch) ** 2))
-            diff[r,c] = diff[r,c] / 8
+                for cd in range(-1, 2):
+                    patch = image[(r + rd) - 1 - size:(r + rd) + 1 + size, (c + cd) - 1 - size:(c + cd) + 1 + size]
+                    diff[r, c] += torch.sqrt(torch.sum((main_patch - patch) ** 2))
+            diff[r, c] = diff[r, c] / 8
 
     return diff
-
 
 
 if __name__ == '__main__':

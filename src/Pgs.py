@@ -588,6 +588,37 @@ class PGS(nn.Module):
         self.cls7 = CLS(self.dim_outputs[6], self.dim_inputs[0])
         self.cls8 = CLS(self.dim_outputs[7], self.dim_inputs[0])
         self.cls9 = CLS(self.dim_outputs[8], self.dim_inputs[0])  # main classifier
+    def get_expanding_layers_outputs(self, X):
+
+        c1, d1, c2, d2, c3, d3, c4, d4 = self.__fw_contracting_path(X)
+        interm_inputs = []
+        # bottleneck
+
+        c5 = self.__fw_bottleneck(d4)
+        output5 = self.cls5(c5)
+        # expanding path
+        # 4th expanding layer
+
+        up1 = self.__fw_up(c5, c4, self.up1)
+        c6 = self.__fw_expand_4layer(up1)
+        output6 = self.cls6(c6)
+        # 3rd expanding layer
+
+        up2 = self.__fw_up(c6, c3, self.up2)
+        c7 = self.__fw_expand_3layer(up2)
+        output7 = self.cls7(c7)
+        # 2nd expanding layer
+
+        up3 = self.__fw_up(c7, c2, self.up3)
+        c8 = self.__fw_expand_2layer(up3)
+        output8 = self.cls8(c8)
+
+        # 1st expanding layer
+
+        up4 = self.__fw_up(c8, c1, self.up4)
+        c9 = self.__fw_expand_1layer(up4)
+        output9 = self.cls9(c9)
+
 
     def forward(self, X, is_supervised):
         type_unsup = 'layerwise'
@@ -670,38 +701,13 @@ class PGS(nn.Module):
 
     def __fw_supervised(self, X):
 
-        # contracting path
-
-        # c1 = self.conv1(X)
-        # d1 = self.down1(c1)
-        # c2 = self.conv2(d1)
-        # d2 = self.down2(c2)
-        # c3 = self.conv3(d2)
-        # d3 = self.down3(c3)
-        # c4 = self.conv4(d3)
-        # d4 = self.down4(c4)
-
         c1, d1, c2, d2, c3, d3, c4, d4 = self.__fw_contracting_path(X)
 
         # bottleneck
 
-        # if it is unsupervised loss add some noise
-
-        # if not is_supervised:
-        #     uni_dist = Uniform(-0.3, 0.3)
-        #     noise_vector = uni_dist.sample(d4.shape[1:]).to(d4.device).unsqueeze(0)
-        #     d4 = d4.mul(noise_vector) + d4
-
-        # c5 = self.conv5(d4)
-        # output5 = self.cls5(c5)
-
         c5 = self.__fw_bottleneck(d4)
         output5 = self.cls5(c5)
         # expanding path
-
-        # u1 = self.up1((c5, c4))
-        # c6 = self.conv6(u1)
-        # output6 = self.cls6(c6)
         # 4th expanding layer
 
         up1 = self.__fw_up(c5, c4, self.up1)
@@ -709,30 +715,21 @@ class PGS(nn.Module):
         output6 = self.cls6(c6)
         # 3rd expanding layer
 
-        # u2 = self.up2((c6, c3))
-        # c7 = self.conv7(u2)
-        # output7 = self.cls7(c7)
         up2 = self.__fw_up(c6, c3, self.up2)
         c7 = self.__fw_expand_3layer(up2)
         output7 = self.cls7(c7)
         # 2nd expanding layer
 
-        # u3 = self.up3((c7, c2))
-        # c8 = self.conv8(u3)
-        # output8 = self.cls8(c8)
         up3 = self.__fw_up(c7, c2, self.up3)
         c8 = self.__fw_expand_2layer(up3)
         output8 = self.cls8(c8)
 
         # 1st expanding layer
-        # output9 is the main output of the netowrk
+
         up4 = self.__fw_up(c8, c1, self.up4)
         c9 = self.__fw_expand_1layer(up4)
         output9 = self.cls9(c9)
 
-        # u4 = self.up4((c8, c1))
-        # c9 = self.conv9(u4)
-        # output9 = self.cls9(c9)
 
         return output5, output6, output7, output8, output9
 
