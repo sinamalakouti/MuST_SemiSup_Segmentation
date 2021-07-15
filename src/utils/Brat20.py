@@ -39,7 +39,7 @@ class Brat20(torch.utils.data.Dataset):
             subjects_root_dir = os.path.join(dataroot_dir, 'MICCAI_BraTS2020_TrainingData')
 
         self.subjects_name = np.asarray(pd.read_csv(ids_path, header=None)).reshape(-1)
-        self.subjects_id = [int(subject.strip('-')[-1]) for subject in self.subjects_name
+        self.subjects_id = [int(subject.split('_')[-1]) for subject in self.subjects_name
                             for _ in range(max_slice_index - min_slice_index)]
 
         flair_paths = [os.path.join(subjects_root_dir, str(subj_name) + '/{}_flair.nii.gz'.format(subj_name)) for
