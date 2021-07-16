@@ -128,8 +128,22 @@ def get_testset(dataset, batch_size, intensity_rescale, has_t1, mixup_threshold)
             shuffle=False,
             pin_memory=mem_pin
         )
+    elif dataset is Datasets.Brat20:
+        batch_sz = batch_size
+        test = torch.utils.data.DataLoader(
+            Brat20(
+                dataroot_dir=f'data/brats20',
+                mode='test',
+                min_slice_index=50,
+                max_slice_index=110),
+            batch_size=batch_sz,
+            drop_last=True,
+            num_workers=0,
+            shuffle=True,
+            pin_memory=mem_pin
+        )
 
-        return test
+    return test
 
 
 def load_model(path):

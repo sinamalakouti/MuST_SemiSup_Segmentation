@@ -11,6 +11,7 @@ import Pgs
 import matplotlib.pyplot as plt
 from PIL import Image
 import torchvision.transforms.functional as augmentor
+from torch.nn.parallel import DistributedDataParallel as DDP
 
 from utils import reconstruction_loss
 
@@ -25,6 +26,7 @@ import wandb
 sys.path.append('src')
 sys.path.append('src/utils/Constants')
 sys.path.append('srs/utils')
+os.environ['CUDA_VISIBLE_DEVICES'] = "0,1"
 
 for p in sys.path:
     print("path  ", p)
@@ -36,13 +38,14 @@ parser = argparse.ArgumentParser()
 
 def trainPGS(train_loader, model, optimizer, device, epochid):
     model.train()
+    model.to(device)
 
+    model = DDP(model, delay_allreduce=True)
     for step, batch in enumerate(train_loader):
         optimizer.zero_grad()
         b = batch['data']
-        target = batch['label'].to(device)
         b = b.to(device)
-        model.to(device)
+        target = batch['label'].to(device)
 
         # unsup_loss = nn.MSELoss()
         unsup_loss = nn.BCELoss()
@@ -153,7 +156,7 @@ def train_val(dataset, n_epochs, device, wmh_threshold, output_dir, learning_rat
 
     for epoch in range(n_epochs):
         print("iteration:  ", epoch)
-        # score, segmentations = evaluatePGS(pgsnet, dataset, device, wmh_threshold)
+        score, segmentations = evaluatePGS(pgsnet, dataset, device, wmh_threshold)
         train_loader = utils.get_trainset(dataset, 60, True, None, None)
         pgsnet, loss = trainPGS(train_loader, pgsnet, optimizer, device, epoch)
         writer.add_scalar("Loss/train", loss, epoch)
