@@ -316,6 +316,8 @@ def main():
         dev = "cpu"
     print("device is     ", dev)
 
+    dev = 'cuda'
+
     device = torch.device(dev)
     train_val(dataset, args.n_epochs, device, args.wmh_threshold, args.output_dir, args.lr, args)
 
