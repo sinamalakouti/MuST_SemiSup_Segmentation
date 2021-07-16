@@ -30,6 +30,7 @@ class Brat20(torch.utils.data.Dataset):
         self.weights = {}
         if mode == 'train':
             ids_path = os.path.join(dataroot_dir, 'trainset/training_ids.csv')
+
         else:
             ids_path = os.path.join(dataroot_dir, 'valset/val_ids.csv')
 
@@ -39,6 +40,7 @@ class Brat20(torch.utils.data.Dataset):
             subjects_root_dir = os.path.join(dataroot_dir, 'MICCAI_BraTS2020_TrainingData')
 
         self.subjects_name = np.asarray(pd.read_csv(ids_path, header=None)).reshape(-1)
+        self.subjects_name = self.subjects_name[0:len(self.subjects_name) // 2]
         self.subjects_id = [int(subject.split('_')[-1]) for subject in self.subjects_name
                             for _ in range(max_slice_index - min_slice_index)]
 

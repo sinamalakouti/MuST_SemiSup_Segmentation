@@ -11,7 +11,7 @@ import Pgs
 import matplotlib.pyplot as plt
 from PIL import Image
 import torchvision.transforms.functional as augmentor
-from torch.nn.parallel import DistributedDataParallel as DDP
+
 
 from utils import reconstruction_loss
 
@@ -40,7 +40,7 @@ def trainPGS(train_loader, model, optimizer, device, epochid):
     model.train()
     model.to(device)
 
-    model = DDP(model, delay_allreduce=True)
+    model = torch.nn.DataParallel(model)
     for step, batch in enumerate(train_loader):
         optimizer.zero_grad()
         b = batch['data']
@@ -72,7 +72,7 @@ def trainPGS(train_loader, model, optimizer, device, epochid):
 
 
 def evaluatePGS(model, dataset, device, threshold):
-    testset = utils.get_testset(dataset, 60, True, None, None)
+    testset = utils.get_testset(dataset, 32, True, None, None)
 
     model.eval()
     model = model.to(device)
@@ -157,7 +157,7 @@ def train_val(dataset, n_epochs, device, wmh_threshold, output_dir, learning_rat
     for epoch in range(n_epochs):
         print("iteration:  ", epoch)
         score, segmentations = evaluatePGS(pgsnet, dataset, device, wmh_threshold)
-        train_loader = utils.get_trainset(dataset, 60, True, None, None)
+        train_loader = utils.get_trainset(dataset, 32, True, None, None)
         pgsnet, loss = trainPGS(train_loader, pgsnet, optimizer, device, epoch)
         writer.add_scalar("Loss/train", loss, epoch)
 
