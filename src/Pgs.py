@@ -884,84 +884,84 @@ class PGS(nn.Module):
         # output9 = self.cls9(c9)
         return c9
 
-    def __fw_sup_loss(self, y_preds, y_true, loss_functions):
-        (sup_loss, unsup_loss) = loss_functions
-        total_loss = 0
+def __fw_sup_loss(self, y_preds, y_true, loss_functions):
+    (sup_loss, unsup_loss) = loss_functions
+    total_loss = 0
 
-        for output in y_preds:
-            ratio = int(np.round(y_true.shape[2] / output.shape[2]))
+    for output in y_preds:
+        ratio = int(np.round(y_true.shape[2] / output.shape[2]))
+        maxpool = nn.MaxPool2d(kernel_size=2, stride=ratio, padding=0)
+        #
+        target = maxpool(y_true)
+        if target.shape != output.shape:
+            h_diff = output.size()[2] - target.size()[2]
+            w_diff = output.size()[3] - target.size()[3]
+            #
+            target = F.pad(target, (w_diff // 2, w_diff - w_diff // 2,
+                                    h_diff // 2, h_diff - h_diff // 2))
+        #
+        # print("SUPERVISED : padded target!!!")
+        #
+        #
+        assert output.shape == target.shape, "output and target shape is not similar!!"
+        total_loss += sup_loss(output, target)
+    return total_loss
+
+def __fw_self_unsup_loss(y_preds, loss_functions):
+    main_output = y_preds[-1].detach()
+    (_, unsup_loss) = loss_functions
+    total_loss = 0
+
+    for i in range(len(y_preds) - 1):
+        # if out
+        assert not (main_output.shape == y_preds[i].shape), "Wrong output: comparing main output with itself"
+        with torch.no_grad():
+            ratio = int(np.round(main_output.shape[2] / y_preds[i].shape[2]))
+
             maxpool = nn.MaxPool2d(kernel_size=2, stride=ratio, padding=0)
-            #
-            target = maxpool(y_true)
-            if target.shape != output.shape:
-                h_diff = output.size()[2] - target.size()[2]
-                w_diff = output.size()[3] - target.size()[3]
-                #
-                target = F.pad(target, (w_diff // 2, w_diff - w_diff // 2,
-                                        h_diff // 2, h_diff - h_diff // 2))
-            #
-            # print("SUPERVISED : padded target!!!")
-            #
-            #
-            assert output.shape == target.shape, "output and target shape is not similar!!"
-            total_loss += sup_loss(output, target)
-        return total_loss
 
-    def __fw_self_unsup_loss(self, y_preds, loss_functions):
-        main_output = y_preds[-1].detach()
-        (_, unsup_loss) = loss_functions
-        total_loss = 0
+            pooled_main_output = maxpool(main_output)
+            if pooled_main_output.shape != y_preds[i].shape:
+                h_diff = y_preds[i].size()[2] - pooled_main_output.size()[2]
+                w_diff = y_preds[i].size()[3] - pooled_main_output.size()[3]
 
-        for i in range(len(y_preds) - 1):
-            # if out
-            assert not (main_output.shape == y_preds[i].shape), "Wrong output: comparing main output with itself"
-            with torch.no_grad():
-                ratio = int(np.round(main_output.shape[2] / y_preds[i].shape[2]))
+                pooled_main_output = F.pad(pooled_main_output, (w_diff // 2, w_diff - w_diff // 2,
+                                                                h_diff // 2, h_diff - h_diff // 2))
+                # print(pooled_main_output)
+                # print("Unsupervised: Padded OUTPUT!!!")
 
-                maxpool = nn.MaxPool2d(kernel_size=2, stride=ratio, padding=0)
+            assert pooled_main_output.shape == y_preds[i].shape, \
+                "Error! shapes has to be equal but got {} and {}".format(pooled_main_output.shape,
+                                                                         y_preds[i].shape)
+        total_loss += unsup_loss(y_preds[i], pooled_main_output)
+    return total_loss
 
-                pooled_main_output = maxpool(main_output)
-                if pooled_main_output.shape != y_preds[i].shape:
-                    h_diff = y_preds[i].size()[2] - pooled_main_output.size()[2]
-                    w_diff = y_preds[i].size()[3] - pooled_main_output.size()[3]
+def __fw_outputwise_unsup_loss( y_noisy, y_orig, loss_functions):
+    (_, unsup_loss) = loss_functions
+    total_loss = 0
+    assert len(y_orig) == len(y_noisy), "Error! unsup_preds and sup_preds have to have same length"
+    num_preds = len(y_orig)
 
-                    pooled_main_output = F.pad(pooled_main_output, (w_diff // 2, w_diff - w_diff // 2,
-                                                                    h_diff // 2, h_diff - h_diff // 2))
-                    # print(pooled_main_output)
-                    # print("Unsupervised: Padded OUTPUT!!!")
+    for i in range(num_preds):
+        orig_pred = y_orig[i]
+        noisy_pred = y_noisy[i]
+        assert orig_pred.shape == noisy_pred.shape, "Error! for preds number {}, supervised and unsupervised" \
+                                                    " prediction shape is not similar!".format(i)
+        total_loss += unsup_loss(noisy_pred, orig_pred.detach())
+    return total_loss
 
-                assert pooled_main_output.shape == y_preds[i].shape, \
-                    "Error! shapes has to be equal but got {} and {}".format(pooled_main_output.shape,
-                                                                             y_preds[i].shape)
-            total_loss += unsup_loss(y_preds[i], pooled_main_output)
-        return total_loss
+def compute_loss( y_preds, y_true, loss_functions, is_supervised):
 
-    def __fw_outputwise_unsup_loss(self, y_noisy, y_orig, loss_functions):
-        (_, unsup_loss) = loss_functions
-        total_loss = 0
-        assert len(y_orig) == len(y_noisy), "Error! unsup_preds and sup_preds have to have same length"
-        num_preds = len(y_orig)
+    if is_supervised:
+        total_loss = __fw_sup_loss(y_preds, y_true, loss_functions)
+    else:
+        # for comparing outputs together!
+        # total_loss = self.__fw_self_unsup_loss(y_preds, loss_functions)
 
-        for i in range(num_preds):
-            orig_pred = y_orig[i]
-            noisy_pred = y_noisy[i]
-            assert orig_pred.shape == noisy_pred.shape, "Error! for preds number {}, supervised and unsupervised" \
-                                                        " prediction shape is not similar!".format(i)
-            total_loss += unsup_loss(noisy_pred, orig_pred.detach())
-        return total_loss
+        # consistency of original output and noisy output
+        total_loss = __fw_outputwise_unsup_loss(y_preds, y_true, loss_functions)
 
-    def compute_loss(self, y_preds, y_true, loss_functions, is_supervised):
-
-        if is_supervised:
-            total_loss = self.__fw_sup_loss(y_preds, y_true, loss_functions)
-        else:
-            # for comparing outputs together!
-            # total_loss = self.__fw_self_unsup_loss(y_preds, loss_functions)
-
-            # consistency of original output and noisy output
-            total_loss = self.__fw_outputwise_unsup_loss(y_preds, y_true, loss_functions)
-
-        return total_loss
+    return total_loss
 
 
 if __name__ == '__main__':

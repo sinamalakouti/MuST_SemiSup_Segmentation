@@ -58,11 +58,11 @@ def trainPGS(train_loader, model, optimizer, device, epochid):
         sup_outputs, unsup_outputs = model(b, is_supervised)
 
         if is_supervised:
-            total_loss = model.compute_loss(sup_outputs, target, loss_functions, is_supervised)
+            total_loss = Pgs.compute_loss(sup_outputs, target, loss_functions, is_supervised)
         else:
 
             # raise Exception("unsupervised is false")
-            total_loss = model.compute_loss(unsup_outputs, sup_outputs, loss_functions, is_supervised)
+            total_loss = Pgs.compute_loss(unsup_outputs, sup_outputs, loss_functions, is_supervised)
 
         print("****** LOSSS  : Is_supervised: {} *********   :".format(is_supervised), total_loss)
 
