@@ -35,9 +35,7 @@ parser = argparse.ArgumentParser()
 
 def trainPgs_semi(train_sup_loader, train_unsup_loader, model, optimizer, device, epochid):
     model.train()
-    model.to(device)
 
-    model = torch.nn.DataParallel(model)
     for step, (batch_sup, batch_unsup) in enumerate(zip(train_sup_loader, train_unsup_loader)):
         optimizer.zero_grad()
         b_sup = batch_sup['data']
@@ -66,7 +64,7 @@ def trainPgs_semi(train_sup_loader, train_unsup_loader, model, optimizer, device
 
 def trainPGS(train_loader, model, optimizer, device, epochid):
     model.train()
-    model.to(device)
+    # model.to(device)
 
     model = torch.nn.DataParallel(model)
     for step, batch in enumerate(train_loader):
@@ -103,7 +101,7 @@ def evaluatePGS(model, dataset, device, threshold):
     testset = utils.get_testset(dataset, 32, True, None, None)
 
     model.eval()
-    model = model.to(device)
+
     dice_arr = []
     segmentation_outputs = []
 
@@ -181,13 +179,19 @@ def train_val(dataset, n_epochs, device, wmh_threshold, output_dir, learning_rat
     scheduler = lr_scheduler.StepLR(optimizer, step_size=step_size, gamma=0.1)  # don't use it
     print("scheduler step size is :   ", step_size)
     best_score = 0
+    start_epoch = 0
+    pgsnet = utils.load_model(os.path.join(output_model_dir, 'psgnet_best_lr{}.model'.format(learning_rate)))
+    start_epoch += 1
+    pgsnet.to(device)
+    pgsnet = torch.nn.DataParallel(pgsnet)
 
-    for epoch in range(n_epochs):
+    for epoch in range(start_epoch, n_epochs):
         print("iteration:  ", epoch)
         train_sup_loader = utils.get_trainset(dataset, 32, True, None, None, mode='train_semi_sup')
         train_unsup_loader = utils.get_trainset(dataset, 32, True, None, None, mode='train_semi_unsup')
 
         # pgsnet, loss = trainPGS(train_loader, pgsnet, optimizer, device, epoch)
+
         pgsnet, loss = trainPgs_semi(train_sup_loader, train_unsup_loader, pgsnet, optimizer, device, epoch)
         writer.add_scalar("Loss/train", loss, epoch)
 
