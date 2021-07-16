@@ -156,7 +156,7 @@ def train_val(dataset, n_epochs, device, wmh_threshold, output_dir, learning_rat
 
     for epoch in range(n_epochs):
         print("iteration:  ", epoch)
-        score, segmentations = evaluatePGS(pgsnet, dataset, device, wmh_threshold)
+        # score, segmentations = evaluatePGS(pgsnet, dataset, device, wmh_threshold)
         train_loader = utils.get_trainset(dataset, 32, True, None, None)
         pgsnet, loss = trainPGS(train_loader, pgsnet, optimizer, device, epoch)
         writer.add_scalar("Loss/train", loss, epoch)
