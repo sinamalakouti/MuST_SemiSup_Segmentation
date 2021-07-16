@@ -538,7 +538,7 @@ class PGS_attention(nn.Module):
             total_loss = self.__fw_sup_loss(y_preds, y_true, loss_functions)
         else:
             # for comparing outputs together!
-            # total_loss = self.__fw_self_unsup_loss(y_preds, loss_functions)
+            # total_loss = self.__fw_self_unsup_lossf(y_preds, loss_functions)
 
             # consistency of original output and noisy output
             total_loss = self.__fw_outputwise_unsup_loss(y_preds, y_true, loss_functions)
@@ -884,7 +884,7 @@ class PGS(nn.Module):
         # output9 = self.cls9(c9)
         return c9
 
-def __fw_sup_loss(self, y_preds, y_true, loss_functions):
+def __fw_sup_loss( y_preds, y_true, loss_functions):
     (sup_loss, unsup_loss) = loss_functions
     total_loss = 0
 

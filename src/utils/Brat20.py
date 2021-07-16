@@ -17,6 +17,15 @@ def train_val_split(all_data_csv, train_dir_path, val_dir_path, val_size=69):
     np.savetxt(val_dir_path + "/val_ids.csv", val_ids.astype(np.str), delimiter=',', fmt='%s')
 
 
+def semi_sup_split(train_dir_csv, sup_dir_path, unsup_dir_path, ratio=0.5):
+    all_train = np.asarray(pd.read_csv(train_dir_csv, header=None)).reshape(-1)
+    unsup_size = int(ratio * len(all_train))
+    unsup_ids = np.random.choice(all_train, unsup_size, replace=False)
+    sup_ids = np.setdiff1d(all_train, unsup_ids)
+    np.savetxt(sup_dir_path + "/train_sup_ids.csv", sup_ids.astype(np.str), delimiter=',', fmt='%s')
+    np.savetxt(unsup_dir_path + "/train_unsup_ids.csv", unsup_ids.astype(np.str), delimiter=',', fmt='%s')
+
+
 class Brat20(torch.utils.data.Dataset):
 
     def __init__(self, dataroot_dir, mode, min_slice_index, max_slice_index, augment=False, intensity_aug=False):
@@ -30,12 +39,16 @@ class Brat20(torch.utils.data.Dataset):
         self.weights = {}
         if mode == 'train':
             ids_path = os.path.join(dataroot_dir, 'trainset/training_ids.csv')
-
-        else:
+        elif mode == "train_semi_sup":
+            ids_path = os.path.join(dataroot_dir, 'trainset/training_sup_ids.csv')
+        elif mode == "train_semi_unsup":
+            ids_path = os.path.join(dataroot_dir, 'trainset/training_unsup_ids.csv')
+        else:  # validation
             ids_path = os.path.join(dataroot_dir, 'valset/val_ids.csv')
 
         if mode == 'train':
             subjects_root_dir = os.path.join(dataroot_dir, 'MICCAI_BraTS2020_TrainingData')
+
         else:
             subjects_root_dir = os.path.join(dataroot_dir, 'MICCAI_BraTS2020_TrainingData')
 
@@ -86,7 +99,6 @@ class Brat20(torch.utils.data.Dataset):
         x = rescale_intensity(x)
 
         return {'data': x, 'label': y, 'subject': self.subjects_id[index]}
-
 
 
 def augment(x, y, m=None, t1=None, intensity_aug=None):

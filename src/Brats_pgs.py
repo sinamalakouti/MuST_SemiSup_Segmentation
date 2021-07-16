@@ -12,7 +12,6 @@ import matplotlib.pyplot as plt
 from PIL import Image
 import torchvision.transforms.functional as augmentor
 
-
 from utils import reconstruction_loss
 
 import numpy as np
@@ -20,8 +19,6 @@ import numpy as np
 import argparse
 from torch.utils.tensorboard import SummaryWriter
 import wandb
-
-
 
 sys.path.append('src')
 sys.path.append('src/utils/Constants')
@@ -34,6 +31,37 @@ torch.manual_seed(42)
 np.random.seed(42)
 utils.Constants.USE_CUDA = True
 parser = argparse.ArgumentParser()
+
+
+def trainPgs_semi(train_sup_loader, train_unsup_loader, model, optimizer, device, epochid):
+    model.train()
+    model.to(device)
+
+    model = torch.nn.DataParallel(model)
+    for step, (batch_sup, batch_unsup) in enumerate(zip(train_sup_loader, train_unsup_loader)):
+        optimizer.zero_grad()
+        b_sup = batch_sup['data']
+        b_unsup = batch_unsup['data']
+        b_sup = b_sup.to(device)
+        b_unsup = b_unsup.to(device)
+        target_sup = batch_sup['label'].to(device)
+
+        unsup_loss = nn.BCELoss()
+        sup_loss = torch.nn.BCELoss()
+
+        loss_functions = (sup_loss, unsup_loss)
+
+        print("subject is : ", batch_sup['subject'])
+        print("subject is : ", batch_unsup['subject'])
+        sup_outputs, _ = model(b_sup, is_supervised=True)
+        total_loss = Pgs.compute_loss(sup_outputs, target_sup, loss_functions, is_supervised=True)
+        sup_outputs, unsup_outputs = model(b_unsup, is_supervised=False)
+        total_loss += Pgs.compute_loss(unsup_outputs, sup_outputs, loss_functions, is_supervised=False)
+        print("**************** LOSSS  : {} ****************".format(total_loss))
+
+        total_loss.backward()
+        optimizer.step()
+    return model, total_loss
 
 
 def trainPGS(train_loader, model, optimizer, device, epochid):
@@ -156,9 +184,11 @@ def train_val(dataset, n_epochs, device, wmh_threshold, output_dir, learning_rat
 
     for epoch in range(n_epochs):
         print("iteration:  ", epoch)
-        # score, segmentations = evaluatePGS(pgsnet, dataset, device, wmh_threshold)
-        train_loader = utils.get_trainset(dataset, 32, True, None, None)
-        pgsnet, loss = trainPGS(train_loader, pgsnet, optimizer, device, epoch)
+        train_sup_loader = utils.get_trainset(dataset, 32, True, None, None, mode='train_semi_sup')
+        train_unsup_loader = utils.get_trainset(dataset, 32, True, None, None, mode='train_semi_unsup')
+
+        # pgsnet, loss = trainPGS(train_loader, pgsnet, optimizer, device, epoch)
+        pgsnet, loss = trainPgs_semi(train_sup_loader, train_unsup_loader, pgsnet, optimizer, device, epoch)
         writer.add_scalar("Loss/train", loss, epoch)
 
         if epoch % 1 == 0:
@@ -172,8 +202,8 @@ def train_val(dataset, n_epochs, device, wmh_threshold, output_dir, learning_rat
                 with open(path, 'wb') as f:
                     torch.save(pgsnet, f)
 
-                # save_score(output_image_dir, score, epoch)
-                save_predictions(segmentations, wmh_threshold, output_image_dir, score, epoch)
+                save_score(output_image_dir, score, epoch)
+                # save_predictions(segmentations, wmh_threshold, output_image_dir, score, epoch)
         scheduler.step()
         example = segmentations[0]
         example = example >= wmh_threshold
@@ -320,8 +350,6 @@ def main():
 
     device = torch.device(dev)
     train_val(dataset, args.n_epochs, device, args.wmh_threshold, args.output_dir, args.lr, args)
-
-
 
 
 def get_cluster_assumption_representation(h):

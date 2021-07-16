@@ -52,7 +52,7 @@ def update_adaptiveRate(cur_step, L):
     return np.exp(-5 * (1 - cur_step / L) ** 2)
 
 
-def get_trainset(dataset, batch_size, intensity_rescale, has_t1, mixup_threshold) -> torch.utils.data.DataLoader:
+def get_trainset(dataset, batch_size, intensity_rescale, has_t1, mixup_threshold, mode='train') -> torch.utils.data.DataLoader:
     mem_pin = False
     if Constants.USE_CUDA:
         mem_pin = True
@@ -89,7 +89,7 @@ def get_trainset(dataset, batch_size, intensity_rescale, has_t1, mixup_threshold
         train = torch.utils.data.DataLoader(
             Brat20(
                 dataroot_dir=f'data/brats20',
-                mode= 'train',
+                mode= mode,
                 min_slice_index=50,
                 max_slice_index=110),
             batch_size=batch_sz,
