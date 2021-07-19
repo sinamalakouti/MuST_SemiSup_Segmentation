@@ -1,6 +1,6 @@
 from utils.Constants import *
 from utils.dataloader import *
-from utils.Brat20  import *
+from utils.Brat20 import *
 import Wnet
 import matplotlib.pyplot as plt
 import os
@@ -35,7 +35,7 @@ def __ema(p1, p2, factor):
     return factor * p1 + (1 - factor) * p2
 
 
-def ema_update(student, teacher, cur_step, L = 400):
+def ema_update(student, teacher, cur_step, L=400):
     if cur_step < L:
         alpha = 0.99
     else:
@@ -52,7 +52,8 @@ def update_adaptiveRate(cur_step, L):
     return np.exp(-5 * (1 - cur_step / L) ** 2)
 
 
-def get_trainset(dataset, batch_size, intensity_rescale, has_t1, mixup_threshold, mode='train') -> torch.utils.data.DataLoader:
+def get_trainset(dataset, batch_size, intensity_rescale, has_t1, mixup_threshold,
+                 mode='train') -> torch.utils.data.DataLoader:
     mem_pin = False
     if Constants.USE_CUDA:
         mem_pin = True
@@ -89,9 +90,10 @@ def get_trainset(dataset, batch_size, intensity_rescale, has_t1, mixup_threshold
         train = torch.utils.data.DataLoader(
             Brat20(
                 dataroot_dir=f'data/brats20',
-                mode= mode,
-                min_slice_index=50,
-                max_slice_index=110),
+                mode=mode,
+                min_slice_index=10,
+                max_slice_index=155,
+                center_cropping=True),
             batch_size=batch_sz,
             drop_last=True,
             num_workers=0,
@@ -102,7 +104,7 @@ def get_trainset(dataset, batch_size, intensity_rescale, has_t1, mixup_threshold
     return train
 
 
-def get_testset(dataset, batch_size, intensity_rescale, has_t1, mixup_threshold) -> torch.utils.data.DataLoader:
+def get_testset(dataset, batch_size, intensity_rescale, has_t1, mixup_threshold, mode="test2019_new") -> torch.utils.data.DataLoader:
     mem_pin = False
     if Constants.USE_CUDA:
         mem_pin = True
@@ -133,9 +135,10 @@ def get_testset(dataset, batch_size, intensity_rescale, has_t1, mixup_threshold)
         test = torch.utils.data.DataLoader(
             Brat20(
                 dataroot_dir=f'data/brats20',
-                mode='test',
-                min_slice_index=50,
-                max_slice_index=110),
+                mode=mode,
+                min_slice_index=10,
+                max_slice_index=155,
+                center_cropping=True),
             batch_size=batch_sz,
             drop_last=True,
             num_workers=0,
@@ -146,11 +149,18 @@ def get_testset(dataset, batch_size, intensity_rescale, has_t1, mixup_threshold)
     return test
 
 
-def load_model(path):
-    model = torch.load(path, map_location=torch.device('cpu'))
-    # wnet = torch.load(path)
-
+def load_model(path, device):
+    model = torch.load(path, map_location=device)
     return model
+
+
+def load_state_dict(model, path):
+    model.load_state_dict(torch.load(path))
+    return model
+
+
+def save_state_dict(model, path):
+    torch.save(model.state_dict(), path)
 
 
 def save_segment_images(segments, path):

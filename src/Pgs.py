@@ -49,7 +49,7 @@ class CLS(nn.Module):
     def __build_module(self):
         return nn.Sequential(
             nn.Conv2d(self.dim_in, self.dim_out, 1),
-            nn.Sigmoid(),
+            # nn.Sigmoid(),
             # nn.Softmax2d()
         )
 
@@ -105,7 +105,7 @@ class AttentionBlock(nn.Module):
                                 nn.BatchNorm2d(int_channels))
         self.psi = nn.Sequential(nn.Conv2d(int_channels, 1, kernel_size=1),
                                  nn.BatchNorm2d(1),
-                                 nn.Sigmoid())
+                                 nn.Sigmoid()) #todo? What iare these sigmoids for
 
     def forward(self, x, g):
         # apply the Wx to the skip connection
@@ -583,11 +583,11 @@ class PGS(nn.Module):
 
         # classifiers
         print(self.dim_outputs[4])
-        self.cls5 = CLS(self.dim_outputs[4], self.dim_inputs[0])
-        self.cls6 = CLS(self.dim_outputs[5], self.dim_inputs[0])
-        self.cls7 = CLS(self.dim_outputs[6], self.dim_inputs[0])
-        self.cls8 = CLS(self.dim_outputs[7], self.dim_inputs[0])
-        self.cls9 = CLS(self.dim_outputs[8], self.dim_inputs[0])  # main classifier
+        self.cls5 = CLS(self.dim_outputs[4], self.dim_outputs[-1])
+        self.cls6 = CLS(self.dim_outputs[5], self.dim_outputs[-1])
+        self.cls7 = CLS(self.dim_outputs[6], self.dim_outputs[-1])
+        self.cls8 = CLS(self.dim_outputs[7], self.dim_outputs[-1])
+        self.cls9 = CLS(self.dim_outputs[8], self.dim_outputs[-1])  # main classifier
     def get_expanding_layers_outputs(self, X):
 
         c1, d1, c2, d2, c3, d3, c4, d4 = self.__fw_contracting_path(X)

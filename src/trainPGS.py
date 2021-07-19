@@ -114,7 +114,7 @@ def evaluatePGS(model, dataset, device, threshold):
 
 def train_val(dataset, n_epochs, device, wmh_threshold, output_dir, learning_rate, args):
     inputs_dim = [1, 64, 96, 128, 256, 768, 384, 224, 160]
-    outputs_dim = [64, 96, 128, 256, 512, 256, 128, 96, 64]
+    outputs_dim = [64, 96, 128, 256, 512, 256, 128, 96, 64, 1]
     kernels = [5, 3, 3, 3, 3, 3, 3, 3, 3]
     strides = [1, 1, 1, 1, 1, 1, 1, 1, 1]
 

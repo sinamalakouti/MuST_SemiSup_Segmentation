@@ -2,11 +2,45 @@ import numpy as np
 import pandas as pd
 import torch
 import torchvision.transforms.functional as augmentor
-
+import torchvision.transforms as transformer
 import os
 import nibabel as nib
 
 
+def get_name_mapping(name_mapping_csv_path):
+    df = pd.read_csv(name_mapping_csv_path)
+    name_map = {}
+
+    for index, row in df.iterrows():
+        name_map[row['BraTS_2020_subject_ID']] = {'brats18': row['BraTS_2018_subject_ID'],
+                                                  'brats19': row['BraTS_2019_subject_ID']}
+
+    return name_map
+
+
+def id19_to_id20(name_map):
+    ids = []
+    for id_2020 in name_map:
+        if name_map[id_2020]['brats19'] is not np.nan:
+            ids.append(id_2020)
+    return ids
+
+
+def id18_to_id20(name_map):
+    ids = []
+    for id_2020 in name_map:
+        if name_map[id_2020]['brats18'] is not np.nan:
+            ids.append(id_2020)
+    return ids
+
+
+# train: whole 2018  and test: new 2019 subjects (5)
+def train_val_split(traindata_id, testdata_id, train_dir_path, test_dir_path):
+    np.savetxt(train_dir_path + "/brats2018.csv", traindata_id.astype(np.str), delimiter=',', fmt='%s')
+    np.savetxt(test_dir_path + "/brats2019_new.csv", testdata_id.astype(np.str), delimiter=',', fmt='%s')
+
+
+# randomly picking  from the 2020 data
 def train_val_split(all_data_csv, train_dir_path, val_dir_path, val_size=69):
     df = pd.read_csv(all_data_csv)
     all_ids = df.BraTS_2020_subject_ID
@@ -28,32 +62,41 @@ def semi_sup_split(train_dir_csv, sup_dir_path, unsup_dir_path, ratio=0.5):
 
 class Brat20(torch.utils.data.Dataset):
 
-    def __init__(self, dataroot_dir, mode, min_slice_index, max_slice_index, augment=False, intensity_aug=False):
+    def __init__(self, dataroot_dir, mode,
+                 min_slice_index, max_slice_index, augment=False, intensity_aug=False, center_cropping=False):
         super(Brat20, self).__init__()
 
-        # NOTE: if dataloader does not shuffle
-        # and batch size is kept to 60, then
-        # each batch equates to a single subject
         self.augment = augment
         self.intensity_aug = intensity_aug
+        self.center_cropping = center_cropping
         self.weights = {}
-        if mode == 'train':
-            ids_path = os.path.join(dataroot_dir, 'trainset/training_ids.csv')
-        elif mode == "train_semi_sup":
-            ids_path = os.path.join(dataroot_dir, 'trainset/training_sup_ids.csv')
-        elif mode == "train_semi_unsup":
-            ids_path = os.path.join(dataroot_dir, 'trainset/training_unsup_ids.csv')
-        else:  # validation
-            ids_path = os.path.join(dataroot_dir, 'valset/val_ids.csv')
 
-        if mode == 'train':
-            subjects_root_dir = os.path.join(dataroot_dir, 'MICCAI_BraTS2020_TrainingData')
+        if mode == "train2020_sup":
+            ids_path = os.path.join(dataroot_dir, 'trainset/brats20_training_ids.csv')
+        elif mode == "train2020_semi_sup":
+            ids_path = os.path.join(dataroot_dir, 'trainset/brats20_training_sup_ids.csv')
+        elif mode == "train2020_semi_unsup":
+            ids_path = os.path.join(dataroot_dir, 'trainset/brats20_training_unsup_ids.csv')
+        elif mode == "test2020":  # validation
+            ids_path = os.path.join(dataroot_dir, 'valset/brats20_val_ids.csv')
+        elif mode == "train2018_sup":
+            ids_path = os.path.join(dataroot_dir, 'trainset/brats2018.csv')
+        elif mode == "train2018_semi_sup":
+            None  #todo
+        elif mode == "train2018_semi_unsup":
+            None  #todo
+        elif mode == "test2019_new":
+            ids_path = os.path.join(dataroot_dir, 'valset/brats2019_new.csv')
 
-        else:
-            subjects_root_dir = os.path.join(dataroot_dir, 'MICCAI_BraTS2020_TrainingData')
+        subjects_root_dir = os.path.join(dataroot_dir, 'MICCAI_BraTS2020_TrainingData')
+
+        # if mode == 'train':
+        #     subjects_root_dir = os.path.join(dataroot_dir, 'MICCAI_BraTS2020_TrainingData')
+
+        # else:
+        #     subjects_root_dir = os.path.join(dataroot_dir, 'MICCAI_BraTS2020_TrainingData')
 
         self.subjects_name = np.asarray(pd.read_csv(ids_path, header=None)).reshape(-1)
-        self.subjects_name = self.subjects_name[0:len(self.subjects_name) // 2]
         self.subjects_id = [int(subject.split('_')[-1]) for subject in self.subjects_name
                             for _ in range(max_slice_index - min_slice_index)]
 
@@ -70,6 +113,8 @@ class Brat20(torch.utils.data.Dataset):
             Y = self._extract(label, slices=list(range(min_slice_index, max_slice_index)))
 
             for sl in range(Y.shape[2]):
+                if Y[:, :, sl].sum() == 0 or X[:, :, sl].sum() == 0:
+                    continue
                 self.data.append({
                     'data': X[:, :, sl],
                     'label': Y[:, :, sl]})
@@ -86,11 +131,16 @@ class Brat20(torch.utils.data.Dataset):
 
         x = self.data[index]['data']
         y = self.data[index]['label']
+        x, y = tensorize(x, y)
+        if self.center_cropping:
+            x, y = center_crop(x, y)
+
         # only Whole Tumor (WT) segmentation
-        y[y >= 1] = 1
+        # y[y >= 1] = 1
+
+        y[y == 4] = 3
 
         if self.augment:
-            None
             x, y, m = augment(
                 x=x, y=y, intensity_aug=self.intensity_aug)
         else:
@@ -182,6 +232,14 @@ def adjust_contrast(x, c_factor):
 
 def tensorize(*args):
     return tuple(torch.Tensor(arg).float().unsqueeze(0) for arg in args)
+
+
+def center_crop(x, y, size=200):
+    cropper = transformer.CenterCrop(size)
+    x_cropped = cropper(x).reshape((size, size))
+    y_cropped = cropper(y).reshape((size, size))
+    assert y.sum() == y_cropped.sum(), "cropped label part!!!!"
+    return x_cropped, y_cropped
 
 
 def rescale_intensity(x):
