@@ -113,11 +113,13 @@ class Brat20(torch.utils.data.Dataset):
             Y = self._extract(label, slices=list(range(min_slice_index, max_slice_index)))
 
             for sl in range(Y.shape[2]):
-                if Y[:, :, sl].sum() == 0 or X[:, :, sl].sum() == 0:
-                    continue
-                self.data.append({
-                    'data': X[:, :, sl],
-                    'label': Y[:, :, sl]})
+                if Y[:, :, sl].sum() == 0 or X[:, :, sl].sum() == 0 or np.sum((X[:, :, sl] >0))/(240 * 240) * 100 < 20:
+                    None
+                else:
+                    self.data.append({
+                        'data': X[:, :, sl],
+                        'label': Y[:, :, sl]
+                    })
 
     def __len__(self):
         return len(self.data)
@@ -147,6 +149,8 @@ class Brat20(torch.utils.data.Dataset):
             x, y = tensorize(x, y)
 
         x = rescale_intensity(x)
+        if x.isnan().sum() > 0:
+            print("dfafadfads")
 
         return {'data': x, 'label': y, 'subject': self.subjects_id[index]}
 
