@@ -47,7 +47,6 @@ class Module(nn.Module):
                 nn.ReLU(),
                 nn.BatchNorm2d(self.dim_out),
 
-
             )
 
     def forward(self, X):
@@ -142,39 +141,40 @@ class Wnet(nn.Module):
         self.separables = separables
         self.n_modules = n_modules
         self.k = k
-        self.linear_combination = torch.nn.Conv2d(k, dim_inputs[0], kernel_size = 1, bias=False)
-        with torch.no_grad():
-            for p in self.linear_combination.parameters():
-                p.data = torch.abs(p.data)
+        # self.linear_combination = torch.nn.Conv2d(k, dim_inputs[0], kernel_size=1, bias=False)
+        # with torch.no_grad():
+        #     for p in self.linear_combination.parameters():
+        #         p.data = torch.abs(p.data)
         self.build()
 
     def build(self):
         self.Uenc = Unet(self.n_modules // 2, self.dim_inputs, self.dim_outputs, self.strides, self.paddings,
                          self.kernels, self.separables)
         self.conv1 = nn.Conv2d(self.dim_outputs[-1], self.k, kernel_size=1, bias=False)
-        dec_dim_inputs = [0] * len(self.dim_inputs)
-        dec_dim_inputs[0] = self.k
-        dec_dim_inputs[1:] = self.dim_inputs[1:]
-        self.Udec = Unet(self.n_modules // 2, dec_dim_inputs, self.dim_outputs, self.strides, self.paddings,
-                         self.kernels, self.separables)
-        self.conv2 = nn.Conv2d(self.dim_outputs[-1], self.dim_inputs[0], kernel_size=1)
-        self.softmax = nn.Softmax2d()
+        # dec_dim_inputs = [0] * len(self.dim_inputs)
+        # dec_dim_inputs[0] = self.k
+        # dec_dim_inputs[1:] = self.dim_inputs[1:]
+        # self.Udec = Unet(self.n_modules // 2, dec_dim_inputs, self.dim_outputs, self.strides, self.paddings,
+        #                  self.kernels, self.separables)
+        # self.conv2 = nn.Conv2d(self.dim_outputs[-1], self.dim_inputs[0], kernel_size=1)
+        # self.softmax = nn.Softmax2d()
 
     def U_enc_fw(self, X):
         X_in_intermediate = self.Uenc(X)
-        X_in_intermediate = self.conv1(X_in_intermediate)
-        X_out_intermediate = self.softmax(X_in_intermediate)
-        return X_out_intermediate
+        logits = self.conv1(X_in_intermediate)
+        # preds = self.softmax(X_out_intermediate)
+        return logits
 
-    def U_dec_fw(self, X):
-        X_in_final = self.Udec(X)
-        X_out_final = self.conv2(X_in_final)
-        return X_out_final
+    # def U_dec_fw(self, X):
+    #     X_in_final = self.Udec(X)
+    #     X_out_final = self.conv2(X_in_final)
+    #     return X_out_final
 
     def forward(self, X):
         X_out_intermediate = self.U_enc_fw(X)
-        X_out_final = self.U_dec_fw(X_out_intermediate)
-        return X_out_final
+        return X_out_intermediate
+        # X_out_final = self.U_dec_fw(X_out_intermediate)
+        # return X_out_final
 
 
 if __name__ == '__main__':

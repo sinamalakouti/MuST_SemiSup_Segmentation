@@ -9,7 +9,7 @@ from utils import utils
 from evaluation_metrics import dice_coef
 import Pgs
 import matplotlib.pyplot as plt
-
+import Unet
 import torch.nn.functional as F
 import numpy as np
 import torchvision.transforms.functional as augmentor
@@ -51,6 +51,26 @@ def __fw_sup_loss(y_preds, y_true, sup_loss):
         if output.shape[1] != target.shape[1] and type(sup_loss) == torch.nn.CrossEntropyLoss:
             target = target.reshape((target.shape[0], target.shape[2], target.shape[3])).type(torch.LongTensor)
         total_loss += sup_loss(output, target.to(output.device))
+    return total_loss
+
+
+def unet_compute_loss(y_preds, y_true, loss_fuctions, is_supervised):
+    total_loss = 0
+    sup_loss = loss_fuctions[0]
+    if is_supervised:
+
+        if y_preds.shape[1] != y_true.shape[1]:
+            target = y_true.reshape((y_true.shape[0], y_true.shape[2], y_true.shape[3])).type(torch.LongTensor)
+
+        total_loss = sup_loss(y_preds, target.to(y_preds.device))
+    else:
+        None
+        # for comparing outputs together!
+        # total_loss = self.__fw_self_unsup_loss(y_preds, loss_functions)
+
+        # consistency of original output and noisy output
+        # total_loss = __fw_outputwise_unsup_loss(y_preds, y_true, loss_functions)
+
     return total_loss
 
 
@@ -97,6 +117,26 @@ def trainPgs_semi(train_sup_loader, train_unsup_loader, model, optimizer, device
 
         total_loss.backward()
         optimizer.step()
+    return model, total_loss
+
+
+def trainUnet_sup(train_sup_loader, model, optimizer, device, loss_functions, epochid):
+    model.train()
+
+    for step, batch_sup in enumerate(train_sup_loader):
+        optimizer.zero_grad()
+        b_sup = batch_sup['data'].to(device)
+        target_sup = batch_sup['label'].to(device)
+
+        print("subject is : ", batch_sup['subject'])
+        sup_outputs = model(b_sup)
+        total_loss = unet_compute_loss(sup_outputs, target_sup, loss_functions, is_supervised=True)
+
+        print("**************** LOSSS  : {} ****************".format(total_loss))
+
+        total_loss.backward()
+        optimizer.step()
+
     return model, total_loss
 
 
@@ -153,6 +193,33 @@ def trainPGS(train_loader, model, optimizer, device, epochid):
     return model, total_loss
 
 
+def evaluateUnet(model, dataset, device, threshold):
+    print("******************** EVALUATING ********************")
+    testset = utils.get_testset(dataset, 64, True, None, None, mode="test2019_new")
+
+    model.eval()
+
+    dice_arr = []
+
+    with torch.no_grad():
+        for batch in testset:
+            b = batch['data']
+            b = b.to(device)
+            target = batch['label'].to(device)
+            outputs, _ = model(b, True)
+            # apply softmax
+            sf = torch.nn.Softmax2d()
+            y_pred = sf(outputs) >= threshold
+
+            y_WT = create_WT_output(y_pred)
+            target[target >= 1] = 1
+            target_WT = target
+            dice_score = dice_coef(target_WT.reshape(y_WT.shape), y_WT)
+            dice_arr.append(dice_score.item())
+
+    return np.mean(np.array(dice_arr))
+
+
 def evaluatePGS(model, dataset, device, threshold):
     print("******************** EVALUATING ********************")
     testset = utils.get_testset(dataset, 32, True, None, None, mode="test2019_new")
@@ -167,18 +234,19 @@ def evaluatePGS(model, dataset, device, threshold):
             b = batch['data']
             b = b.to(device)
             target = batch['label'].to(device)
-            outputs, _ = model(b, True)
+            predictions, _ = model(b, True)
             # apply softmax
             sf = torch.nn.Softmax2d()
-            y_pred = sf(outputs[-1]) >= threshold
+            y_pred = sf(predictions[-1]) >= threshold
 
             y_WT = create_WT_output(y_pred)
             target[target >= 1] = 1
             target_WT = target
             dice_score = dice_coef(target_WT.reshape(y_WT.shape), y_WT)
             dice_arr.append(dice_score.item())
-            outputs = outputs[-1].reshape(outputs[-1].shape[0], outputs[-1].shape[1], outputs[-1].shape[2],
-                                          outputs[-1].shape[3])
+            outputs = predictions[-1].reshape(predictions[-1].shape[0], predictions[-1].shape[1],
+                                              predictions[-1].shape[2],
+                                              predictions[-1].shape[3])
             for output in outputs:
                 segmentation_outputs.append(output)
 
@@ -188,6 +256,99 @@ def evaluatePGS(model, dataset, device, threshold):
 def create_WT_output(preds):
     WT_pred = preds[:, 1:4, :, :].sum(1) >= 1
     return WT_pred
+
+
+def Unet_train_val(dataset, n_epochs, device, wmh_threshold, output_dir, learning_rate, args):
+    inputs_dim = [4, 64, 128, 256, 512, 1024, 512, 256, 128]
+    outputs_dim = [64, 128, 256, 512, 1024, 512, 256, 128, 64]
+    kernels = [3, 3, 3, 3, 3, 3, 3, 3, 3]
+    paddings = [1, 1, 1, 1, 1, 1, 1, 1, 1]
+    strides = [1, 1, 1, 1, 1, 1, 1, 1, 1]
+    separables = [False, False, False, False, False, False, False, False, False]
+
+    print("output_dir is    ", output_dir)
+    if not os.path.isdir(output_dir):
+        try:
+            os.mkdir(output_dir, 0o777)
+        except OSError:
+            print("Creation of the directory %s failed" % output_dir)
+    else:
+        None
+
+    output_model_dir = os.path.join(output_dir, "best_model")
+
+    print("output_model_dir is   ", output_model_dir)
+
+    if not os.path.isdir(output_model_dir):
+        try:
+            os.mkdir(output_model_dir, 0o777)
+        except OSError:
+            print("Creation of the directory %s failed" % output_model_dir)
+    else:
+        None
+
+    if not os.path.isdir(os.path.join(output_dir, "runs")):
+        try:
+            os.mkdir(os.path.join(output_dir, "runs"), 0o777)
+        except OSError:
+            print("Creation of the directory %s failed" % os.path.join(output_dir, "runs"))
+    else:
+        None
+
+    # writer = SummaryWriter(log_dir=os.path.join(output_dir, "runs"))
+    wandb.init(project="fully_sup_brats", config=args)
+    wandb.run.name = "UNET_FULLY_SUP" + str(wandb.run.id)
+    output_image_dir = os.path.join(output_dir, "result_images/")
+
+    if not os.path.isdir(output_image_dir):
+        try:
+            os.mkdir(output_image_dir, 0o777)
+        except OSError:
+            print("Creation of the directory %s failed" % output_image_dir)
+    else:
+        None
+
+    unet = Unet.Wnet(18, 4, inputs_dim, outputs_dim, strides=strides, paddings=paddings, kernels=kernels,
+                     separables=separables)
+
+    print("learning_rate is    ", learning_rate)
+    optimizer = torch.optim.SGD(unet.parameters(), learning_rate, momentum=0.9, weight_decay=1e-4)
+    step_size = 30
+    scheduler = lr_scheduler.StepLR(optimizer, step_size=step_size, gamma=0.1)  # don't use it
+    print("scheduler step size is :   ", step_size)
+    best_score = 0
+    start_epoch = 0
+
+    if torch.cuda.is_available() and type(unet) is not torch.nn.DataParallel:
+        unet = torch.nn.DataParallel(unet)
+        device = 'cuda'
+    elif not torch.cuda.is_available():
+        device = 'cpu'
+
+    device = torch.device(device)
+
+    unet.to(device)
+    train_sup_loader = utils.get_trainset(dataset, 64, True, None, None, mode='train2018_sup')
+    sup_loss = torch.nn.CrossEntropyLoss()
+
+    loss_functions = (sup_loss, None)
+    for epoch in range(start_epoch, n_epochs):
+        print("iteration:  ", epoch)
+        unet, loss = trainUnet_sup(train_sup_loader, unet, optimizer, device, loss_functions, epoch)
+        if epoch % 1 == 0:
+            score = evaluateUnet(unet, dataset, device, wmh_threshold)
+            print("** SCORE @ Iteration {} is {} **".format(epoch, score))
+            if score > best_score:
+                print("****************** BEST SCORE @ ITERATION {} is {} ******************".format(epoch, score))
+                best_score = score
+                path = os.path.join(output_model_dir, 'psgnet_best_lr{}.model'.format(learning_rate))
+                with open(path, 'wb') as f:
+                    torch.save(unet, f)
+
+                save_score(output_image_dir, score, epoch)
+            wandb.log({"train_loss": loss, "dev_dsc": score})
+        scheduler.step()
+
 
 
 def train_val(dataset, n_epochs, device, wmh_threshold, output_dir, learning_rate, args):
@@ -259,10 +420,9 @@ def train_val(dataset, n_epochs, device, wmh_threshold, output_dir, learning_rat
     #                           device=device)
 
     pgsnet.to(device)
-
+    train_sup_loader = utils.get_trainset(dataset, 32, True, None, None, mode='train2018_sup')
     for epoch in range(start_epoch, n_epochs):
         print("iteration:  ", epoch)
-        train_sup_loader = utils.get_trainset(dataset, 32, True, None, None, mode='train2018_sup')
         # train_unsup_loader = utils.get_trainset(dataset, 32, True, None, None, mode='train_semi_unsup')
         # pgsnet, loss = trainPGS(train_loader, pgsnet, optimizer, device, epoch)
         # pgsnet, loss = trainPgs_semi(train_sup_loader, train_unsup_loader, pgsnet, optimizer, device, epoch)
@@ -426,7 +586,8 @@ def main():
     print("device is     ", dev)
 
     device = torch.device(dev)
-    train_val(dataset, args.n_epochs, device, args.wmh_threshold, args.output_dir, args.lr, args)
+    # train_val(dataset, args.n_epochs, device, args.wmh_threshold, args.output_dir, args.lr, args)
+    Unet_train_val(dataset, args.n_epochs, device, args.wmh_threshold, args.output_dir, args.lr, args)
 
 
 def get_cluster_assumption_representation(h):
