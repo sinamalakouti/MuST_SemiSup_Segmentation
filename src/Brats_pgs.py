@@ -50,7 +50,7 @@ def __fw_sup_loss(y_preds, y_true, sup_loss):
         assert output.shape[2:] == target.shape[2:], "output and target shape is not similar!!"
         if output.shape[1] != target.shape[1] and type(sup_loss) == torch.nn.CrossEntropyLoss:
             target = target.reshape((target.shape[0], target.shape[2], target.shape[3])).type(torch.LongTensor)
-        total_loss += sup_loss(output, target)
+        total_loss += sup_loss(output, target.to(output.device))
     return total_loss
 
 
@@ -106,8 +106,6 @@ def trainPgs_sup(train_sup_loader, model, optimizer, device, epochid):
     for step, batch_sup in enumerate(train_sup_loader):
         optimizer.zero_grad()
         b_sup = batch_sup['data'].to(device)
-
-
         target_sup = batch_sup['label'].to(device)
         sup_loss = torch.nn.CrossEntropyLoss()
 
@@ -241,7 +239,6 @@ def train_val(dataset, n_epochs, device, wmh_threshold, output_dir, learning_rat
         None
 
     pgsnet = Pgs.PGS(inputs_dim, outputs_dim, kernels, strides)
-
 
     print("learning_rate is    ", learning_rate)
     optimizer = torch.optim.SGD(pgsnet.parameters(), learning_rate, momentum=0.9, weight_decay=1e-4)

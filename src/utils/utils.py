@@ -145,7 +145,7 @@ def get_testset(dataset, batch_size, intensity_rescale, has_t1, mixup_threshold,
                 max_slice_index=155,
                 center_cropping=True,
                 t1=True,
-                t2=True,    
+                t2=True,
                 t1ce=True,
                 augment=False
             ),
