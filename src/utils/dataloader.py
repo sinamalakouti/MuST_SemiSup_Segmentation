@@ -123,7 +123,6 @@ def augment(x, y, m=None, t1=None, intensity_aug=None):
         return x, y
 
 
-
 class DataLoader():
     # initialization
     # datapath : the data folder of bsds500
@@ -339,7 +338,7 @@ class PittLocalFull(torch.utils.data.Dataset):
                     WMH_cluster = self.data[index]['fcm_seg']
 
             if self.is_FCM:
-                return {'data': x_final , 'label': y, 'mask': m.bool(),
+                return {'data': x_final, 'label': y, 'mask': m.bool(),
                         'subject': self.order[index], 'wmh_cluster': WMH_cluster}
             return {'data': x_final, 'label': y, 'mask': m.bool(),
                     'subject': self.order[index]}
@@ -371,9 +370,8 @@ def tensorize(*args):
     return tuple(torch.Tensor(arg).float().unsqueeze(0) for arg in args)
 
 
-
 def rescale_intensity(x):
-    return normalize_quantile(x,0.99)
+    return normalize_quantile(x, 0.99)
     maximum = x.max()
     minimum = x.min()
     return (x - minimum + 0.01) / (maximum - minimum + 0.01)

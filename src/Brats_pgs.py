@@ -10,7 +10,6 @@ from evaluation_metrics import dice_coef
 import Pgs
 import matplotlib.pyplot as plt
 
-
 import torch.nn.functional as F
 import numpy as np
 import torchvision.transforms.functional as augmentor
@@ -50,7 +49,7 @@ def __fw_sup_loss(y_preds, y_true, sup_loss):
 
         assert output.shape[2:] == target.shape[2:], "output and target shape is not similar!!"
         if output.shape[1] != target.shape[1] and type(sup_loss) == torch.nn.CrossEntropyLoss:
-            target = target.reshape((target.shape[0],target.shape[2],target.shape[3])).type(torch.LongTensor)
+            target = target.reshape((target.shape[0], target.shape[2], target.shape[3])).type(torch.LongTensor)
         total_loss += sup_loss(output, target)
     return total_loss
 
@@ -107,8 +106,9 @@ def trainPgs_sup(train_sup_loader, model, optimizer, device, epochid):
     for step, batch_sup in enumerate(train_sup_loader):
         optimizer.zero_grad()
         b_sup = batch_sup['data'].to(device)
-        target_sup = batch_sup['label'].to(device)
 
+
+        target_sup = batch_sup['label'].to(device)
         sup_loss = torch.nn.CrossEntropyLoss()
 
         print("subject is : ", batch_sup['subject'])
@@ -119,6 +119,7 @@ def trainPgs_sup(train_sup_loader, model, optimizer, device, epochid):
 
         total_loss.backward()
         optimizer.step()
+
     return model, total_loss
 
 
@@ -169,7 +170,7 @@ def evaluatePGS(model, dataset, device, threshold):
             b = b.to(device)
             target = batch['label'].to(device)
             outputs, _ = model(b, True)
-            #apply softmax
+            # apply softmax
             sf = torch.nn.Softmax2d()
             y_pred = sf(outputs[-1]) >= threshold
 
@@ -192,7 +193,7 @@ def create_WT_output(preds):
 
 
 def train_val(dataset, n_epochs, device, wmh_threshold, output_dir, learning_rate, args):
-    inputs_dim = [1, 64, 96, 128, 256, 768, 384, 224, 160]
+    inputs_dim = [4, 64, 96, 128, 256, 768, 384, 224, 160]
     outputs_dim = [64, 96, 128, 256, 512, 256, 128, 96, 64, 4]
     kernels = [5, 3, 3, 3, 3, 3, 3, 3, 3]
     strides = [1, 1, 1, 1, 1, 1, 1, 1, 1]
@@ -240,9 +241,11 @@ def train_val(dataset, n_epochs, device, wmh_threshold, output_dir, learning_rat
         None
 
     pgsnet = Pgs.PGS(inputs_dim, outputs_dim, kernels, strides)
+
+
     print("learning_rate is    ", learning_rate)
     optimizer = torch.optim.SGD(pgsnet.parameters(), learning_rate, momentum=0.9, weight_decay=1e-4)
-    step_size = 150
+    step_size = 30
     scheduler = lr_scheduler.StepLR(optimizer, step_size=step_size, gamma=0.1)  # don't use it
     print("scheduler step size is :   ", step_size)
     best_score = 0
@@ -254,6 +257,9 @@ def train_val(dataset, n_epochs, device, wmh_threshold, output_dir, learning_rat
     elif not torch.cuda.is_available():
         device = 'cpu'
 
+    device = torch.device(device)
+    # pgsnet = utils.load_model(path=os.path.join(output_model_dir, 'psgnet_best_lr{}.model'.format(learning_rate)),
+    #                           device=device)
 
     pgsnet.to(device)
 
@@ -263,7 +269,7 @@ def train_val(dataset, n_epochs, device, wmh_threshold, output_dir, learning_rat
         # train_unsup_loader = utils.get_trainset(dataset, 32, True, None, None, mode='train_semi_unsup')
         # pgsnet, loss = trainPGS(train_loader, pgsnet, optimizer, device, epoch)
         # pgsnet, loss = trainPgs_semi(train_sup_loader, train_unsup_loader, pgsnet, optimizer, device, epoch)
-        score, segmentations = evaluatePGS(pgsnet, dataset, device, wmh_threshold)
+        # score, segmentations = evaluatePGS(pgsnet, dataset, device, wmh_threshold)
         pgsnet, loss = trainPgs_sup(train_sup_loader, pgsnet, optimizer, device, epoch)
         # writer.add_scalar("Loss/train", loss, epoch)
 
@@ -282,9 +288,9 @@ def train_val(dataset, n_epochs, device, wmh_threshold, output_dir, learning_rat
             wandb.log({"train_loss": loss, "dev_dsc": score})
             # example = segmentations[0]
             # example = example >= wmh_threshold
-    #         wandb.log(
-    #             {"train_loss": loss, "dev_dsc": score, "image": [wandb.Image(augmentor.to_pil_image(example.int())
-    #                                                                          , caption="output example")]})
+        #         wandb.log(
+        #             {"train_loss": loss, "dev_dsc": score, "image": [wandb.Image(augmentor.to_pil_image(example.int())
+        #                                                                          , caption="output example")]})
         scheduler.step()
 
     # writer.flush()
@@ -421,8 +427,6 @@ def main():
     else:
         dev = "cpu"
     print("device is     ", dev)
-
-    dev = 'cpu'
 
     device = torch.device(dev)
     train_val(dataset, args.n_epochs, device, args.wmh_threshold, args.output_dir, args.lr, args)

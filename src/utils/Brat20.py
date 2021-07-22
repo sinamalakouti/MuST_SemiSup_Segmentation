@@ -62,14 +62,17 @@ def semi_sup_split(train_dir_csv, sup_dir_path, unsup_dir_path, ratio=0.5):
 
 class Brat20(torch.utils.data.Dataset):
 
-    def __init__(self, dataroot_dir, mode,
-                 min_slice_index, max_slice_index, augment=False, intensity_aug=False, center_cropping=False):
+    def __init__(self, dataroot_dir, mode, min_slice_index, max_slice_index,
+                 augment=False, intensity_aug=None, center_cropping=False, t1=None, t2=None, t1ce=None):
         super(Brat20, self).__init__()
 
         self.augment = augment
         self.intensity_aug = intensity_aug
         self.center_cropping = center_cropping
         self.weights = {}
+        self.t1 = t1
+        self.t2 = t2
+        self.t1ce = t1ce
 
         if mode == "train2020_sup":
             ids_path = os.path.join(dataroot_dir, 'trainset/brats20_training_ids.csv')
@@ -82,9 +85,9 @@ class Brat20(torch.utils.data.Dataset):
         elif mode == "train2018_sup":
             ids_path = os.path.join(dataroot_dir, 'trainset/brats2018.csv')
         elif mode == "train2018_semi_sup":
-            None  #todo
+            None  # todo
         elif mode == "train2018_semi_unsup":
-            None  #todo
+            None  # todo
         elif mode == "test2019_new":
             ids_path = os.path.join(dataroot_dir, 'valset/brats2019_new.csv')
 
@@ -102,24 +105,66 @@ class Brat20(torch.utils.data.Dataset):
 
         flair_paths = [os.path.join(subjects_root_dir, str(subj_name) + '/{}_flair.nii.gz'.format(subj_name)) for
                        subj_name in self.subjects_name]
+
+        if self.t1 is not None:
+            t1_paths = [os.path.join(subjects_root_dir, str(subj_name) + '/{}_t1.nii.gz'.format(subj_name)) for
+                        subj_name in self.subjects_name]
+        else:
+            t1_paths = [None for _ in self.subjects_name]
+        if self.t2 is not None:
+            t2_paths = [os.path.join(subjects_root_dir, str(subj_name) + '/{}_t2.nii.gz'.format(subj_name)) for
+                        subj_name in self.subjects_name]
+        else:
+            t2_paths = [None for _ in self.subjects_name]
+
+        if self.t1ce is not None:
+            t1ce_paths = [os.path.join(subjects_root_dir, str(subj_name) + '/{}_t1ce.nii.gz'.format(subj_name)) for
+                          subj_name in self.subjects_name]
+        else:
+            t1ce_paths = [None for _ in self.subjects_name]
+
         label_paths = [os.path.join(subjects_root_dir, str(subj_name) + '/{}_seg.nii.gz'.format(subj_name)) for
                        subj_name in self.subjects_name]
 
-        paths = zip(flair_paths, label_paths)
+        paths = zip(flair_paths, t1_paths, t2_paths, t1ce_paths, label_paths)
         self.data = []
-        for data, label in paths:
+        for data, t1_data, t2_data, t1ce_data, label in paths:
 
             X = self._extract(data, slices=list(range(min_slice_index, max_slice_index)))
             Y = self._extract(label, slices=list(range(min_slice_index, max_slice_index)))
+            if self.t1 is not None:
+                X_t1 = self._extract(t1_data, slices=list(range(min_slice_index, max_slice_index)))
+            if self.t2 is not None:
+                X_t2 = self._extract(t2_data, slices=list(range(min_slice_index, max_slice_index)))
+            if self.t1ce is not None:
+                X_t1ce = self._extract(t1ce_data, slices=list(range(min_slice_index, max_slice_index)))
 
             for sl in range(Y.shape[2]):
-                if Y[:, :, sl].sum() == 0 or X[:, :, sl].sum() == 0 or np.sum((X[:, :, sl] >0))/(240 * 240) * 100 < 20:
+                if Y[:, :, sl].sum() == 0 or X[:, :, sl].sum() == 0 or np.sum((X[:, :, sl] > 0)) / (
+                        240 * 240) * 100 < 20:
                     None
                 else:
-                    self.data.append({
-                        'data': X[:, :, sl],
-                        'label': Y[:, :, sl]
-                    })
+                    data_map = {'data': X[:, :, sl],
+                                'label': Y[:, :, sl]
+                                }
+                    if self.t1 is not None:
+                        data_map['data_t1'] = X_t1[:, :, sl]
+                    else:
+                        data_map['data_t1'] = None
+                    if self.t2 is not None:
+                        data_map['data_t2'] = X_t2[:, :, sl]
+                    else:
+                        data_map['data_t2'] = None
+                    if self.t1ce is not None:
+                        data_map['data_t1ce'] = X_t1ce[:, :, sl]
+                    else:
+                        data_map['data_t1ce'] = None
+
+                    self.data.append(data_map)
+                    # self.data.append({
+                    #     'data': X[:, :, sl],
+                    #     'label': Y[:, :, sl]
+                    # })
 
     def __len__(self):
         return len(self.data)
@@ -132,30 +177,48 @@ class Brat20(torch.utils.data.Dataset):
     def __getitem__(self, index):
 
         x = self.data[index]['data']
+        x_t1 = self.data[index]['data_t1']
+        x_t2 = self.data[index]['data_t2']
+        x_t1ce = self.data[index]['data_t1ce']
         y = self.data[index]['label']
-        x, y = tensorize(x, y)
+        x, x_t1, x_t2, x_t1ce, y = tensorize(x, x_t1, x_t2, x_t1ce, y)
         if self.center_cropping:
-            x, y = center_crop(x, y)
+            x, x_t1, x_t2, x_t1ce, y = center_crop(x, x_t1, x_t2, x_t1ce, y)
 
         # only Whole Tumor (WT) segmentation
         # y[y >= 1] = 1
 
-        y[y == 4] = 3
+        y[y == 4] = 3  # for simplicity in training, substitute label = 3 with 4
 
         if self.augment:
-            x, y, m = augment(
-                x=x, y=y, intensity_aug=self.intensity_aug)
-        else:
-            x, y = tensorize(x, y)
+            x, x_t1, x_t2, x_t1ce, y = augment(
+                x=x, y=y, t1=x_t1, t2=x_t2, t1ce=x_t1ce, intensity_aug=self.intensity_aug)
 
         x = rescale_intensity(x)
-        if x.isnan().sum() > 0:
-            print("dfafadfads")
+        x_t1 = rescale_intensity(x_t1) if x_t1 is not None else None
+        x_t2 = rescale_intensity(x_t2) if x_t2 is not None else None
+        x_t1ce = rescale_intensity(x_t1ce) if x_t1ce is not None else None
 
-        return {'data': x, 'label': y, 'subject': self.subjects_id[index]}
+        result = {'data': x, 'label': y, 'subject': self.subjects_id[index]}
+        data_modalities = []
+        if x is not None:
+            data_modalities.append(x)
+        if x_t1 is not None:
+            result['data_t1'] = x_t1
+            data_modalities.append(x_t1)
+        if x_t2 is not None:
+            result['data_t2'] = x_t2
+            data_modalities.append(x_t2)
+        if x_t1ce is not None:
+            result['data_t1ce'] = x_t1ce
+            data_modalities.append(x_t1ce)
+
+        x_final = torch.cat(data_modalities, dim=0)
+        result = {'data': x_final, 'label': y, 'subject': self.subjects_id[index]}
+        return result
 
 
-def augment(x, y, m=None, t1=None, intensity_aug=None):
+def augment(x, y, m=None, t1=None, t2=None, t1ce=None, intensity_aug=None):
     # NOTE: method expects numpy float arrays
     # to_pil_image makes assumptions based on input when mode = None
     # i.e. it should infer that mode = 'F'
@@ -195,6 +258,14 @@ def augment(x, y, m=None, t1=None, intensity_aug=None):
         if intensity_aug is not None:
             t1 = adjust_contrast(t1, c_factor)
         t1 = augmentor.to_pil_image(t1, mode='F')
+    if t2 is not None:
+        if intensity_aug is not None:
+            t2 = adjust_contrast(t2, c_factor)
+        t2 = augmentor.to_pil_image(t2, mode='F')
+    if t1ce is not None:
+        if intensity_aug is not None:
+            t1ce = adjust_contrast(t1ce, c_factor)
+        t1ce = augmentor.to_pil_image(t1ce, mode='F')
 
     x = augmentor.affine(x,
                          angle=angle, translate=(0, 0), shear=shear, scale=scale)
@@ -206,25 +277,34 @@ def augment(x, y, m=None, t1=None, intensity_aug=None):
     if t1 is not None:
         t1 = augmentor.affine(t1,
                               angle=angle, translate=(0, 0), shear=shear, scale=scale)
+        t1 = augmentor.to_tensor(t1).float()
+    if t2 is not None:
+        t2 = augmentor.affine(t2,
+                              angle=angle, translate=(0, 0), shear=shear, scale=scale)
+        t2 = augmentor.to_tensor(t2).float()
+    if t1ce is not None:
+        t1ce = augmentor.affine(t1ce,
+                                angle=angle, translate=(0, 0), shear=shear, scale=scale)
+        t1ce = augmentor.to_tensor(t1ce).float()
+
     x = augmentor.to_tensor(x).float()
     y = augmentor.to_tensor(y).float()
-    y = (y > 0).float()
+    # y = (y > 0).float()
 
     if m is not None:
         m = augmentor.to_tensor(m).float()
         m = (m > 0).float()
 
-    if t1 is not None:
-        t1 = augmentor.to_tensor(t1).float()
+    return x, t1, t2, t1ce, y
 
-    if m is not None and t1 is not None:
-        return x, y, m, t1
-    elif m is not None and t1 is None:
-        return x, y, m
-    elif m is None and t1 is not None:
-        return x, y, t1
-    else:
-        return x, y
+    # if m is not None and t1 is not None:
+    #     return x, y, m, t1
+    # elif m is not None and t1 is None:
+    #     return x, y, m
+    # elif m is None and t1 is not None:
+    #     return x, y, t1
+    # else:
+    #     return x, y
 
 
 def adjust_contrast(x, c_factor):
@@ -235,15 +315,19 @@ def adjust_contrast(x, c_factor):
 
 
 def tensorize(*args):
-    return tuple(torch.Tensor(arg).float().unsqueeze(0) for arg in args)
+    return tuple(torch.Tensor(arg).float().unsqueeze(0) if arg is not None else None for arg in args)
 
 
-def center_crop(x, y, size=200):
+def center_crop(x, x_t1, x_t2, x_t1ce, y, size=200):
     cropper = transformer.CenterCrop(size)
     x_cropped = cropper(x).reshape((size, size))
+    x_t1_cropped = cropper(x_t1).reshape((size, size)) if x_t1 is not None else None
+    x_t2_cropped = cropper(x_t2).reshape((size, size)) if x_t2 is not None else None
+    x_t1ce_cropped = cropper(x_t1ce).reshape((size, size)) if x_t1ce is not None else None
     y_cropped = cropper(y).reshape((size, size))
+
     assert y.sum() == y_cropped.sum(), "cropped label part!!!!"
-    return x_cropped, y_cropped
+    return x_cropped, x_t1_cropped, x_t2_cropped, x_t1ce_cropped, y_cropped
 
 
 def rescale_intensity(x):

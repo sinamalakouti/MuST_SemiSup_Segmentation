@@ -3,8 +3,8 @@ import torchvision.transforms.functional as F
 from torch.distributions.uniform import Uniform
 import random
 
-def augment(x, y, cascade = False):
 
+def augment(x, y, cascade=False):
     angle = np.random.uniform(-180, 180)
     scale = np.random.uniform(.8, 1.2)
     # shear = np.random.uniform(-30, 30)
@@ -30,16 +30,16 @@ def augment(x, y, cascade = False):
         return x_transform, y_transform
     else:
         # perform scaling
-        if random_selector == 0 :
+        if random_selector == 0:
             x_transform = F.affine(x,
-                                 angle=0, translate=(0, 0), shear=0, scale=scale)
+                                   angle=0, translate=(0, 0), shear=0, scale=scale)
             y_transform = F.affine(y,
-                                 angle=0, translate=(0, 0), shear=0, scale=scale)
+                                   angle=0, translate=(0, 0), shear=0, scale=scale)
         elif random_selector == 1:
             x_transform = F.affine(x,
-                                 angle=angle, translate=(0, 0), shear=0, scale=1)
+                                   angle=angle, translate=(0, 0), shear=0, scale=1)
             y_transform = F.affine(y,
-                                 angle=angle, translate=(0, 0), shear=0, scale=1)
+                                   angle=angle, translate=(0, 0), shear=0, scale=1)
         elif random_selector == 2:
 
             noise = uni_dist.sample(x.shape[1:]).to(x.device)
