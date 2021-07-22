@@ -206,7 +206,7 @@ def evaluateUnet(model, dataset, device, threshold):
             b = batch['data']
             b = b.to(device)
             target = batch['label'].to(device)
-            outputs, _ = model(b, True)
+            outputs = model(b)
             # apply softmax
             sf = torch.nn.Softmax2d()
             y_pred = sf(outputs) >= threshold
@@ -215,6 +215,7 @@ def evaluateUnet(model, dataset, device, threshold):
             target[target >= 1] = 1
             target_WT = target
             dice_score = dice_coef(target_WT.reshape(y_WT.shape), y_WT)
+            print(dice_score)
             dice_arr.append(dice_score.item())
 
     return np.mean(np.array(dice_arr))
@@ -348,7 +349,6 @@ def Unet_train_val(dataset, n_epochs, device, wmh_threshold, output_dir, learnin
                 save_score(output_image_dir, score, epoch)
             wandb.log({"train_loss": loss, "dev_dsc": score})
         scheduler.step()
-
 
 
 def train_val(dataset, n_epochs, device, wmh_threshold, output_dir, learning_rate, args):

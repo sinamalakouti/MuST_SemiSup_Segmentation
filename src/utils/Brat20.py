@@ -100,8 +100,7 @@ class Brat20(torch.utils.data.Dataset):
         #     subjects_root_dir = os.path.join(dataroot_dir, 'MICCAI_BraTS2020_TrainingData')
 
         self.subjects_name = np.asarray(pd.read_csv(ids_path, header=None)).reshape(-1)
-        self.subjects_id = [int(subject.split('_')[-1]) for subject in self.subjects_name
-                            for _ in range(max_slice_index - min_slice_index)]
+        # self.subjects_id = [
 
         flair_paths = [os.path.join(subjects_root_dir, str(subj_name) + '/{}_flair.nii.gz'.format(subj_name)) for
                        subj_name in self.subjects_name]
@@ -126,9 +125,9 @@ class Brat20(torch.utils.data.Dataset):
         label_paths = [os.path.join(subjects_root_dir, str(subj_name) + '/{}_seg.nii.gz'.format(subj_name)) for
                        subj_name in self.subjects_name]
 
-        paths = zip(flair_paths, t1_paths, t2_paths, t1ce_paths, label_paths)
+        paths = zip(flair_paths, t1_paths, t2_paths, t1ce_paths, label_paths, self.subjects_name)
         self.data = []
-        for data, t1_data, t2_data, t1ce_data, label in paths:
+        for data, t1_data, t2_data, t1ce_data, label, subject_name in paths:
 
             X = self._extract(data, slices=list(range(min_slice_index, max_slice_index)))
             Y = self._extract(label, slices=list(range(min_slice_index, max_slice_index)))
@@ -138,14 +137,15 @@ class Brat20(torch.utils.data.Dataset):
                 X_t2 = self._extract(t2_data, slices=list(range(min_slice_index, max_slice_index)))
             if self.t1ce is not None:
                 X_t1ce = self._extract(t1ce_data, slices=list(range(min_slice_index, max_slice_index)))
-
+            subject_id = int(subject_name.split('_')[-1])
             for sl in range(Y.shape[2]):
                 if Y[:, :, sl].sum() == 0 or X[:, :, sl].sum() == 0 or np.sum((X[:, :, sl] > 0)) / (
                         240 * 240) * 100 < 20:
                     None
                 else:
                     data_map = {'data': X[:, :, sl],
-                                'label': Y[:, :, sl]
+                                'label': Y[:, :, sl],
+                                'subject_id': subject_id
                                 }
                     if self.t1 is not None:
                         data_map['data_t1'] = X_t1[:, :, sl]
@@ -193,28 +193,30 @@ class Brat20(torch.utils.data.Dataset):
         if self.augment:
             x, x_t1, x_t2, x_t1ce, y = augment(
                 x=x, y=y, t1=x_t1, t2=x_t2, t1ce=x_t1ce, intensity_aug=self.intensity_aug)
+        else:
+            x, x_t1, x_t2, x_t1ce, y = tensorize(x, x_t1, x_t2, x_t1ce, y)
 
         x = rescale_intensity(x)
         x_t1 = rescale_intensity(x_t1) if x_t1 is not None else None
         x_t2 = rescale_intensity(x_t2) if x_t2 is not None else None
         x_t1ce = rescale_intensity(x_t1ce) if x_t1ce is not None else None
 
-        result = {'data': x, 'label': y, 'subject': self.subjects_id[index]}
+        # result = {'data': x, 'label': y, 'subject': self.subjects_id[index]}
         data_modalities = []
         if x is not None:
             data_modalities.append(x)
         if x_t1 is not None:
-            result['data_t1'] = x_t1
+            # result['data_t1'] = x_t1
             data_modalities.append(x_t1)
         if x_t2 is not None:
-            result['data_t2'] = x_t2
+            # result['data_t2'] = x_t2
             data_modalities.append(x_t2)
         if x_t1ce is not None:
-            result['data_t1ce'] = x_t1ce
+            # result['data_t1ce'] = x_t1ce
             data_modalities.append(x_t1ce)
 
         x_final = torch.cat(data_modalities, dim=0)
-        result = {'data': x_final, 'label': y, 'subject': self.subjects_id[index]}
+        result = {'data': x_final, 'label': y, 'subject': self.data[index]['subject_id']}
         return result
 
 
