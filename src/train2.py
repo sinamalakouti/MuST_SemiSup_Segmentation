@@ -1,11 +1,9 @@
-import torch
 import sys
 import os
 import torch
 from utils import utils
-import Wnet
+from models import Wnet
 import matplotlib.pyplot as plt
-from utils import reconstruction_loss
 
 sys.path.append('src')
 sys.path.append('src/utils/Constants')
@@ -14,15 +12,16 @@ sys.path.append('srs/utils')
 for p in sys.path:
     print("path  ", p)
 
-utils.Constants.USE_CUDA = True
+utils.Constants. \
+    _CUDA = True
 utils.Constants.N_ITERATION = 20000
 
 
 def train(dataset):
     utils.FCM = False
     # read data
-    trainset = utils.get_trainset(dataset,5, False, None, None)
-    testset = utils.get_testset(dataset,5, False, None, None)
+    trainset = utils.get_trainset(dataset, 5, False, None, None)
+    testset = utils.get_testset(dataset, 5, False, None, None)
     experiment_path = "only_unet"
 
     cuda_number = 1
@@ -47,8 +46,9 @@ def train(dataset):
     wnet.to(device)
 
     optimizer = torch.optim.Adam(wnet.parameters(), 0.001)
-    #get dataset
+    # get dataset
     test = torch.tensor(testset.dataset.data[0]['data']).reshape((1, 1, 212, 256))
+    test = utils.normalize_quantile(test, 0.99)
     plt.imshow(test.reshape((212, 256)))
     plt.savefig("../" + experiment_path + "/images/image_original.png")
 
@@ -64,21 +64,20 @@ def train(dataset):
                 torch.save(wnet, f)
 
         if iter % 10 == 0:
-            save_test(wnet, experiment_path, test, device, path,iter)
-
-
+            save_test(wnet, experiment_path, test, device, path, iter)
 
         for batch in trainset:
             wnet.train()
             b = batch['data']
             b = b.to(device)
+            wnet.to(device)
             segments = wnet.U_enc_fw(b)
             pred = wnet.linear_combination(segments)
 
             loss = torch.nn.MSELoss().to(device)
             recon_loss = loss(pred, b)
             recon_loss.backward()
-            regularization = reconstruction_loss.regularization(segments)
+            # regularization = reconstruction_loss.regularization(segments)
 
             optimizer.step()
             optimizer.zero_grad()
@@ -86,13 +85,12 @@ def train(dataset):
     return wnet
 
 
-
-def save_test(wnet, experiment_path, test, device, path, iter):
+def save_test(model, experiment_path, test, device, path, iter):
     with torch.no_grad():
-        wnet.eval()
+        model.eval()
 
         test.reshape((1, 1, 212, 256))
-        X_out_intermediate = wnet.U_enc_fw(test.to(device))
+        X_out_intermediate = model.U_enc_fw(test.to(device))
 
         sample_dir = '../' + experiment_path + '/images/segmentation/iter_{}'.format(iter)
         if not os.path.isdir(sample_dir):
@@ -106,10 +104,11 @@ def save_test(wnet, experiment_path, test, device, path, iter):
         utils.save_segment_images(X_out_intermediate.cpu(),
                                   "../" + experiment_path + "/images/segmentation/iter_{}".format(iter))
 
-        intermediate_pred = wnet.linear_combination(X_out_intermediate)
+        intermediate_pred = model.linear_combination(X_out_intermediate)
 
         plt.imshow(intermediate_pred[0, 0].cpu().reshape((212, 256)))
         plt.savefig("../" + experiment_path + "/images/segmentation/iter_{}/linear_comb_{}.png".format(iter, iter))
+
 
 if __name__ == '__main__':
     dataset = utils.Datasets.PittLocalFull

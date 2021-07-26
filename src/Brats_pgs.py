@@ -1,4 +1,3 @@
-import torch
 import sys
 import os
 import torch
@@ -6,21 +5,26 @@ import torch.nn as nn
 from torch.optim import lr_scheduler
 
 from utils import utils
-from evaluation_metrics import dice_coef
-import Pgs
+from utils import model_utils
+
+from evaluation_metrics import dice_coef, get_dice_coef_per_subject
+from models import Pgs, Unet
 import matplotlib.pyplot as plt
-import Unet
 import torch.nn.functional as F
 import numpy as np
-import torchvision.transforms.functional as augmentor
 
 import argparse
-from torch.utils.tensorboard import SummaryWriter
+import yaml
+from easydict import EasyDict as edict
+
 import wandb
 
 sys.path.append('src')
 sys.path.append('src/utils/Constants')
 sys.path.append('srs/utils')
+# sys.path.append('srs/models')
+# sys.path.append('srs/models')
+
 os.environ['CUDA_VISIBLE_DEVICES'] = "2,3"
 
 for p in sys.path:
@@ -193,16 +197,21 @@ def trainPGS(train_loader, model, optimizer, device, epochid):
     return model, total_loss
 
 
-def evaluateUnet(model, dataset, device, threshold):
+def evaluateUnet(model, dataset, device, threshold, cfg, data_mode):
     print("******************** EVALUATING ********************")
-    testset = utils.get_testset(dataset, 64, True, None, None, mode="test2019_new")
+
+    testset = utils.get_testset(dataset, cfg.batch_size, intensity_rescale=cfg.intensity_rescale,
+                                mixup_threshold=cfg.mixup_threshold, mode=data_mode,
+                                t1=cfg.t1, t2=cfg.t2, t1ce=cfg.t1ce, augment=cfg.augment)
 
     model.eval()
 
     dice_arr = []
-
+    all_preds = None
+    all_targets = None
+    all_subjects = None
     with torch.no_grad():
-        for batch in testset:
+        for batch_id, batch in enumerate(testset):
             b = batch['data']
             b = b.to(device)
             target = batch['label'].to(device)
@@ -210,20 +219,35 @@ def evaluateUnet(model, dataset, device, threshold):
             # apply softmax
             sf = torch.nn.Softmax2d()
             y_pred = sf(outputs) >= threshold
+            if batch_id == 0:
+                all_preds = y_pred
+                all_subjects = batch['subject']
+                all_targets = target
+            else:
+                all_preds = torch.cat((all_preds, y_pred), dim=0)
+                all_subjects = torch.cat((all_subjects, batch['subject']), dim=0)
+                all_targets = torch.cat((all_targets, target), dim=0)
 
-            y_WT = create_WT_output(y_pred)
+            y_WT = seg2WT(y_pred)
             target[target >= 1] = 1
             target_WT = target
             dice_score = dice_coef(target_WT.reshape(y_WT.shape), y_WT)
             print(dice_score)
             dice_arr.append(dice_score.item())
 
-    return np.mean(np.array(dice_arr))
+        all_targets[all_targets >= 1] = 1
+        all_preds = seg2WT(all_preds)
+        subject_wise_DSC = get_dice_coef_per_subject(all_targets.reshape(all_preds.shape), all_preds, all_subjects)
+
+    return np.mean(np.array(dice_arr)), subject_wise_DSC
 
 
-def evaluatePGS(model, dataset, device, threshold):
+def evaluatePGS(model, dataset, device, threshold, cfg, training_mode):
     print("******************** EVALUATING ********************")
-    testset = utils.get_testset(dataset, 32, True, None, None, mode="test2019_new")
+
+    testset = utils.get_testset(dataset, cfg.batch_size, intensity_rescale=cfg.intensity_rescale,
+                                mixup_threshold=cfg.mixup_threshold, mode=training_mode,
+                                t1=cfg.t1, t2=cfg.t2, t1ce=cfg.t1ce, augment=cfg.augmetn)
 
     model.eval()
 
@@ -240,7 +264,7 @@ def evaluatePGS(model, dataset, device, threshold):
             sf = torch.nn.Softmax2d()
             y_pred = sf(predictions[-1]) >= threshold
 
-            y_WT = create_WT_output(y_pred)
+            y_WT = seg2WT(y_pred)
             target[target >= 1] = 1
             target_WT = target
             dice_score = dice_coef(target_WT.reshape(y_WT.shape), y_WT)
@@ -254,13 +278,13 @@ def evaluatePGS(model, dataset, device, threshold):
     return np.mean(np.array(dice_arr)), segmentation_outputs
 
 
-def create_WT_output(preds):
+def seg2WT(preds):
     WT_pred = preds[:, 1:4, :, :].sum(1) >= 1
     return WT_pred
 
 
-def Unet_train_val(dataset, n_epochs, device, wmh_threshold, output_dir, learning_rate, args):
-    inputs_dim = [4, 64, 128, 256, 512, 1024, 512, 256, 128]
+def Unet_train_val(dataset, n_epochs, device, wmh_threshold, output_dir, learning_rate, args, cfg):
+    inputs_dim = [1, 64, 128, 256, 512, 1024, 512, 256, 128]
     outputs_dim = [64, 128, 256, 512, 1024, 512, 256, 128, 64]
     kernels = [3, 3, 3, 3, 3, 3, 3, 3, 3]
     paddings = [1, 1, 1, 1, 1, 1, 1, 1, 1]
@@ -297,7 +321,11 @@ def Unet_train_val(dataset, n_epochs, device, wmh_threshold, output_dir, learnin
         None
 
     # writer = SummaryWriter(log_dir=os.path.join(output_dir, "runs"))
-    wandb.init(project="fully_sup_brats", config=args)
+    config_dictionary = dict(
+        yaml=cfg,
+        args=args,
+    )
+    wandb.init(project="fully_sup_brats", config=config_dictionary)
     wandb.run.name = "UNET_FULLY_SUP" + str(wandb.run.id)
     output_image_dir = os.path.join(output_dir, "result_images/")
 
@@ -329,29 +357,35 @@ def Unet_train_val(dataset, n_epochs, device, wmh_threshold, output_dir, learnin
     device = torch.device(device)
 
     unet.to(device)
-    train_sup_loader = utils.get_trainset(dataset, 64, True, None, None, mode='train2018_sup')
+    # unet = model_utils.load_model('/Users/sinamalakouti/Desktop/psgnet_best_lr0.001.model', device)
+    # regular_score, subjet_wise_score = evaluateUnet(unet, dataset, device, wmh_threshold, cfg, cfg.val_mode)
+    train_sup_loader = utils.get_trainset(dataset, batch_size=cfg.batch_size, intensity_rescale=cfg.intensity_rescale,
+                                          mixup_threshold=cfg.mixup_threshold, mode=cfg.train_mode, t1=cfg.t1,
+                                          t2=cfg.t2, t1ce=cfg.t1ce, augment=cfg.augment)
     sup_loss = torch.nn.CrossEntropyLoss()
 
     loss_functions = (sup_loss, None)
     for epoch in range(start_epoch, n_epochs):
         print("iteration:  ", epoch)
+
         unet, loss = trainUnet_sup(train_sup_loader, unet, optimizer, device, loss_functions, epoch)
         if epoch % 1 == 0:
-            score = evaluateUnet(unet, dataset, device, wmh_threshold)
-            print("** SCORE @ Iteration {} is {} **".format(epoch, score))
-            if score > best_score:
-                print("****************** BEST SCORE @ ITERATION {} is {} ******************".format(epoch, score))
-                best_score = score
+            regular_score, subjet_wise_score = evaluateUnet(unet, dataset, device, wmh_threshold, cfg, cfg.val_mode)
+            print("** SCORE @ Iteration {} is {} **".format(epoch, subjet_wise_score))
+            if subjet_wise_score > best_score:
+                print("****************** BEST SCORE @ ITERATION {} is {} ******************".format(epoch,
+                                                                                                     subjet_wise_score))
+                best_score = subjet_wise_score
                 path = os.path.join(output_model_dir, 'psgnet_best_lr{}.model'.format(learning_rate))
                 with open(path, 'wb') as f:
                     torch.save(unet, f)
 
-                save_score(output_image_dir, score, epoch)
-            wandb.log({"train_loss": loss, "dev_dsc": score})
+                save_score(output_image_dir, subjet_wise_score, epoch)
+            wandb.log({"train_loss": loss, "dev_dsc": subjet_wise_score})
         scheduler.step()
 
 
-def train_val(dataset, n_epochs, device, wmh_threshold, output_dir, learning_rate, args):
+def train_val(dataset, n_epochs, device, wmh_threshold, output_dir, learning_rate, args, cfg):
     inputs_dim = [4, 64, 96, 128, 256, 768, 384, 224, 160]
     outputs_dim = [64, 96, 128, 256, 512, 256, 128, 96, 64, 4]
     kernels = [5, 3, 3, 3, 3, 3, 3, 3, 3]
@@ -387,7 +421,11 @@ def train_val(dataset, n_epochs, device, wmh_threshold, output_dir, learning_rat
         None
 
     # writer = SummaryWriter(log_dir=os.path.join(output_dir, "runs"))
-    wandb.init(project="fully_sup_brats", config=args)
+    config_params = dict(
+        args=args,
+        config=cfg
+    )
+    wandb.init(project="fully_sup_brats", config=config_params)
     wandb.run.name = wandb.run.id
     output_image_dir = os.path.join(output_dir, "result_images/")
 
@@ -404,7 +442,7 @@ def train_val(dataset, n_epochs, device, wmh_threshold, output_dir, learning_rat
     print("learning_rate is    ", learning_rate)
     optimizer = torch.optim.SGD(pgsnet.parameters(), learning_rate, momentum=0.9, weight_decay=1e-4)
     step_size = 30
-    scheduler = lr_scheduler.StepLR(optimizer, step_size=step_size, gamma=0.1)  # don't use it
+    scheduler = lr_scheduler.StepLR(optimizer, step_size=cfg.scheduler_step_size, gamma=0.1)  # don't use it
     print("scheduler step size is :   ", step_size)
     best_score = 0
     start_epoch = 0
@@ -416,22 +454,27 @@ def train_val(dataset, n_epochs, device, wmh_threshold, output_dir, learning_rat
         device = 'cpu'
 
     device = torch.device(device)
-    # pgsnet = utils.load_model(path=os.path.join(output_model_dir, 'psgnet_best_lr{}.model'.format(learning_rate)),
-    #                           device=device)
+    # pgsnet = model_utils.load_model(path=os.path.join(output_model_dir, 'psgnet_best_lr{}.model'.format(
+    # learning_rate)), device=device)
 
     pgsnet.to(device)
-    train_sup_loader = utils.get_trainset(dataset, 32, True, None, None, mode='train2018_sup')
+
+    train_sup_loader = utils.get_trainset(dataset, batch_size=cfg.batch_size, intensity_rescale=cfg.intensity_rescale,
+                                          mixup_threshold=cfg.mixup_threshold, mode=cfg.train_mode, t1=cfg.t1,
+                                          t2=cfg.t2, t1ce=cfg.t1ce, augment=cfg.augment)
     for epoch in range(start_epoch, n_epochs):
         print("iteration:  ", epoch)
-        # train_unsup_loader = utils.get_trainset(dataset, 32, True, None, None, mode='train_semi_unsup')
+
+        # train_unsup_loader = utils.get_trainset(dataset, batch_size=32, intensity_rescale=True, mixup_threshold=None,
+        #                                       mode='train_semi_unsup', t1=False, t2=False, t1ce=False, augment=True)
         # pgsnet, loss = trainPGS(train_loader, pgsnet, optimizer, device, epoch)
         # pgsnet, loss = trainPgs_semi(train_sup_loader, train_unsup_loader, pgsnet, optimizer, device, epoch)
-        # score, segmentations = evaluatePGS(pgsnet, dataset, device, wmh_threshold)
+        # score, segmentations = evaluatePGS(pgsnet, dataset, device, wmh_threshold, cfg, cfg.val_mode)
         pgsnet, loss = trainPgs_sup(train_sup_loader, pgsnet, optimizer, device, epoch)
         # writer.add_scalar("Loss/train", loss, epoch)
 
         if epoch % 1 == 0:
-            score, segmentations = evaluatePGS(pgsnet, dataset, device, wmh_threshold)
+            score, segmentations = evaluatePGS(pgsnet, dataset, device, wmh_threshold, cfg, cfg.val_mode)
             # writer.add_scalar("dice_score/test", score, epoch)
             print("** SCORE @ Iteration {} is {} **".format(epoch, score))
             if score > best_score:
@@ -506,37 +549,6 @@ def main():
         help="cuda indices 0,1,2,3"
     )
     parser.add_argument(
-        "--intensity_normalization",
-        default=True,
-        type=bool,
-        help="intensity_normalization = T/F"
-    )
-    parser.add_argument(
-        "--addT1",
-        default=None,
-        type=int,
-        help="add T1?  1/None"
-    )
-
-    parser.add_argument(
-        "--mixup-threshold",
-        default=None,
-        type=float,
-        help="mixup threshold = None or float value"
-    )
-    parser.add_argument(
-        '--lr',
-        default=0.001,
-        type=float,
-        help="learning rate"
-    )
-    parser.add_argument(
-        "--optimizer",
-        default="SGD",
-        type=str,
-        help="SGD or ADAM"
-    )
-    parser.add_argument(
         "--output_dir",
         default="dasfdsfsaf",
         type=str,
@@ -544,24 +556,16 @@ def main():
     )
 
     parser.add_argument(
-        "--n_epochs",
-        default=400,
-        type=int,
-        help="number of epochs"
-    )
-
-    parser.add_argument(
-        "--wmh_threshold",
-        default=0.5,
-        type=float,
-        help=" wmh mask threshold between 0 and 1"
-    )
-
-    parser.add_argument(
         "--num_supervised",
         default=2,
         type=int,
         help="number of supervised samples"
+    )
+
+    parser.add_argument(
+        "--config",
+        type=str,
+        default='config.yaml'
     )
 
     parser.add_argument(
@@ -576,8 +580,11 @@ def main():
         type=str,
         help="<subject1>_<subject2> ... <subjectn> or all for all subjects"
     )
+
     dataset = utils.Constants.Datasets.Brat20
     args = parser.parse_args()
+    with open(args.config, "r") as f:
+        cfg = edict(yaml.safe_load(f))
 
     if torch.cuda.is_available() and utils.Constants.USE_CUDA:
         dev = "cuda:{}".format(args.cuda)
@@ -586,8 +593,8 @@ def main():
     print("device is     ", dev)
 
     device = torch.device(dev)
-    # train_val(dataset, args.n_epochs, device, args.wmh_threshold, args.output_dir, args.lr, args)
-    Unet_train_val(dataset, args.n_epochs, device, args.wmh_threshold, args.output_dir, args.lr, args)
+    # train_val(dataset, cfg.n_epochs, device, cfg.wmh_threshold, args.output_dir, cfg.lr, args, cfg)
+    Unet_train_val(dataset, cfg.n_epochs, device, cfg.wmh_threshold, args.output_dir, cfg.lr, args, cfg)
 
 
 def get_cluster_assumption_representation(h):

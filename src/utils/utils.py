@@ -1,13 +1,11 @@
 from utils.Constants import *
-from utils.dataloader import *
-from utils.Brat20 import *
-import Wnet
+from dataset.dataloader import *
+from dataset.Brat20 import *
 import matplotlib.pyplot as plt
 import os
 import torch
 from evaluation_metrics import dice_coef
 
-import random
 import numpy as np
 
 
@@ -31,29 +29,10 @@ import numpy as np
 #         raise ("n = len(array)")
 #
 #     return random.sample(subjects, n)
-def __ema(p1, p2, factor):
-    return factor * p1 + (1 - factor) * p2
 
 
-def ema_update(student, teacher, cur_step, L=400):
-    if cur_step < L:
-        alpha = 0.99
-    else:
-        alpha = 0.999
-
-    for stud_p, teach_p in zip(student.parameters(), teacher.parameters()):
-        teach_p.data = __ema(teach_p.data, stud_p.data, alpha)
-    return student, teacher
-
-
-def update_adaptiveRate(cur_step, L):
-    if cur_step > L:
-        return 1.0
-    return np.exp(-5 * (1 - cur_step / L) ** 2)
-
-
-def get_trainset(dataset, batch_size, intensity_rescale, has_t1, mixup_threshold,
-                 mode='train') -> torch.utils.data.DataLoader:
+def get_trainset(dataset, batch_size, intensity_rescale, mixup_threshold=None,
+                 mode='train', t1=False, t2=False, t1ce=False, augment=False) -> torch.utils.data.DataLoader:
     mem_pin = False
     if Constants.USE_CUDA:
         mem_pin = True
@@ -61,10 +40,10 @@ def get_trainset(dataset, batch_size, intensity_rescale, has_t1, mixup_threshold
         batch_sz = batch_size
         train = torch.utils.data.DataLoader(
             PittLocalFull(
-                None,
-                has_t1,
+                False,
+                t1,
                 mixup_threshold,
-                None,
+                False,
                 intensity_rescale,
                 [f'paths/fold-0/data_paths.txt',
                  f'paths/fold-2/data_paths.txt', f'paths/fold-3/data_paths.txt',
@@ -73,7 +52,7 @@ def get_trainset(dataset, batch_size, intensity_rescale, has_t1, mixup_threshold
                  f'paths/fold-3/label_paths.txt', f'paths/fold-4/label_paths.txt'],
                 [f'paths/fold-0/mask_paths.txt', f'paths/fold-2/mask_paths.txt',
                  f'paths/fold-3/mask_paths.txt', f'paths/fold-4/mask_paths.txt'],
-                augment=True,
+                augment=augment,
                 is_FCM=Constants.FCM,
                 data_paths_t1=[f'paths/fold-0/data_paths_t1.txt',
                                f'paths/fold-2/data_paths_t1.txt', f'paths/fold-3/data_paths_t1.txt',
@@ -94,10 +73,10 @@ def get_trainset(dataset, batch_size, intensity_rescale, has_t1, mixup_threshold
                 min_slice_index=10,
                 max_slice_index=155,
                 center_cropping=True,
-                t1=True,
-                t2=True,
-                t1ce=True,
-                augment=True
+                t1=t1,
+                t2=t2,
+                t1ce=t1ce,
+                augment=augment
             ),
             batch_size=batch_sz,
             drop_last=True,
@@ -109,7 +88,8 @@ def get_trainset(dataset, batch_size, intensity_rescale, has_t1, mixup_threshold
     return train
 
 
-def get_testset(dataset, batch_size, intensity_rescale, has_t1, mixup_threshold, mode="test2019_new") -> torch.utils.data.DataLoader:
+def get_testset(dataset, batch_size, intensity_rescale, mixup_threshold=None,
+                mode='test2019_new', t1=False, t2=False, t1ce=False, augment=False) -> torch.utils.data.DataLoader:
     mem_pin = False
     if Constants.USE_CUDA:
         mem_pin = True
@@ -117,15 +97,15 @@ def get_testset(dataset, batch_size, intensity_rescale, has_t1, mixup_threshold,
         batch_sz = batch_size
         test = torch.utils.data.DataLoader(
             PittLocalFull(
-                None,
-                has_t1,
+                False,
+                t1,
                 mixup_threshold,
-                None,
+                False,
                 intensity_rescale,
                 [f'paths/fold-1/data_paths.txt'],
                 [f'paths/fold-1/label_paths.txt'],
                 [f'paths/fold-1/mask_paths.txt'],
-                augment=False,
+                augment=augment,
                 is_FCM=Constants.FCM,
                 data_paths_t1=[f'paths/fold-1/data_paths_t1.txt']
             ),
@@ -144,10 +124,10 @@ def get_testset(dataset, batch_size, intensity_rescale, has_t1, mixup_threshold,
                 min_slice_index=10,
                 max_slice_index=155,
                 center_cropping=True,
-                t1=True,
-                t2=True,
-                t1ce=True,
-                augment=False
+                t1=t1,
+                t2=t2,
+                t1ce=t1ce,
+                augment=augment
             ),
             batch_size=batch_sz,
             drop_last=True,
@@ -157,20 +137,6 @@ def get_testset(dataset, batch_size, intensity_rescale, has_t1, mixup_threshold,
         )
 
     return test
-
-
-def load_model(path, device):
-    model = torch.load(path, map_location=device)
-    return model
-
-
-def load_state_dict(model, path):
-    model.load_state_dict(torch.load(path))
-    return model
-
-
-def save_state_dict(model, path):
-    torch.save(model.state_dict(), path)
 
 
 def save_segment_images(segments, path):
@@ -238,8 +204,8 @@ def _evaluate(y_true, predictions, segment_index):
 
 
 def evaluate(dataset, model, output_path):
-    testset = utils.get_testset(dataset, 5, True)
-    if torch.cuda.is_available() and utils.Constants.USE_CUDA:
+    testset = get_testset(dataset, 5, True)
+    if torch.cuda.is_available() and Constants.USE_CUDA:
         dev = "cuda:0"
     else:
         dev = "cpu"

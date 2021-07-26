@@ -1,4 +1,3 @@
-import torch
 import sys
 import os
 import torch
@@ -6,22 +5,18 @@ import torch.nn as nn
 from torch.optim import lr_scheduler
 
 from utils import utils
+from utils import model_utils
 from evaluation_metrics import dice_coef
-import Pgs
+from models import Pgs
 import matplotlib.pyplot as plt
-from PIL import Image
 from torch.distributions.normal import Normal
 
-from utils import reconstruction_loss
-
 import numpy as np
-import torchvision.transforms.functional as augmentor
 import argparse
-from torch.utils.tensorboard import SummaryWriter
 import wandb
 
 sys.path.append('src')
-sys.path.append('src/utils/Constants')  
+sys.path.append('src/utils/Constants')
 sys.path.append('srs/utils')
 
 for p in sys.path:
@@ -115,13 +110,13 @@ def train_MT(dataset, student_model, teacher_model, optimizer, device, cur_epoch
             student_output, _ = student_model(b_student, True)
 
             unsup_err = student_model.compute_loss(student_output, teacher_output, loss_functions, is_supervised)
-        total_loss = sup_err + unsup_err * utils.update_adaptiveRate(total_num_batches * cur_epoch + step, 400)
+        total_loss = sup_err + unsup_err * model_utils.update_adaptiveRate(total_num_batches * cur_epoch + step, 400)
         print("****** LOSSS  : Is_supervised: {} *********   :".format(is_supervised), total_loss)
 
         total_loss.backward()
         optimizer.step()
-        student_model, teacher_model = utils.ema_update(student_model, teacher_model,
-                                                        cur_epoch * total_num_batches + step, 400)
+        student_model, teacher_model = model_utils.ema_update(student_model, teacher_model,
+                                                              cur_epoch * total_num_batches + step, 400)
     return student_model, teacher_model, total_loss
 
 
@@ -230,7 +225,7 @@ def train_val(dataset, n_epochs, device, wmh_threshold, output_dir, learning_rat
         teacher_pgs.to(device)
         for teach_p, stud_p in zip(teacher_pgs.parameters(), student_pgs.parameters()):
             teach_p.data = stud_p.data
-        # student_pgs, teacher_pgs = utils.ema_update(student_pgs, teacher_pgs,
+        # student_pgs, teacher_pgs = model_utils.ema_update(student_pgs, teacher_pgs,
         #                                                  epoch * 16 , 400)
 
     best_score = 0

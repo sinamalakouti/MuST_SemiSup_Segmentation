@@ -2,7 +2,7 @@ import torch
 from utils import utils
 from evaluation_metrics import dice_coef
 import numpy as np
-import Wnet
+from models import Wnet
 
 
 def open_net(net):
@@ -24,7 +24,8 @@ def open_net(net):
 
 
 def test(dataset, model_path):
-    testset = utils.get_testset(dataset, 5, True)
+
+    testset = utils.get_testset(dataset, 20, True)
     if torch.cuda.is_available() and utils.Constants.USE_CUDA:
         dev = "cuda:0"
     else:
@@ -84,4 +85,4 @@ def test(dataset, model_path):
 
 
 if __name__ == '__main__':
-    test(utils.Constants.Datasets.PittLocalFull, '../models_enc_withoutMask/model_epoch_1200_.model')
+    test(utils.Constants.Datasets.PittLocalFull, '../models_enc_withoutMask/model_epoch_3000_.model')

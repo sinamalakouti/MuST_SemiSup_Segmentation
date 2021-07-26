@@ -1,18 +1,14 @@
-import torch
 import sys
 import os
 import torch
 import torch.nn as nn
 from torch.optim import lr_scheduler
 
-from utils import utils
+from utils import utils, model_utils
 from evaluation_metrics import dice_coef
-import Pgs
+from models import Pgs
 import matplotlib.pyplot as plt
-from PIL import Image
 import torchvision.transforms.functional as augmentor
-
-from utils import reconstruction_loss
 
 import numpy as np
 
@@ -337,7 +333,7 @@ def main():
     train_loader = utils.get_trainset(dataset, 60, True, None, None)
     #
 
-    model = utils.load_model('/Users/sinamalakouti/Desktop/WMH_PROJECT/psgnet_best_lr0.001.model')
+    model = model_utils.load_state_dict('/Users/sinamalakouti/Desktop/WMH_PROJECT/psgnet_best_lr0.001.model')
 
     for step, batch in enumerate(train_loader):
         data = batch['data']

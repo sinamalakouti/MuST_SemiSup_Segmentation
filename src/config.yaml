@@ -1,0 +1,15 @@
+train_mode: "only_train2018_sup"
+val_mode: "only_val2018"
+test_mode: "only_test2018"
+n_epochs: 200
+lr: 0.001
+scheduler_step_size: 30
+batch_size: 64
+t1: False
+t2: False
+t1ce: False
+augment: True
+wmh_threshold: 0.5
+optimizer: "SGD" #SGD OR ADAM
+mixup_threshold: None
+intensity_rescale: True

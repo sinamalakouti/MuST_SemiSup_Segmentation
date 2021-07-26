@@ -56,3 +56,14 @@ src/data/dana/all_15_subjects/FLAIR/.DS_Store
 src/data/dana/all_15_subjects/manual_tracing/.DS_Store
 src/data/dana/preprocess/0097RS/.DS_Store
 src/data/dana/whitestripe/processed/.DS_Store
+src/cluster_assumption_res/
+src/data
+src/dasfdsfsaf
+src/paths
+src/data/dana
+src/wandb
+src/utils/__pycache__
+src/dasfdsfsaf/runs/events.out.tfevents.1620426571.sina.36542.0
+src/dasfdsfsaf/runs/events.out.tfevents.1621295785.sina.38283.0
+src/data/dana/preprocess/0064KW/.DS_Store
+src/__pycache__

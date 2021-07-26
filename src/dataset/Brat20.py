@@ -18,6 +18,7 @@ def get_name_mapping(name_mapping_csv_path):
     return name_map
 
 
+# return brats2020 ids that were in brats 2019
 def id19_to_id20(name_map):
     ids = []
     for id_2020 in name_map:
@@ -26,12 +27,26 @@ def id19_to_id20(name_map):
     return ids
 
 
+# return brats2020 ids that were in brats2018
 def id18_to_id20(name_map):
     ids = []
     for id_2020 in name_map:
         if name_map[id_2020]['brats18'] is not np.nan:
             ids.append(id_2020)
     return ids
+
+
+def generate_train_val_test_2018(all_data_csv, root_dir, val_size=50, test_size=50):
+
+    name_map = get_name_mapping(all_data_csv)
+    all_ids = id18_to_id20(name_map)
+    val_test_ids = np.random.choice(all_ids, val_size + test_size, replace=False)
+    tr_ids = np.setdiff1d(all_ids, val_test_ids)
+    test_ids = np.random.choice(val_test_ids, test_size, replace=False)
+    val_ids = np.setdiff1d(val_test_ids, test_ids)
+    np.savetxt(root_dir + "only2018/some_train2018.csv", tr_ids.astype(np.str), delimiter=',', fmt='%s')
+    np.savetxt(root_dir + "only2018/val2018_ids.csv", val_ids.astype(np.str), delimiter=',', fmt='%s')
+    np.savetxt(root_dir + "only2018/test2018_ids.csv", test_ids.astype(np.str), delimiter=',', fmt='%s')
 
 
 # train: whole 2018  and test: new 2019 subjects (5)
@@ -80,10 +95,16 @@ class Brat20(torch.utils.data.Dataset):
             ids_path = os.path.join(dataroot_dir, 'trainset/brats20_training_sup_ids.csv')
         elif mode == "train2020_semi_unsup":
             ids_path = os.path.join(dataroot_dir, 'trainset/brats20_training_unsup_ids.csv')
-        elif mode == "test2020":  # validation
+        elif mode == "val2020":  # validation
             ids_path = os.path.join(dataroot_dir, 'valset/brats20_val_ids.csv')
-        elif mode == "train2018_sup":
+        elif mode == "all_train2018_sup":
             ids_path = os.path.join(dataroot_dir, 'trainset/brats2018.csv')
+        elif mode == "only_train2018_sup":
+            ids_path = os.path.join(dataroot_dir, 'only2018/some_train2018_ids.csv')
+        elif mode == "only_test2018":
+            ids_path = os.path.join(dataroot_dir, 'only2018/test2018.csv')
+        elif mode == "only_val2018":
+            ids_path = os.path.join(dataroot_dir, 'only2018/val2018.csv')
         elif mode == "train2018_semi_sup":
             None  # todo
         elif mode == "train2018_semi_unsup":
@@ -105,18 +126,18 @@ class Brat20(torch.utils.data.Dataset):
         flair_paths = [os.path.join(subjects_root_dir, str(subj_name) + '/{}_flair.nii.gz'.format(subj_name)) for
                        subj_name in self.subjects_name]
 
-        if self.t1 is not None:
+        if self.t1:
             t1_paths = [os.path.join(subjects_root_dir, str(subj_name) + '/{}_t1.nii.gz'.format(subj_name)) for
                         subj_name in self.subjects_name]
         else:
             t1_paths = [None for _ in self.subjects_name]
-        if self.t2 is not None:
+        if self.t2:
             t2_paths = [os.path.join(subjects_root_dir, str(subj_name) + '/{}_t2.nii.gz'.format(subj_name)) for
                         subj_name in self.subjects_name]
         else:
             t2_paths = [None for _ in self.subjects_name]
 
-        if self.t1ce is not None:
+        if self.t1ce:
             t1ce_paths = [os.path.join(subjects_root_dir, str(subj_name) + '/{}_t1ce.nii.gz'.format(subj_name)) for
                           subj_name in self.subjects_name]
         else:
@@ -131,31 +152,31 @@ class Brat20(torch.utils.data.Dataset):
 
             X = self._extract(data, slices=list(range(min_slice_index, max_slice_index)))
             Y = self._extract(label, slices=list(range(min_slice_index, max_slice_index)))
-            if self.t1 is not None:
+            if self.t1:
                 X_t1 = self._extract(t1_data, slices=list(range(min_slice_index, max_slice_index)))
-            if self.t2 is not None:
+            if self.t2:
                 X_t2 = self._extract(t2_data, slices=list(range(min_slice_index, max_slice_index)))
-            if self.t1ce is not None:
+            if self.t1ce:
                 X_t1ce = self._extract(t1ce_data, slices=list(range(min_slice_index, max_slice_index)))
             subject_id = int(subject_name.split('_')[-1])
             for sl in range(Y.shape[2]):
-                if Y[:, :, sl].sum() == 0 or X[:, :, sl].sum() == 0 or np.sum((X[:, :, sl] > 0)) / (
-                        240 * 240) * 100 < 20:
+                if X[:, :, sl].sum() == 0 or np.sum((X[:, :, sl] > 0)) / (240 * 240) * 100 < 20:
                     None
                 else:
                     data_map = {'data': X[:, :, sl],
                                 'label': Y[:, :, sl],
-                                'subject_id': subject_id
+                                'subject_id': subject_id,
+                                'slice': sl + min_slice_index
                                 }
-                    if self.t1 is not None:
+                    if self.t1:
                         data_map['data_t1'] = X_t1[:, :, sl]
                     else:
                         data_map['data_t1'] = None
-                    if self.t2 is not None:
+                    if self.t2:
                         data_map['data_t2'] = X_t2[:, :, sl]
                     else:
                         data_map['data_t2'] = None
-                    if self.t1ce is not None:
+                    if self.t1ce:
                         data_map['data_t1ce'] = X_t1ce[:, :, sl]
                     else:
                         data_map['data_t1ce'] = None
@@ -181,6 +202,7 @@ class Brat20(torch.utils.data.Dataset):
         x_t2 = self.data[index]['data_t2']
         x_t1ce = self.data[index]['data_t1ce']
         y = self.data[index]['label']
+
         x, x_t1, x_t2, x_t1ce, y = tensorize(x, x_t1, x_t2, x_t1ce, y)
         if self.center_cropping:
             x, x_t1, x_t2, x_t1ce, y = center_crop(x, x_t1, x_t2, x_t1ce, y)
@@ -189,8 +211,9 @@ class Brat20(torch.utils.data.Dataset):
         # y[y >= 1] = 1
 
         y[y == 4] = 3  # for simplicity in training, substitute label = 3 with 4
+        rand = np.random.rand(1)
+        if self.augment:# and rand < 0.5:
 
-        if self.augment:
             x, x_t1, x_t2, x_t1ce, y = augment(
                 x=x, y=y, t1=x_t1, t2=x_t2, t1ce=x_t1ce, intensity_aug=self.intensity_aug)
         else:
@@ -216,11 +239,12 @@ class Brat20(torch.utils.data.Dataset):
             data_modalities.append(x_t1ce)
 
         x_final = torch.cat(data_modalities, dim=0)
-        result = {'data': x_final, 'label': y, 'subject': self.data[index]['subject_id']}
+        result = {'data': x_final, 'label': y, 'subject': self.data[index]['subject_id'],
+                  'slice': self.data[index]['slice']}
         return result
 
 
-def augment(x, y, m=None, t1=None, t2=None, t1ce=None, intensity_aug=None):
+def augment(x, y, m=False, t1=False, t2=False, t1ce=False, intensity_aug=False):
     # NOTE: method expects numpy float arrays
     # to_pil_image makes assumptions based on input when mode = None
     # i.e. it should infer that mode = 'F'
@@ -247,25 +271,25 @@ def augment(x, y, m=None, t1=None, t2=None, t1ce=None, intensity_aug=None):
 
     ori_x = x
     ori_t1 = None
-    if intensity_aug is not None:
+    if intensity_aug:
         x = adjust_contrast(x, c_factor)
 
     x = augmentor.to_pil_image(x, mode='F')
     y = augmentor.to_pil_image(y, mode='F')
 
-    if m is not None:
+    if m:
         m = augmentor.to_pil_image(m, mode='F')
-    if t1 is not None:
+    if t1:
         ori_t1 = t1
-        if intensity_aug is not None:
+        if intensity_aug:
             t1 = adjust_contrast(t1, c_factor)
         t1 = augmentor.to_pil_image(t1, mode='F')
-    if t2 is not None:
-        if intensity_aug is not None:
+    if t2:
+        if intensity_aug:
             t2 = adjust_contrast(t2, c_factor)
         t2 = augmentor.to_pil_image(t2, mode='F')
-    if t1ce is not None:
-        if intensity_aug is not None:
+    if t1ce:
+        if intensity_aug:
             t1ce = adjust_contrast(t1ce, c_factor)
         t1ce = augmentor.to_pil_image(t1ce, mode='F')
 
@@ -273,18 +297,18 @@ def augment(x, y, m=None, t1=None, t2=None, t1ce=None, intensity_aug=None):
                          angle=angle, translate=(0, 0), shear=shear, scale=scale)
     y = augmentor.affine(y,
                          angle=angle, translate=(0, 0), shear=shear, scale=scale)
-    if m is not None:
+    if m:
         m = augmentor.affine(m,
                              angle=angle, translate=(0, 0), shear=shear, scale=scale)
-    if t1 is not None:
+    if t1:
         t1 = augmentor.affine(t1,
                               angle=angle, translate=(0, 0), shear=shear, scale=scale)
         t1 = augmentor.to_tensor(t1).float()
-    if t2 is not None:
+    if t2:
         t2 = augmentor.affine(t2,
                               angle=angle, translate=(0, 0), shear=shear, scale=scale)
         t2 = augmentor.to_tensor(t2).float()
-    if t1ce is not None:
+    if t1ce:
         t1ce = augmentor.affine(t1ce,
                                 angle=angle, translate=(0, 0), shear=shear, scale=scale)
         t1ce = augmentor.to_tensor(t1ce).float()
@@ -293,20 +317,11 @@ def augment(x, y, m=None, t1=None, t2=None, t1ce=None, intensity_aug=None):
     y = augmentor.to_tensor(y).float()
     # y = (y > 0).float()
 
-    if m is not None:
+    if m:
         m = augmentor.to_tensor(m).float()
         m = (m > 0).float()
 
     return x, t1, t2, t1ce, y
-
-    # if m is not None and t1 is not None:
-    #     return x, y, m, t1
-    # elif m is not None and t1 is None:
-    #     return x, y, m
-    # elif m is None and t1 is not None:
-    #     return x, y, t1
-    # else:
-    #     return x, y
 
 
 def adjust_contrast(x, c_factor):

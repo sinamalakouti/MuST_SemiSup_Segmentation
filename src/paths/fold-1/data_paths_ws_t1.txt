@@ -1,4 +1,4 @@
-data/dana/whitestripe/processed/0545GS_T1_ws.nii.gz
+	data/dana/whitestripe/processed/0545GS_T1_ws.nii.gz
 data/dana/whitestripe/processed/0580VM24_T1_ws.nii.gz
 data/dana/whitestripe/processed/0280AK_T1_ws.nii.gz
 data/dana/whitestripe/processed/0189HW_T1_ws.nii.gz

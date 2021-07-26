@@ -1,12 +1,10 @@
-import torch
 import sys
 import os
 import torch
 from utils import utils
-from evaluation_metrics import dice_coef
-import Wnet
+from models import Wnet
 import matplotlib.pyplot as plt
-from utils import reconstruction_loss
+from losses import reconstruction_loss
 
 sys.path.append('src')
 sys.path.append('src/utils/Constants')
@@ -590,7 +588,7 @@ def train_with_fcm(dataset):
 
                 plt.imshow(intermediate_pred[0,0].cpu().reshape((212, 256)))
                 plt.savefig("../images1/segmentation/iter_{}/linear_comb_{}.png".format(iter, iter))
-                utils.evaluate(dataset,wnet,"../images1/segmentation/iter_{}".format(iter))
+               # utils.evaluate(dataset,wnet,"../images1/segmentation/iter_{}".format(iter))
 
         # torch.autograd.set_detect_anomaly(True)
         wnet.train()
@@ -600,10 +598,11 @@ def train_with_fcm(dataset):
            # mask = batch['mask']
             #mask = mask.to(device)
             b = b.to(device)
-
-            prior = batch['wmh_cluster']
-            prior = prior.to(device)
-            prior = prior.type(torch.DoubleTensor)
+            print("device device")
+            print(b.device)
+            #prior = batch['wmh_cluster']
+            #prior = prior.to(device)
+            #prior = prior.type(torch.DoubleTensor)
 
             X_out_intermediate = wnet.U_enc_fw(b)
            # X_out_intermediate = torch.mul(mask, X_out_intermediate)
@@ -619,8 +618,8 @@ def train_with_fcm(dataset):
             regularization = reconstruction_loss.regularization((X_out_intermediate))
             # regularization = reconstruction_loss.regularization(torch.mul(X_out_intermediate, mask))
             X_out_intermediate = X_out_intermediate.to(device)
-            prior = prior.to(device)
-            alpha = 1
+            # prior = prior.to(device)
+            # alpha = 1
             # if iter > 300:
             #     fcm_loss = 0
             # else:

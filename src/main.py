@@ -1,13 +1,9 @@
-import numpy as np
 import torch
-import torch.nn as nn
-import torch.nn.functional as F
 import torchvision
-import torchvision.transforms as transforms
 
 from src.utils import utils
-from src.utils.reconstruction_loss import ReconstructionLoss
-from src import Wnet
+from losses.reconstruction_loss import ReconstructionLoss
+from models import Wnet
 import matplotlib.pyplot as plt
 
 utils.Constants.USE_CUDA = True
@@ -51,7 +47,7 @@ def train(dataset):
     strides = [1, 1, 1, 1, 1, 1, 1, 1, 1]
     separables = [False, True, True, True, True, True, True, True, False]
     wnet = Wnet.Wnet(18, 5, inputs_dim, outputs_dim, strides=strides, paddings=paddings, kernels=kernels,
-                separables=separables)
+                     separables=separables)
 
     if torch.cuda.is_available() and utils.Constants.USE_CUDA:
         dev = "cuda:0"
