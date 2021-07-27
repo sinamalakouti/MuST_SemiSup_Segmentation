@@ -25,7 +25,7 @@ sys.path.append('srs/utils')
 # sys.path.append('srs/models')
 # sys.path.append('srs/models')
 
-os.environ['CUDA_VISIBLE_DEVICES'] = "1,2"
+os.environ['CUDA_VISIBLE_DEVICES'] = "0,1"
 
 for p in sys.path:
     print("path  ", p)
@@ -457,7 +457,7 @@ def train_val(dataset, n_epochs, device, wmh_threshold, output_dir, learning_rat
 
     print("learning_rate is    ", learning_rate)
     optimizer = torch.optim.SGD(pgsnet.parameters(), learning_rate, momentum=0.9, weight_decay=1e-4)
-    step_size = 30
+    step_size = cfg.scheduler_step_size
     scheduler = lr_scheduler.StepLR(optimizer, step_size=cfg.scheduler_step_size, gamma=0.1)  # don't use it
     print("scheduler step size is :   ", step_size)
     best_score = 0
