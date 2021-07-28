@@ -23,7 +23,7 @@ def update_adaptiveRate(cur_step, L):
     return np.exp(-5 * (1 - cur_step / L) ** 2)
 
 
-def load_model(path, device):
+def load_model( path, device):
     model = torch.load(path, map_location=device)
     return model
 

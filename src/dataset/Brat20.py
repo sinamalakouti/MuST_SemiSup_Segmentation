@@ -37,7 +37,6 @@ def id18_to_id20(name_map):
 
 
 def generate_train_val_test_2018(all_data_csv, root_dir, val_size=50, test_size=50):
-
     name_map = get_name_mapping(all_data_csv)
     all_ids = id18_to_id20(name_map)
     val_test_ids = np.random.choice(all_ids, val_size + test_size, replace=False)
@@ -102,9 +101,9 @@ class Brat20(torch.utils.data.Dataset):
         elif mode == "only_train2018_sup":
             ids_path = os.path.join(dataroot_dir, 'only2018/some_train2018_ids.csv')
         elif mode == "only_test2018":
-            ids_path = os.path.join(dataroot_dir, 'only2018/test2018.csv')
+            ids_path = os.path.join(dataroot_dir, 'only2018/test2018_ids.csv')
         elif mode == "only_val2018":
-            ids_path = os.path.join(dataroot_dir, 'only2018/val2018.csv')
+            ids_path = os.path.join(dataroot_dir, 'only2018/val2018_ids.csv')
         elif mode == "train2018_semi_sup":
             None  # todo
         elif mode == "train2018_semi_unsup":
@@ -113,19 +112,12 @@ class Brat20(torch.utils.data.Dataset):
             ids_path = os.path.join(dataroot_dir, 'valset/brats2019_new.csv')
 
         subjects_root_dir = os.path.join(dataroot_dir, 'MICCAI_BraTS2020_TrainingData')
-
-        # if mode == 'train':
-        #     subjects_root_dir = os.path.join(dataroot_dir, 'MICCAI_BraTS2020_TrainingData')
-
-        # else:
-        #     subjects_root_dir = os.path.join(dataroot_dir, 'MICCAI_BraTS2020_TrainingData')
-
         self.subjects_name = np.asarray(pd.read_csv(ids_path, header=None)).reshape(-1)
-        # self.subjects_id = [
 
+        label_paths = [os.path.join(subjects_root_dir, str(subj_name) + '/{}_seg.nii.gz'.format(subj_name)) for
+                       subj_name in self.subjects_name]
         flair_paths = [os.path.join(subjects_root_dir, str(subj_name) + '/{}_flair.nii.gz'.format(subj_name)) for
                        subj_name in self.subjects_name]
-
         if self.t1:
             t1_paths = [os.path.join(subjects_root_dir, str(subj_name) + '/{}_t1.nii.gz'.format(subj_name)) for
                         subj_name in self.subjects_name]
@@ -142,11 +134,8 @@ class Brat20(torch.utils.data.Dataset):
                           subj_name in self.subjects_name]
         else:
             t1ce_paths = [None for _ in self.subjects_name]
-
-        label_paths = [os.path.join(subjects_root_dir, str(subj_name) + '/{}_seg.nii.gz'.format(subj_name)) for
-                       subj_name in self.subjects_name]
-
         paths = zip(flair_paths, t1_paths, t2_paths, t1ce_paths, label_paths, self.subjects_name)
+
         self.data = []
         for data, t1_data, t2_data, t1ce_data, label, subject_name in paths:
 
@@ -160,7 +149,7 @@ class Brat20(torch.utils.data.Dataset):
                 X_t1ce = self._extract(t1ce_data, slices=list(range(min_slice_index, max_slice_index)))
             subject_id = int(subject_name.split('_')[-1])
             for sl in range(Y.shape[2]):
-                if X[:, :, sl].sum() == 0 or np.sum((X[:, :, sl] > 0)) / (240 * 240) * 100 < 20:
+                if X[:, :, sl].sum() == 0 or np.sum((X[:, :, sl] > 0)) / (240 * 240) * 100 < 10:
                     None
                 else:
                     data_map = {'data': X[:, :, sl],
@@ -182,10 +171,6 @@ class Brat20(torch.utils.data.Dataset):
                         data_map['data_t1ce'] = None
 
                     self.data.append(data_map)
-                    # self.data.append({
-                    #     'data': X[:, :, sl],
-                    #     'label': Y[:, :, sl]
-                    # })
 
     def __len__(self):
         return len(self.data)
@@ -211,8 +196,8 @@ class Brat20(torch.utils.data.Dataset):
         # y[y >= 1] = 1
 
         y[y == 4] = 3  # for simplicity in training, substitute label = 3 with 4
-        rand = np.random.rand(1)
-        if self.augment:# and rand < 0.5:
+        # rand = np.random.rand(1)
+        if self.augment:  # and rand < 0.5:
 
             x, x_t1, x_t2, x_t1ce, y = augment(
                 x=x, y=y, t1=x_t1, t2=x_t2, t1ce=x_t1ce, intensity_aug=self.intensity_aug)
@@ -249,19 +234,6 @@ def augment(x, y, m=False, t1=False, t2=False, t1ce=False, intensity_aug=False):
     # to_pil_image makes assumptions based on input when mode = None
     # i.e. it should infer that mode = 'F'
     # manually setting mode to 'F' in this function
-
-    # print(x.shape); exit()
-    # NOTE: accepts np.ndarray of size H x W x C
-    # x.shape = 64x64
-    # torch implicitly expands last dim as below:
-    # elif pic.ndim == 2:
-    # if 2D image, add channel dimension (HWC)
-    # pic = np.expand_dims(pic, 2)
-    # BUT!!!!!!!
-    # if x was a tensor this would be different:
-    # elif pic.ndimension() == 2:
-    # if 2D image, add channel dimension (CHW)
-    # pic = pic.unsqueeze(0)
 
     angle = np.random.uniform(-180, 180)
     scale = np.random.uniform(.8, 1.2)
@@ -315,7 +287,6 @@ def augment(x, y, m=False, t1=False, t2=False, t1ce=False, intensity_aug=False):
 
     x = augmentor.to_tensor(x).float()
     y = augmentor.to_tensor(y).float()
-    # y = (y > 0).float()
 
     if m:
         m = augmentor.to_tensor(m).float()

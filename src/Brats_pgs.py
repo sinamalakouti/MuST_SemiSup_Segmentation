@@ -114,10 +114,15 @@ def trainPgs_semi(train_sup_loader, train_unsup_loader, model, optimizer, device
         print("subject is : ", batch_sup['subject'])
         print("subject is : ", batch_unsup['subject'])
         sup_outputs, _ = model(b_sup, is_supervised=True)
+
         total_loss = Pgs.compute_loss(sup_outputs, target_sup, loss_functions, is_supervised=True)
+        wandb.log({"sup_loss": total_loss})
         sup_outputs, unsup_outputs = model(b_unsup, is_supervised=False)
-        total_loss += Pgs.compute_loss(unsup_outputs, sup_outputs, loss_functions, is_supervised=False)
+        unsup_loss = Pgs.compute_loss(unsup_outputs, sup_outputs, loss_functions, is_supervised=False)
+        total_loss += unsup_loss
+        wandb.log({"unsup_loss": unsup_loss})
         print("**************** LOSSS  : {} ****************".format(total_loss))
+        wandb.log({"loss": total_loss})
 
         total_loss.backward()
         optimizer.step()
@@ -135,7 +140,7 @@ def trainUnet_sup(train_sup_loader, model, optimizer, device, loss_functions, ep
         print("subject is : ", batch_sup['subject'])
         sup_outputs = model(b_sup)
         total_loss = unet_compute_loss(sup_outputs, target_sup, loss_functions, is_supervised=True)
-
+        wandb.log({"loss": total_loss})
         print("**************** LOSSS  : {} ****************".format(total_loss))
 
         total_loss.backward()
@@ -156,7 +161,7 @@ def trainPgs_sup(train_sup_loader, model, optimizer, device, epochid):
         print("subject is : ", batch_sup['subject'])
         sup_outputs, _ = model(b_sup, is_supervised=True)
         total_loss = compute_loss(sup_outputs, target_sup, (sup_loss, None), is_supervised=True)
-
+        wandb.log({"loss": total_loss})
         print("**************** LOSSS  : {} ****************".format(total_loss))
 
         total_loss.backward()
@@ -185,11 +190,12 @@ def trainPGS(train_loader, model, optimizer, device, epochid):
 
         if is_supervised:
             total_loss = Pgs.compute_loss(sup_outputs, target, loss_functions, is_supervised)
+            wandb.log({"sup_loss": total_loss})
         else:
 
             # raise Exception("unsupervised is false")
             total_loss = Pgs.compute_loss(unsup_outputs, sup_outputs, loss_functions, is_supervised)
-
+            wandb.log({"unsup_loss": total_loss})
         print("****** LOSSS  : Is_supervised: {} *********   :".format(is_supervised), total_loss)
 
         total_loss.backward()
@@ -198,11 +204,11 @@ def trainPGS(train_loader, model, optimizer, device, epochid):
 
 
 def evaluateUnet(model, dataset, device, threshold, cfg, data_mode):
-    print("******************** EVALUATING ********************")
+    print("******************** EVALUATING {}********************".format(data_mode))
 
     testset = utils.get_testset(dataset, cfg.batch_size, intensity_rescale=cfg.intensity_rescale,
                                 mixup_threshold=cfg.mixup_threshold, mode=data_mode,
-                                t1=cfg.t1, t2=cfg.t2, t1ce=cfg.t1ce, augment=cfg.augment)
+                                t1=cfg.t1, t2=cfg.t2, t1ce=cfg.t1ce, augment=False)
 
     model.eval()
 
@@ -218,7 +224,7 @@ def evaluateUnet(model, dataset, device, threshold, cfg, data_mode):
             outputs = model(b)
             # apply softmax
             sf = torch.nn.Softmax2d()
-            y_pred = sf(outputs) >= threshold
+            y_pred = sf(outputs)
             if batch_id == 0:
                 all_preds = y_pred
                 all_subjects = batch['subject']
@@ -228,26 +234,26 @@ def evaluateUnet(model, dataset, device, threshold, cfg, data_mode):
                 all_subjects = torch.cat((all_subjects, batch['subject']), dim=0)
                 all_targets = torch.cat((all_targets, target), dim=0)
 
-            y_WT = seg2WT(y_pred)
+            y_WT = seg2WT(y_pred, threshold)
             target[target >= 1] = 1
             target_WT = target
             dice_score = dice_coef(target_WT.reshape(y_WT.shape), y_WT)
-            print(dice_score)
+
             dice_arr.append(dice_score.item())
 
         all_targets[all_targets >= 1] = 1
-        all_preds = seg2WT(all_preds)
+        all_preds = seg2WT(all_preds, threshold)
         subject_wise_DSC = get_dice_coef_per_subject(all_targets.reshape(all_preds.shape), all_preds, all_subjects)
 
     return np.mean(np.array(dice_arr)), subject_wise_DSC
 
 
 def evaluatePGS(model, dataset, device, threshold, cfg, training_mode):
-    print("******************** EVALUATING ********************")
+    print("******************** EVALUATING  : {} ********************".format(training_mode))
 
     testset = utils.get_testset(dataset, cfg.batch_size, intensity_rescale=cfg.intensity_rescale,
                                 mixup_threshold=cfg.mixup_threshold, mode=training_mode,
-                                t1=cfg.t1, t2=cfg.t2, t1ce=cfg.t1ce, augment=cfg.augment)
+                                t1=cfg.t1, t2=cfg.t2, t1ce=cfg.t1ce, augment=False)
 
     model.eval()
 
@@ -265,7 +271,7 @@ def evaluatePGS(model, dataset, device, threshold, cfg, training_mode):
             predictions, _ = model(b, True)
             # apply softmax
             sf = torch.nn.Softmax2d()
-            y_pred = sf(predictions[-1]) >= threshold
+            y_pred = sf(predictions[-1])
 
             if batch_id == 0:
                 all_preds = y_pred
@@ -276,7 +282,7 @@ def evaluatePGS(model, dataset, device, threshold, cfg, training_mode):
                 all_subjects = torch.cat((all_subjects, batch['subject']), dim=0)
                 all_targets = torch.cat((all_targets, target), dim=0)
 
-            y_WT = seg2WT(y_pred)
+            y_WT = seg2WT(y_pred, threshold)
             target[target >= 1] = 1
             target_WT = target
             dice_score = dice_coef(target_WT.reshape(y_WT.shape), y_WT)
@@ -288,14 +294,19 @@ def evaluatePGS(model, dataset, device, threshold, cfg, training_mode):
                 segmentation_outputs.append(output)
 
     all_targets[all_targets >= 1] = 1
-    all_preds = seg2WT(all_preds)
+    all_preds = seg2WT(all_preds, threshold)
     subject_wise_DSC = get_dice_coef_per_subject(all_targets.reshape(all_preds.shape), all_preds, all_subjects)
 
     return np.mean(np.array(dice_arr)), subject_wise_DSC, segmentation_outputs
 
 
-def seg2WT(preds):
-    WT_pred = preds[:, 1:4, :, :].sum(1) >= 1
+def seg2WT(preds, threshold):
+    max_val, max_indx = torch.max(preds, dim=1)
+    max_val = (max_val >= threshold).float()
+    max_indx[max_indx >= 1] = 1
+    WT_pred = torch.multiply(max_indx, max_val)
+
+    # WT_pred = preds[:, 1:4, :, :].sum(1) >= 1
     return WT_pred
 
 
@@ -306,6 +317,7 @@ def Unet_train_val(dataset, n_epochs, device, wmh_threshold, output_dir, learnin
     paddings = [1, 1, 1, 1, 1, 1, 1, 1, 1]
     strides = [1, 1, 1, 1, 1, 1, 1, 1, 1]
     separables = [False, False, False, False, False, False, False, False, False]
+    print("******* TRAINING UNET***********")
 
     print("output_dir is    ", output_dir)
     if not os.path.isdir(output_dir):
@@ -357,9 +369,8 @@ def Unet_train_val(dataset, n_epochs, device, wmh_threshold, output_dir, learnin
                      separables=separables)
 
     print("learning_rate is    ", learning_rate)
-    optimizer = torch.optim.SGD(unet.parameters(), learning_rate, momentum=0.9, weight_decay=1e-4)
-    step_size = 30
-    scheduler = lr_scheduler.StepLR(optimizer, step_size=step_size, gamma=0.1)  # don't use it
+    step_size = cfg.scheduler_step_size
+
     print("scheduler step size is :   ", step_size)
     best_score = 0
     start_epoch = 0
@@ -373,40 +384,47 @@ def Unet_train_val(dataset, n_epochs, device, wmh_threshold, output_dir, learnin
     device = torch.device(device)
 
     unet.to(device)
-    # unet = model_utils.load_model('/Users/sinamalakouti/Desktop/psgnet_best_lr0.001.model', device)
-    # regular_score, subjet_wise_score = evaluateUnet(unet, dataset, device, wmh_threshold, cfg, cfg.val_mode)
+    optimizer = torch.optim.SGD(unet.parameters(), learning_rate, momentum=0.9, weight_decay=1e-4)
+    scheduler = lr_scheduler.StepLR(optimizer, step_size=step_size, gamma=cfg.lr_gamma)  # don't use it
+
     train_sup_loader = utils.get_trainset(dataset, batch_size=cfg.batch_size, intensity_rescale=cfg.intensity_rescale,
                                           mixup_threshold=cfg.mixup_threshold, mode=cfg.train_mode, t1=cfg.t1,
                                           t2=cfg.t2, t1ce=cfg.t1ce, augment=cfg.augment)
     sup_loss = torch.nn.CrossEntropyLoss()
-
     loss_functions = (sup_loss, None)
+
     for epoch in range(start_epoch, n_epochs):
         print("iteration:  ", epoch)
 
         unet, loss = trainUnet_sup(train_sup_loader, unet, optimizer, device, loss_functions, epoch)
         if epoch % 1 == 0:
-            regular_score, subjet_wise_score = evaluateUnet(unet, dataset, device, wmh_threshold, cfg, cfg.val_mode)
-            print("** SCORE @ Iteration {} is {} **".format(epoch, subjet_wise_score))
-            if subjet_wise_score > best_score:
+            regular_score, subject_wise_score = evaluateUnet(unet, dataset, device, wmh_threshold, cfg, cfg.val_mode)
+            print("** SUBJECT WISE SCORE @ Iteration {} is {} **".format(epoch, subject_wise_score))
+            print("** REGULAR SCORE @ Iteration {} is {} **".format(epoch, regular_score))
+            if subject_wise_score > best_score:
                 print("****************** BEST SCORE @ ITERATION {} is {} ******************".format(epoch,
-                                                                                                     subjet_wise_score))
-                best_score = subjet_wise_score
+                                                                                                     subject_wise_score))
+                best_score = subject_wise_score
                 path = os.path.join(output_model_dir, 'psgnet_best_lr{}.model'.format(learning_rate))
+
                 with open(path, 'wb') as f:
                     torch.save(unet, f)
 
-                save_score(output_image_dir, subjet_wise_score, epoch)
-            wandb.log({"train_loss": loss, "dev_dsc": subjet_wise_score})
+                batch_wise_test_score, subject_wise_test_score = evaluateUnet(unet, dataset, device, wmh_threshold,
+                                                                              cfg, cfg.test_mode)
+                wandb.log({"batch_wise_test_DSC": batch_wise_test_score, "subject_wise_test_DSC": subject_wise_test_score})
+
+                save_score(output_image_dir, subject_wise_score, epoch)
+            wandb.log({"subject_wise_val_DSC": subject_wise_score, "batch_wise_val_DSC": regular_score})
         scheduler.step()
 
 
-def train_val(dataset, n_epochs, device, wmh_threshold, output_dir, learning_rate, args, cfg):
+def Pgs_train_val(dataset, n_epochs, device, wmh_threshold, output_dir, learning_rate, args, cfg):
     inputs_dim = [1, 64, 96, 128, 256, 768, 384, 224, 160]
     outputs_dim = [64, 96, 128, 256, 512, 256, 128, 96, 64, 4]
     kernels = [5, 3, 3, 3, 3, 3, 3, 3, 3]
     strides = [1, 1, 1, 1, 1, 1, 1, 1, 1]
-
+    print("******* TRAINING PGS ***********")
     print("output_dir is    ", output_dir)
     if not os.path.isdir(output_dir):
         try:
@@ -456,9 +474,7 @@ def train_val(dataset, n_epochs, device, wmh_threshold, output_dir, learning_rat
     pgsnet = Pgs.PGS(inputs_dim, outputs_dim, kernels, strides)
 
     print("learning_rate is    ", learning_rate)
-    optimizer = torch.optim.SGD(pgsnet.parameters(), learning_rate, momentum=0.9, weight_decay=1e-4)
     step_size = cfg.scheduler_step_size
-    scheduler = lr_scheduler.StepLR(optimizer, step_size=cfg.scheduler_step_size, gamma=0.1)  # don't use it
     print("scheduler step size is :   ", step_size)
     best_score = 0
     start_epoch = 0
@@ -470,15 +486,14 @@ def train_val(dataset, n_epochs, device, wmh_threshold, output_dir, learning_rat
         device = 'cpu'
 
     device = torch.device(device)
-    # pgsnet = model_utils.load_model(path=os.path.join(output_model_dir, 'psgnet_best_lr{}.model'.format(
-    # learning_rate)), device=device)
-
     pgsnet.to(device)
+    optimizer = torch.optim.SGD(pgsnet.parameters(), learning_rate, momentum=0.9, weight_decay=1e-4)
+    scheduler = lr_scheduler.StepLR(optimizer, step_size=cfg.scheduler_step_size, gamma=cfg.lr_gamma)  # don't use it
 
     train_sup_loader = utils.get_trainset(dataset, batch_size=cfg.batch_size, intensity_rescale=cfg.intensity_rescale,
                                           mixup_threshold=cfg.mixup_threshold, mode=cfg.train_mode, t1=cfg.t1,
                                           t2=cfg.t2, t1ce=cfg.t1ce, augment=cfg.augment)
-    print('size of training set: number of subjects:    ', train_sup_loader.dataset.subjects_name)
+    print('size of training set: number of subjects:    ', len(train_sup_loader.dataset.subjects_name))
     for epoch in range(start_epoch, n_epochs):
         print("iteration:  ", epoch)
 
@@ -494,25 +509,22 @@ def train_val(dataset, n_epochs, device, wmh_threshold, output_dir, learning_rat
             dsc_score, subject_wise_DSC, segmentations = evaluatePGS(pgsnet, dataset, device, wmh_threshold,
                                                                      cfg, cfg.val_mode)
             # writer.add_scalar("dice_score/test", score, epoch)
-            print("** SCORE @ Iteration {} is {} **".format(epoch, subject_wise_DSC))
+            print("** SUBJECT WISE SCORE @ Iteration {} is {} **".format(epoch, subject_wise_DSC))
+            print("** REGULAR SCORE @ Iteration {} is {} **".format(epoch, dsc_score))
             if subject_wise_DSC > best_score:
-                print("****************** BEST SCORE @ ITERATION {} is {} ******************".format(epoch, subject_wise_DSC))
+                print("****************** BEST SCORE @ ITERATION {} is {} ******************".format(epoch,
+                                                                                                     subject_wise_DSC))
                 best_score = subject_wise_DSC
                 path = os.path.join(output_model_dir, 'psgnet_best_lr{}.model'.format(learning_rate))
                 with open(path, 'wb') as f:
                     torch.save(pgsnet, f)
+                batch_wise_test_DSC, subject_wise_test_DSC, _ = evaluatePGS(pgsnet, dataset, device, wmh_threshold,
+                                                                         cfg, cfg.test_mode)
+                wandb.log({"subject_wise_test_DSC": subject_wise_test_DSC, "batch_wise_test_dsc": batch_wise_test_DSC})
 
                 save_score(output_image_dir, subject_wise_DSC, epoch)
-            wandb.log({"train_loss": loss, "dev_dsc": subject_wise_DSC})
-            # example = segmentations[0]
-            # example = example >= wmh_threshold
-        #         wandb.log(
-        #             {"train_loss": loss, "dev_dsc": score, "image": [wandb.Image(augmentor.to_pil_image(example.int())
-        #                                                                          , caption="output example")]})
+            wandb.log({"subject_wise_val_DSC": subject_wise_DSC, "batch_wise_val_dsc": dsc_score})
         scheduler.step()
-
-    # writer.flush()
-    # writer.close()
 
 
 def save_score(dir_path, score, iter):
@@ -611,8 +623,8 @@ def main():
     print("device is     ", dev)
 
     device = torch.device(dev)
-    train_val(dataset, cfg.n_epochs, device, cfg.wmh_threshold, args.output_dir, cfg.lr, args, cfg)
-    # Unet_train_val(dataset, cfg.n_epochs, device, cfg.wmh_threshold, args.output_dir, cfg.lr, args, cfg)
+    # Pgs_train_val(dataset, cfg.n_epochs, device, cfg.wmh_threshold, args.output_dir, cfg.lr, args, cfg)
+    Unet_train_val(dataset, cfg.n_epochs, device, cfg.wmh_threshold, args.output_dir, cfg.lr, args, cfg)
 
 
 def get_cluster_assumption_representation(h):

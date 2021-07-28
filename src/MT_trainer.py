@@ -391,20 +391,6 @@ def main():
     # output_dir = '/Users/sinamalakouti/Desktop/alaki'
     train_val(dataset, args.n_epochs, device, args.wmh_threshold, args.output_dir, args.lr, args)
 
-    # train_loader = utils.get_trainset(dataset, 5, True, None, None)
-    #
-    # for step, batch in enumerate(train_loader):
-    #     data = batch['data']
-    #     print(step)
-    #     for i in range(data.shape[0]):
-    #         diff = get_cluster_assumption(data[i][0])
-    #         plt.imshow(data[i][0])
-    #         image_path = "cluster_assumption_res/" + batch['subject'][i] + "_input_{}.png".format(i)
-    #         plt.savefig(image_path)
-    #         plt.imshow(diff)
-    #         image_path = "cluster_assumption_res/" + batch['subject'][i] + "_{}.png".format(i)
-    #         plt.savefig(image_path)
-
 
 def get_cluster_assumption(image):
     n_rows = image.shape[0]

@@ -21,8 +21,8 @@ def dice_coef(y_true, y_pred, smooth=1):  # in order to get the
 #   dice = ( 2. *  n_intersection + smooth) / (union + smooth)
 #   return dice
 
-def get_dice_coef_per_subject(y_true, y_pred, subjects):
 
+def get_dice_coef_per_subject(y_true, y_pred, subjects):
     dsc = []
     for subj in subjects.unique():
         y_pred_subj = y_pred[subjects == subj]
