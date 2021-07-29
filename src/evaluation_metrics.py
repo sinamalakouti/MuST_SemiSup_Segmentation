@@ -31,3 +31,4 @@ def get_dice_coef_per_subject(y_true, y_pred, subjects):
         dsc.append(dice_coef(y_true_subj, y_pred_subj))
 
     return torch.mean(torch.tensor(dsc))
+

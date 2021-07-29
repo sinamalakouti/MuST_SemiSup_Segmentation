@@ -74,10 +74,135 @@ def semi_sup_split(train_dir_csv, sup_dir_path, unsup_dir_path, ratio=0.5):
     np.savetxt(unsup_dir_path + "/train_unsup_ids.csv", unsup_ids.astype(np.str), delimiter=',', fmt='%s')
 
 
+class Brat20Test(torch.utils.data.Dataset):
+
+    def __init__(self, dataroot_dir, mode, min_slice_index, max_slice_index,
+                 augment=False, intensity_aug=None, center_cropping=False, t1=False, t2=False, t1ce=False):
+        super(Brat20Test, self).__init__()
+
+        self.augment = augment
+        self.intensity_aug = intensity_aug
+        self.center_cropping = center_cropping
+        self.weights = {}
+        self.t1 = t1
+        self.t2 = t2
+        self.t1ce = t1ce
+        self.min_slice_index = min_slice_index
+        self.max_slice_index = max_slice_index
+
+        if mode == "val2020":  # validation
+            ids_path = os.path.join(dataroot_dir, 'valset/brats20_val_ids.csv')
+        elif mode == "only_test2018":
+            ids_path = os.path.join(dataroot_dir, 'only2018/test2018_ids.csv')
+        elif mode == "only_val2018":
+            ids_path = os.path.join(dataroot_dir, 'only2018/val2018_ids.csv')
+
+        elif mode == "test2019_new":
+            ids_path = os.path.join(dataroot_dir, 'valset/brats2019_new.csv')
+
+        subjects_root_dir = os.path.join(dataroot_dir, 'MICCAI_BraTS2020_TrainingData')
+        self.subjects_name = np.asarray(pd.read_csv(ids_path, header=None)).reshape(-1)
+
+        label_paths = [os.path.join(subjects_root_dir, str(subj_name) + '/{}_seg.nii.gz'.format(subj_name)) for
+                       subj_name in self.subjects_name]
+        flair_paths = [os.path.join(subjects_root_dir, str(subj_name) + '/{}_flair.nii.gz'.format(subj_name)) for
+                       subj_name in self.subjects_name]
+        if self.t1:
+            t1_paths = [os.path.join(subjects_root_dir, str(subj_name) + '/{}_t1.nii.gz'.format(subj_name)) for
+                        subj_name in self.subjects_name]
+        else:
+            t1_paths = [None for _ in self.subjects_name]
+        if self.t2:
+            t2_paths = [os.path.join(subjects_root_dir, str(subj_name) + '/{}_t2.nii.gz'.format(subj_name)) for
+                        subj_name in self.subjects_name]
+        else:
+            t2_paths = [None for _ in self.subjects_name]
+
+        if self.t1ce:
+            t1ce_paths = [os.path.join(subjects_root_dir, str(subj_name) + '/{}_t1ce.nii.gz'.format(subj_name)) for
+                          subj_name in self.subjects_name]
+        else:
+            t1ce_paths = [None for _ in self.subjects_name]
+        self.paths = zip(flair_paths, t1_paths, t2_paths, t1ce_paths, label_paths, self.subjects_name)
+
+    def get_subject(self, path):
+        data, t1_data, t2_data, t1ce_data, label, subject_name = path
+        X = self._extract(data, slices=list(range(self.min_slice_index, self.max_slice_index)))
+        Y = self._extract(label, slices=list(range(self.min_slice_index, self.max_slice_index)))
+        if self.t1:
+            X_t1 = self._extract(t1_data, slices=list(range(self.min_slice_index, self.max_slice_index)))
+        if self.t2:
+            X_t2 = self._extract(t2_data, slices=list(range(self.min_slice_index, self.max_slice_index)))
+        if self.t1ce:
+            X_t1ce = self._extract(t1ce_data, slices=list(range(self.min_slice_index, self.max_slice_index)))
+        subject_id = int(subject_name.split('_')[-1])
+        data_X = []
+        data_Y = []
+        data_subject = []
+        for sl in range(Y.shape[2]):
+            if X[:, :, sl].sum() == 0 or np.sum((X[:, :, sl] > 0)) / (240 * 240) * 100 < 10:
+                continue
+            x = X[:, :, sl]
+            y = Y[:, :, sl]
+            subject_id = subject_id
+
+            x_t1 = X_t1[:, :, sl] if self.t1 else None
+            x_t2 = X_t2[:, :, sl] if self.t2 else None
+            x_t1ce = X_t1ce[:, :, sl] if self.t1ce else None
+
+            x, x_t1, x_t2, x_t1ce, y = tensorize(x, x_t1, x_t2, x_t1ce, y)
+            if self.center_cropping:
+                x, x_t1, x_t2, x_t1ce, y = center_crop(x, x_t1, x_t2, x_t1ce, y)
+
+            y[y == 4] = 3  # for simplicity in training, substitute label = 3 with 4
+
+            x = rescale_intensity(x)
+            x_t1 = rescale_intensity(x_t1) if x_t1 is not None else None
+            x_t2 = rescale_intensity(x_t2) if x_t2 is not None else None
+            x_t1ce = rescale_intensity(x_t1ce) if x_t1ce is not None else None
+
+            # result = {'data': x, 'label': y, 'subject': self.subjects_id[index]}
+            data_modalities = []
+            if x is not None:
+                data_modalities.append(x)
+            if x_t1 is not None:
+                # result['data_t1'] = x_t1
+                data_modalities.append(x_t1)
+            if x_t2 is not None:
+                # result['data_t2'] = x_t2
+                data_modalities.append(x_t2)
+            if x_t1ce is not None:
+                # result['data_t1ce'] = x_t1ce
+                data_modalities.append(x_t1ce)
+
+            x_final = torch.cat(data_modalities, dim=0)
+            data_X.append(x_final)
+            data_Y.append(y)
+            data_subject.append(subject_id)
+
+        data_X = torch.stack(data_X)
+        data_Y = torch.stack(data_Y)
+        if len(data_X.shape) == 3:
+            data_X = data_X.reshape(data_X.shape[0], 1, data_X.shape[1], data_X.shape[2])
+
+
+            # result = {'data': x_final, 'label': y, 'subject': self.data[index]['subject_id'],
+            #           'slice': self.data[index]['slice']}
+        return {'data': data_X, 'label': data_Y, 'subjects': data_subject}
+
+    def __len__(self):
+        return len(self.data)
+
+    def _extract(self, f, slices=(24, 25, 26, 27, 28)):
+        x = nib.load(f).get_data()
+        slices = np.array(slices)
+        return x[:, :, slices].astype('float32')
+
+
 class Brat20(torch.utils.data.Dataset):
 
     def __init__(self, dataroot_dir, mode, min_slice_index, max_slice_index,
-                 augment=False, intensity_aug=None, center_cropping=False, t1=None, t2=None, t1ce=None):
+                 augment=False, intensity_aug=None, center_cropping=False, t1=False, t2=False, t1ce=False):
         super(Brat20, self).__init__()
 
         self.augment = augment

@@ -81,7 +81,7 @@ def get_trainset(dataset, batch_size, intensity_rescale, mixup_threshold=None,
             batch_size=batch_sz,
             drop_last=True,
             num_workers=0,
-            shuffle=False,
+            shuffle=True,
             pin_memory=mem_pin
         )
 
