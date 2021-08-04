@@ -140,7 +140,7 @@ class Brat20Test(torch.utils.data.Dataset):
         data_Y = []
         data_subject = []
         for sl in range(Y.shape[2]):
-            if Y[:,:, sl].sum() == 0 or X[:, :, sl].sum() == 0 or np.sum((X[:, :, sl] > 0)) / (240 * 240) * 100 < 20:
+            if X[:, :, sl].sum() == 0 or np.sum((X[:, :, sl] > 0)) / (240 * 240) * 100 < 10:
                 continue
             x = X[:, :, sl]
             y = Y[:, :, sl]
@@ -285,7 +285,7 @@ class Brat20(torch.utils.data.Dataset):
                 X_t1ce = self._extract(t1ce_data, slices=list(range(min_slice_index, max_slice_index)))
             subject_id = int(subject_name.split('_')[-1])
             for sl in range(Y.shape[2]):
-                if X[:, :, sl].sum() == 0 or np.sum((X[:, :, sl] > 0)) / (240 * 240) * 100 < 10:
+                if  Y[:,:, sl].sum() == 0 or X[:, :, sl].sum() == 0 or np.sum((X[:, :, sl] > 0)) / (240 * 240) * 100 < 20:
                     None
                 else:
                     data_map = {'data': X[:, :, sl],
