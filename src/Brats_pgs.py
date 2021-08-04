@@ -155,7 +155,7 @@ def trainUnet_sup(train_sup_loader, model, optimizer, device, loss_functions, ep
             if cfg.oneHot:
                 target_sup[target_sup >= 1] = 1
                 target_sup = seg2WT(target_sup, 1, oneHot=cfg.oneHot)
-                y_pred = target_sup
+                y_pred = sup_outputs
             else:
                 sf = torch.nn.Softmax2d()
                 target_sup[target_sup >= 1] = 1
