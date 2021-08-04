@@ -192,7 +192,7 @@ class Brat20Test(torch.utils.data.Dataset):
         if len(data_X.shape) == 3:
             data_X = data_X.reshape(data_X.shape[0], 1, data_X.shape[1], data_X.shape[2])
 
-        elif len(data_X.shape) == 4:
+        elif len(data_X.shape) == 4 and data_X.shape[-1] != 200 or data_X.shape[-2] != 200:
             data_X = data_X.reshape(data_X.shape[0], 4, 200, 200)
 
             # result = {'data': x_final, 'label': y, 'subject': self.data[index]['subject_id'],

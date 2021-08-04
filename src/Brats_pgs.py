@@ -131,7 +131,7 @@ def trainPgs_semi(train_sup_loader, train_unsup_loader, model, optimizer, device
     return model, total_loss
 
 
-def trainUnet_sup(train_sup_loader, model, optimizer, device, loss_functions, epochid):
+def trainUnet_sup(train_sup_loader, model, optimizer, device, loss_functions, epochid, cfg):
     model.train()
 
     for step, batch_sup in enumerate(train_sup_loader):
@@ -142,11 +142,27 @@ def trainUnet_sup(train_sup_loader, model, optimizer, device, loss_functions, ep
         print("subject is : ", batch_sup['subject'])
         sup_outputs = model(b_sup)
         total_loss = unet_compute_loss(sup_outputs, target_sup, loss_functions, is_supervised=True)
-        wandb.log({"batch_id": step + epochid * len(train_sup_loader), "loss": total_loss})
+        # wandb.log({"batch_id": step + epochid * len(train_sup_loader), "loss": total_loss,"batch_score": dice_score})
         print("**************** LOSSS  : {} ****************".format(total_loss))
 
         total_loss.backward()
         optimizer.step()
+
+        with torch.no_grad():
+            if cfg.oneHot:
+                sf = torch.nn.Sigmoid()
+                target_sup[target_sup >= 1] = 1
+                target_sup = seg2WT(target_sup, 1, oneHot=cfg.oneHot)
+            else:
+                sf = torch.nn.Softmax2d()
+                target_sup[target_sup >= 1] = 1
+                target_sup = target_sup
+
+            y_pred = sf(sup_outputs)
+            y_WT = seg2WT(y_pred, 0.5, cfg.oneHot)
+            dice_score = dice_coef(target_sup.reshape(y_WT.shape), y_WT)
+            wandb.log(
+                {"batch_id": step + epochid * len(train_sup_loader), "loss": total_loss, "batch_score": dice_score})
 
     return model, total_loss
 
@@ -262,6 +278,8 @@ def eval_per_subjectUnet(model, device, threshold, cfg, data_mode):
     model.eval()
     dice_arr = []
     paths = testset.paths
+    loss_fn = soft_dice_loss
+
     with torch.no_grad():
         for path in paths:
             batch = testset.get_subject(path)
@@ -271,6 +289,9 @@ def eval_per_subjectUnet(model, device, threshold, cfg, data_mode):
             assert len(np.unique(subjects)) == 1, print("More than one subject at a time")
             b = b.to(device)
             outputs = model(b)
+            loss_val = loss_fn(outputs, target.type(torch.LongTensor).to(device), 1)
+            print("############# LOSS for subject {} is {} ##############".format(subjects[0], loss_val.item()))
+
             if cfg.oneHot:
                 sf = torch.nn.Sigmoid()
                 target[target >= 1] = 1
@@ -386,7 +407,7 @@ def seg2WT(preds, threshold, oneHot=False):
 
 
 def Unet_train_val(dataset, n_epochs, device, wmh_threshold, output_dir, learning_rate, args, cfg):
-    inputs_dim = [4, 64, 128, 256, 512, 1024, 512, 256, 128]
+    inputs_dim = [1, 64, 128, 256, 512, 1024, 512, 256, 128]
     outputs_dim = [64, 128, 256, 512, 1024, 512, 256, 128, 64]
     kernels = [3, 3, 3, 3, 3, 3, 3, 3, 3]
     paddings = [1, 1, 1, 1, 1, 1, 1, 1, 1]
@@ -467,7 +488,7 @@ def Unet_train_val(dataset, n_epochs, device, wmh_threshold, output_dir, learnin
 
     # unet = model_utils.load_model('/Users/sinamalakouti/psgnet_best_lr0.001.model', 'cpu').module
     #
-    # h = eval_per_subjectUnet(unet, device, 0.5, cfg, cfg.val_mode)
+    h = eval_per_subjectUnet(unet, device, 0.5, cfg, cfg.val_mode)
     train_sup_loader = utils.get_trainset(dataset, batch_size=cfg.batch_size, intensity_rescale=cfg.intensity_rescale,
                                           mixup_threshold=cfg.mixup_threshold, mode=cfg.train_mode, t1=cfg.t1,
                                           t2=cfg.t2, t1ce=cfg.t1ce, augment=cfg.augment, oneHot=cfg.oneHot)
@@ -478,7 +499,7 @@ def Unet_train_val(dataset, n_epochs, device, wmh_threshold, output_dir, learnin
     for epoch in range(start_epoch, n_epochs):
         print("iteration:  ", epoch)
 
-        unet, loss = trainUnet_sup(train_sup_loader, unet, optimizer, device, loss_functions, epoch)
+        unet, loss = trainUnet_sup(train_sup_loader, unet, optimizer, device, loss_functions, epoch, cfg)
         if epoch % 1 == 0:
             # regular_score, subject_wise_score = evaluateUnet(unet, dataset, device, wmh_threshold, cfg, cfg.val_mode)
             subject_wise_score = eval_per_subjectUnet(unet, device, wmh_threshold, cfg, cfg.val_mode)
