@@ -178,10 +178,11 @@ class Brat20Test(torch.utils.data.Dataset):
             x_final = torch.cat(data_modalities, dim=0)
             data_X.append(x_final)
             if self.oneHot:
-                y_true = torch.zeros(3, 200, 200)
-                y_true[0, :, :] = y == 1
-                y_true[1, :, :] = y == 2
-                y_true[2, :, :] = y == 3
+                y_true = torch.zeros(4, 200, 200)
+                y_true[0, :, :] = y == 0
+                y_true[1, :, :] = y == 1
+                y_true[2, :, :] = y == 2
+                y_true[3, :, :] = y == 3
                 y = y_true
             data_Y.append(y)
             data_subject.append(subject_id)
@@ -358,10 +359,11 @@ class Brat20(torch.utils.data.Dataset):
             # result['data_t1ce'] = x_t1ce
             data_modalities.append(x_t1ce)
         if self.oneHot:
-            y_true = torch.zeros(3, 200,200)
-            y_true[0, :, :] = y == 1
-            y_true[1, :, :] = y == 2
-            y_true[2, :, :] = y == 3
+            y_true = torch.zeros(4, 200, 200)
+            y_true[0, :, :] = y == 0
+            y_true[1, :, :] = y == 1
+            y_true[2, :, :] = y == 2
+            y_true[3, :, :] = y == 3
             y = y_true
         x_final = torch.cat(data_modalities, dim=0)
         result = {'data': x_final, 'label': y, 'subject': self.data[index]['subject_id'],

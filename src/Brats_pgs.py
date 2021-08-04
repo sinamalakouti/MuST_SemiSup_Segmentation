@@ -467,7 +467,7 @@ def Unet_train_val(dataset, n_epochs, device, wmh_threshold, output_dir, learnin
     else:
         None
     if cfg.oneHot:
-        c = 3
+        c = 4
     else:
         c = 4
 
