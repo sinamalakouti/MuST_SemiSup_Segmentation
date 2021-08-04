@@ -14,4 +14,4 @@ wmh_threshold: 0.5
 optimizer: "SGD" #SGD OR ADAM
 mixup_threshold: None
 intensity_rescale: True
-oneHot: True
+oneHot: False

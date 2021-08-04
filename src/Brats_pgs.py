@@ -110,7 +110,7 @@ def trainPgs_semi(train_sup_loader, train_unsup_loader, model, optimizer, device
         continue
         # unsup_loss = nn.BCELoss()
         # sup_loss = torch.nn.BCELoss()
-        unsup_loss = nn.BCELoss()
+        unsup_loss = nn.CrossEntropyLoss()
         loss_functions = (sup_loss, unsup_loss)
 
         print("subject is : ", batch_sup['subject'])
@@ -200,8 +200,8 @@ def trainPGS(train_loader, model, optimizer, device, epochid):
         target = batch['label'].to(device)
 
         # unsup_loss = nn.MSELoss()
-        unsup_loss = nn.BCELoss()
-        sup_loss = torch.nn.BCELoss()
+        unsup_loss = nn.CrossEntropyLoss()
+        sup_loss = torch.nn.CrossEntropyLoss()
         # sup_loss = reconstruction_loss.dice_coef_loss
         # sup_loss = torch.nn.w
         loss_functions = (sup_loss, unsup_loss)
@@ -282,7 +282,7 @@ def eval_per_subjectUnet(model, device, threshold, cfg, data_mode):
     dice_arr = []
     paths = testset.paths
     # loss_fn = soft_dice_loss()
-    loss_fn = torch.nn.BCELoss()
+    loss_fn = torch.nn.CrossEntropyLoss()
     with torch.no_grad():
         for path in paths:
             batch = testset.get_subject(path)
@@ -500,7 +500,7 @@ def Unet_train_val(dataset, n_epochs, device, wmh_threshold, output_dir, learnin
                                           t2=cfg.t2, t1ce=cfg.t1ce, augment=cfg.augment, oneHot=cfg.oneHot)
     # sup_loss = torch.nn.CrossEntropyLoss()
     # sup_loss = soft_dice_loss()
-    sup_loss = torch.nn.BCELoss()
+    sup_loss = torch.nn.CrossEntropyLoss()
     loss_functions = (sup_loss, None)
 
     for epoch in range(start_epoch, n_epochs):
