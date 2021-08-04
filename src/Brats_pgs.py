@@ -153,15 +153,15 @@ def trainUnet_sup(train_sup_loader, model, optimizer, device, loss_functions, ep
 
         with torch.no_grad():
             if cfg.oneHot:
-                sf = torch.nn.Softmax2d()
                 target_sup[target_sup >= 1] = 1
                 target_sup = seg2WT(target_sup, 1, oneHot=cfg.oneHot)
+                y_pred = target_sup
             else:
                 sf = torch.nn.Softmax2d()
                 target_sup[target_sup >= 1] = 1
                 target_sup = target_sup
+                y_pred = sf(sup_outputs)
 
-            y_pred = sf(sup_outputs)
             y_WT = seg2WT(y_pred, 0.5, cfg.oneHot)
             dice_score = dice_coef(target_sup.reshape(y_WT.shape), y_WT)
             wandb.log(
@@ -299,15 +299,15 @@ def eval_per_subjectUnet(model, device, threshold, cfg, data_mode):
             print("############# LOSS for subject {} is {} ##############".format(subjects[0], loss_val.item()))
 
             if cfg.oneHot:
-                sf = torch.nn.Softmax2d()
                 target[target >= 1] = 1
                 target_WT = seg2WT(target, 1, oneHot=cfg.oneHot)
+                y_pred = outputs
             else:
                 sf = torch.nn.Softmax2d()
                 target[target >= 1] = 1
                 target_WT = target
+                y_pred = sf(outputs)
 
-            y_pred = sf(outputs)
             y_WT = seg2WT(y_pred, threshold, oneHot=cfg.oneHot)
 
             dice_score = dice_coef(target_WT.reshape(y_WT.shape), y_WT)
@@ -401,7 +401,7 @@ def evaluatePGS(model, dataset, device, threshold, cfg, training_mode):
 def seg2WT(preds, threshold, oneHot=False):
     if oneHot:
         preds = preds >= threshold
-        WT_pred = preds.sum(1) >= 1
+        WT_pred = preds[:,1:4,:,:].sum(1) >= 1
     else:
         max_val, max_indx = torch.max(preds, dim=1)
         max_val = (max_val >= threshold).float()
