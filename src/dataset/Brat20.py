@@ -77,7 +77,7 @@ def semi_sup_split(train_dir_csv, sup_dir_path, unsup_dir_path, ratio=0.5):
 class Brat20Test(torch.utils.data.Dataset):
 
     def __init__(self, dataroot_dir, mode, min_slice_index, max_slice_index,
-                 augment=False, intensity_aug=None, center_cropping=False, t1=False, t2=False, t1ce=False):
+                 augment=False, intensity_aug=None, center_cropping=False, t1=False, t2=False, t1ce=False, oneHot=False):
         super(Brat20Test, self).__init__()
 
         self.augment = augment
@@ -89,7 +89,7 @@ class Brat20Test(torch.utils.data.Dataset):
         self.t1ce = t1ce
         self.min_slice_index = min_slice_index
         self.max_slice_index = max_slice_index
-
+        self.oneHot = oneHot
         if mode == "val2020":  # validation
             ids_path = os.path.join(dataroot_dir, 'valset/brats20_val_ids.csv')
         elif mode == "only_test2018":
@@ -155,7 +155,7 @@ class Brat20Test(torch.utils.data.Dataset):
                 x, x_t1, x_t2, x_t1ce, y = center_crop(x, x_t1, x_t2, x_t1ce, y)
 
             y[y == 4] = 3  # for simplicity in training, substitute label = 3 with 4
-
+            x, x_t1, x_t2, x_t1ce, y = tensorize(x, x_t1, x_t2, x_t1ce, y)
             x = rescale_intensity(x)
             x_t1 = rescale_intensity(x_t1) if x_t1 is not None else None
             x_t2 = rescale_intensity(x_t2) if x_t2 is not None else None
@@ -177,14 +177,23 @@ class Brat20Test(torch.utils.data.Dataset):
 
             x_final = torch.cat(data_modalities, dim=0)
             data_X.append(x_final)
+            if self.oneHot:
+                y_true = torch.zeros(3, 200, 200)
+                y_true[0, :, :] = y == 1
+                y_true[1, :, :] = y == 2
+                y_true[2, :, :] = y == 3
+                y = y_true
             data_Y.append(y)
             data_subject.append(subject_id)
 
         data_X = torch.stack(data_X)
         data_Y = torch.stack(data_Y)
+
         if len(data_X.shape) == 3:
             data_X = data_X.reshape(data_X.shape[0], 1, data_X.shape[1], data_X.shape[2])
 
+        elif len(data_X.shape) == 4:
+            data_X = data_X.reshape(data_X.shape[0], 4, 200, 200)
 
             # result = {'data': x_final, 'label': y, 'subject': self.data[index]['subject_id'],
             #           'slice': self.data[index]['slice']}
@@ -202,7 +211,7 @@ class Brat20Test(torch.utils.data.Dataset):
 class Brat20(torch.utils.data.Dataset):
 
     def __init__(self, dataroot_dir, mode, min_slice_index, max_slice_index,
-                 augment=False, intensity_aug=None, center_cropping=False, t1=False, t2=False, t1ce=False):
+                 augment=False, intensity_aug=None, center_cropping=False, t1=False, t2=False, t1ce=False, oneHot=False):
         super(Brat20, self).__init__()
 
         self.augment = augment
@@ -212,6 +221,7 @@ class Brat20(torch.utils.data.Dataset):
         self.t1 = t1
         self.t2 = t2
         self.t1ce = t1ce
+        self.oneHot = oneHot
 
         if mode == "train2020_sup":
             ids_path = os.path.join(dataroot_dir, 'trainset/brats20_training_ids.csv')
@@ -347,14 +357,19 @@ class Brat20(torch.utils.data.Dataset):
         if x_t1ce is not None:
             # result['data_t1ce'] = x_t1ce
             data_modalities.append(x_t1ce)
-
+        if self.oneHot:
+            y_true = torch.zeros(3, 200,200)
+            y_true[0, :, :] = y == 1
+            y_true[1, :, :] = y == 2
+            y_true[2, :, :] = y == 3
+            y = y_true
         x_final = torch.cat(data_modalities, dim=0)
         result = {'data': x_final, 'label': y, 'subject': self.data[index]['subject_id'],
                   'slice': self.data[index]['slice']}
         return result
 
 
-def augment(x, y, m=False, t1=False, t2=False, t1ce=False, intensity_aug=False):
+def augment(x, y, m=None, t1=None, t2=None, t1ce=None, intensity_aug=False):
     # NOTE: method expects numpy float arrays
     # to_pil_image makes assumptions based on input when mode = None
     # i.e. it should infer that mode = 'F'
@@ -374,18 +389,18 @@ def augment(x, y, m=False, t1=False, t2=False, t1ce=False, intensity_aug=False):
     x = augmentor.to_pil_image(x, mode='F')
     y = augmentor.to_pil_image(y, mode='F')
 
-    if m:
+    if m is not None:
         m = augmentor.to_pil_image(m, mode='F')
-    if t1:
+    if t1 is not None:
         ori_t1 = t1
         if intensity_aug:
             t1 = adjust_contrast(t1, c_factor)
         t1 = augmentor.to_pil_image(t1, mode='F')
-    if t2:
+    if t2 is not None:
         if intensity_aug:
             t2 = adjust_contrast(t2, c_factor)
         t2 = augmentor.to_pil_image(t2, mode='F')
-    if t1ce:
+    if t1ce is not None:
         if intensity_aug:
             t1ce = adjust_contrast(t1ce, c_factor)
         t1ce = augmentor.to_pil_image(t1ce, mode='F')
@@ -394,18 +409,18 @@ def augment(x, y, m=False, t1=False, t2=False, t1ce=False, intensity_aug=False):
                          angle=angle, translate=(0, 0), shear=shear, scale=scale)
     y = augmentor.affine(y,
                          angle=angle, translate=(0, 0), shear=shear, scale=scale)
-    if m:
+    if m is not None:
         m = augmentor.affine(m,
                              angle=angle, translate=(0, 0), shear=shear, scale=scale)
-    if t1:
+    if t1 is not None:
         t1 = augmentor.affine(t1,
                               angle=angle, translate=(0, 0), shear=shear, scale=scale)
         t1 = augmentor.to_tensor(t1).float()
-    if t2:
+    if t2 is not None:
         t2 = augmentor.affine(t2,
                               angle=angle, translate=(0, 0), shear=shear, scale=scale)
         t2 = augmentor.to_tensor(t2).float()
-    if t1ce:
+    if t1ce is not None:
         t1ce = augmentor.affine(t1ce,
                                 angle=angle, translate=(0, 0), shear=shear, scale=scale)
         t1ce = augmentor.to_tensor(t1ce).float()
@@ -413,7 +428,7 @@ def augment(x, y, m=False, t1=False, t2=False, t1ce=False, intensity_aug=False):
     x = augmentor.to_tensor(x).float()
     y = augmentor.to_tensor(y).float()
 
-    if m:
+    if m is not None:
         m = augmentor.to_tensor(m).float()
         m = (m > 0).float()
 

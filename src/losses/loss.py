@@ -40,27 +40,20 @@ def dice_coef_loss(y_pred, y_true, smooth=1):
     return 1 - dsc_score
 
 
-#
-# dsc_loss = 0
-#
-# return base - dsc_loss
-#   intersection = torch.mul(y_true, y_pred)
-#   n_intersection = torch.sum(intersection,(1,2))
-#   n_y_true = torch.sum(y_true,(1,2))
-#   n_y_pred = torch.sum(y_pred,(1,2))
-#   union = n_y_true + n_y_pred
-#   dice = ( 2. *  n_intersection + smooth) / (union + smooth)
-#   return 1 - dice
-#
+def DSC_BCE_loss(y_pred, y_true, smooth=1):
+    dsc = dice_coef_loss(y_pred, y_true, smooth)
+    bce = torch.nn.BCEWithLogitsLoss()
+    return
 
-def soft_dice_loss(y_pred, y_true, epsilon=1e-6):
+
+def soft_dice_loss(y_pred, y_true, epsilon=1):
     '''
     Soft dice loss calculation for arbitrary batch size, number of classes, and number of spatial dimensions.
     Assumes the `channels_last` format.
 
     # Arguments
-        y_true: b x X x Y( x Z...) x c One hot encoding of ground truth
-        y_  pred: b x X x Y( x Z...) x c Network output, must sum to 1 over c channel (such as after softmax)
+        y_true: b x c x * X x Y( x Z...)  One hot encoding of ground truth
+        y_  pred: b x c x X x Y( x Z...)  Network output, must sum to 1 over c channel (such as after softmax)
         epsilon: Used for numerical stability to avoid divide by zero errors
 
     # References
@@ -71,10 +64,9 @@ def soft_dice_loss(y_pred, y_true, epsilon=1e-6):
 
         Adapted from https://github.com/Lasagne/Recipes/issues/99#issuecomment-347775022
     '''
-    sigmoid = torch.nn.Sigmoid()
-    y_pred = sigmoid(y_pred)
+
     # skip the batch and class axis for calculating Dice score
-    axes = tuple(range(1, len(y_pred.shape) - 1))
+    axes = tuple(range(2, len(y_pred.shape)))
     numerator = 2. * torch.sum(y_pred * y_true, axes)
     denominator = torch.sum(y_pred ** 2 + y_true ** 2, axes)
 

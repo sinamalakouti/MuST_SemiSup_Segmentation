@@ -1,5 +1,5 @@
-import sys
 import os
+import sys
 import torch
 import torch.nn as nn
 from torch.optim import lr_scheduler
@@ -17,6 +17,7 @@ import numpy as np
 import argparse
 import yaml
 from easydict import EasyDict as edict
+from losses.loss import dice_coef_loss, soft_dice_loss
 
 import wandb
 
@@ -65,9 +66,9 @@ def unet_compute_loss(y_preds, y_true, loss_fuctions, is_supervised):
     if is_supervised:
 
         if y_preds.shape[1] != y_true.shape[1]:
-            target = y_true.reshape((y_true.shape[0], y_true.shape[2], y_true.shape[3])).type(torch.LongTensor)
+            y_true = y_true.reshape((y_true.shape[0], y_true.shape[2], y_true.shape[3])).type(torch.LongTensor)
 
-        total_loss = sup_loss(y_preds, target.to(y_preds.device))
+        total_loss = sup_loss(y_preds, y_true.to(y_preds.device))
     else:
         None
         # for comparing outputs together!
@@ -209,7 +210,7 @@ def evaluateUnet(model, dataset, device, threshold, cfg, data_mode):
 
     testset = utils.get_testset(dataset, cfg.batch_size, intensity_rescale=cfg.intensity_rescale,
                                 mixup_threshold=cfg.mixup_threshold, mode=data_mode,
-                                t1=cfg.t1, t2=cfg.t2, t1ce=cfg.t1ce, augment=False)
+                                t1=cfg.t1, t2=cfg.t2, t1ce=cfg.t1ce, augment=False, oneHot=cfg.oneHot)
 
     model.eval()
 
@@ -224,7 +225,10 @@ def evaluateUnet(model, dataset, device, threshold, cfg, data_mode):
             target = batch['label'].to(device)
             outputs = model(b)
             # apply softmax
-            sf = torch.nn.Softmax2d()
+            if cfg.oneHot:
+                sf = torch.nn.Sigmoid()
+            else:
+                sf = torch.nn.Softmax2d()
             y_pred = sf(outputs)
             if batch_id == 0:
                 all_preds = y_pred
@@ -235,15 +239,17 @@ def evaluateUnet(model, dataset, device, threshold, cfg, data_mode):
                 all_subjects = torch.cat((all_subjects, batch['subject']), dim=0)
                 all_targets = torch.cat((all_targets, target), dim=0)
 
-            y_WT = seg2WT(y_pred, threshold)
+            y_WT = seg2WT(y_pred, threshold, cfg.oneHot)
             target[target >= 1] = 1
             target_WT = target
             dice_score = dice_coef(target_WT.reshape(y_WT.shape), y_WT)
-
+            print("now at this iteration   ", batch['subject'])
+            print("***** result is  *******")
+            print(dice_score)
             dice_arr.append(dice_score.item())
 
         all_targets[all_targets >= 1] = 1
-        all_preds = seg2WT(all_preds, threshold)
+        all_preds = seg2WT(all_preds, threshold, oneHot=cfg.oneHot)
         subject_wise_DSC = get_dice_coef_per_subject(all_targets.reshape(all_preds.shape), all_preds, all_subjects)
 
     return np.mean(np.array(dice_arr)), subject_wise_DSC
@@ -251,12 +257,9 @@ def evaluateUnet(model, dataset, device, threshold, cfg, data_mode):
 
 def eval_per_subjectUnet(model, device, threshold, cfg, data_mode):
     print("******************** EVALUATING {}********************".format(data_mode))
-
     testset = Brat20Test(f'data/brats20', data_mode, 10, 155,
-                         augment=False, center_cropping=True, t1=cfg.t1, t2=cfg.t2, t1ce=cfg.t1ce)
-
+                         augment=False, center_cropping=True, t1=cfg.t1, t2=cfg.t2, t1ce=cfg.t1ce, oneHot=cfg.oneHot)
     model.eval()
-
     dice_arr = []
     paths = testset.paths
     with torch.no_grad():
@@ -268,15 +271,22 @@ def eval_per_subjectUnet(model, device, threshold, cfg, data_mode):
             assert len(np.unique(subjects)) == 1, print("More than one subject at a time")
             b = b.to(device)
             outputs = model(b)
-            sf = torch.nn.Softmax2d()
+            if cfg.oneHot:
+                sf = torch.nn.Sigmoid()
+                target[target >= 1] = 1
+                target_WT = seg2WT(target, 1, oneHot=cfg.oneHot)
+            else:
+                sf = torch.nn.Softmax2d()
+                target[target >= 1] = 1
+                target_WT = target
+
             y_pred = sf(outputs)
-            y_WT = seg2WT(y_pred, threshold)
-            target[target >= 1] = 1
-            target_WT = target
+            y_WT = seg2WT(y_pred, threshold, oneHot=cfg.oneHot)
+
             dice_score = dice_coef(target_WT.reshape(y_WT.shape), y_WT)
             print("score for subject {} is {}".format(subjects[0], dice_score))
             dice_arr.append(dice_score)
-        return np.mean(np.array(dice_arr))
+    return np.mean(np.array(dice_arr))
 
 
 def eval_per_subjectPgs(model, device, threshold, cfg, data_mode):
@@ -300,7 +310,7 @@ def eval_per_subjectPgs(model, device, threshold, cfg, data_mode):
             outputs, _ = model(b, True)
             sf = torch.nn.Softmax2d()
             y_pred = sf(outputs[-1])
-            y_WT = seg2WT(y_pred, threshold)
+            y_WT = seg2WT(y_pred, threshold, cfg.oneHot)
             target[target >= 1] = 1
             target_WT = target
             dice_score = dice_coef(target_WT.reshape(y_WT.shape), y_WT)
@@ -361,18 +371,22 @@ def evaluatePGS(model, dataset, device, threshold, cfg, training_mode):
     return np.mean(np.array(dice_arr)), subject_wise_DSC, segmentation_outputs
 
 
-def seg2WT(preds, threshold):
-    max_val, max_indx = torch.max(preds, dim=1)
-    max_val = (max_val >= threshold).float()
-    max_indx[max_indx >= 1] = 1
-    WT_pred = torch.multiply(max_indx, max_val)
+def seg2WT(preds, threshold, oneHot=False):
+    if oneHot:
+        preds = preds >= threshold
+        WT_pred = preds.sum(1) >= 1
+    else:
+        max_val, max_indx = torch.max(preds, dim=1)
+        max_val = (max_val >= threshold).float()
+        max_indx[max_indx >= 1] = 1
+        WT_pred = torch.multiply(max_indx, max_val)
 
     # WT_pred = preds[:, 1:4, :, :].sum(1) >= 1
     return WT_pred
 
 
 def Unet_train_val(dataset, n_epochs, device, wmh_threshold, output_dir, learning_rate, args, cfg):
-    inputs_dim = [1, 64, 128, 256, 512, 1024, 512, 256, 128]
+    inputs_dim = [4, 64, 128, 256, 512, 1024, 512, 256, 128]
     outputs_dim = [64, 128, 256, 512, 1024, 512, 256, 128, 64]
     kernels = [3, 3, 3, 3, 3, 3, 3, 3, 3]
     paddings = [1, 1, 1, 1, 1, 1, 1, 1, 1]
@@ -425,10 +439,13 @@ def Unet_train_val(dataset, n_epochs, device, wmh_threshold, output_dir, learnin
             print("Creation of the directory %s failed" % output_image_dir)
     else:
         None
+    if cfg.oneHot:
+        c = 3
+    else:
+        c = 4
 
-    unet = Unet.Wnet(18, 4, inputs_dim, outputs_dim, strides=strides, paddings=paddings, kernels=kernels,
+    unet = Unet.Wnet(18, c, inputs_dim, outputs_dim, strides=strides, paddings=paddings, kernels=kernels,
                      separables=separables)
-    subject_wise_test_score = eval_per_subjectUnet(unet, device, wmh_threshold, cfg, cfg.test_mode)
     print("learning_rate is    ", learning_rate)
     step_size = cfg.scheduler_step_size
 
@@ -446,13 +463,16 @@ def Unet_train_val(dataset, n_epochs, device, wmh_threshold, output_dir, learnin
 
     unet.to(device)
     optimizer = torch.optim.SGD(unet.parameters(), learning_rate, momentum=0.9, weight_decay=1e-4)
-    optimizer = torch.optim.Adam(unet.parameters(), lr=1e-2)
     scheduler = lr_scheduler.StepLR(optimizer, step_size=step_size, gamma=cfg.lr_gamma)  # don't use it
 
+    # unet = model_utils.load_model('/Users/sinamalakouti/psgnet_best_lr0.001.model', 'cpu').module
+    #
+    # h = eval_per_subjectUnet(unet, device, 0.5, cfg, cfg.val_mode)
     train_sup_loader = utils.get_trainset(dataset, batch_size=cfg.batch_size, intensity_rescale=cfg.intensity_rescale,
                                           mixup_threshold=cfg.mixup_threshold, mode=cfg.train_mode, t1=cfg.t1,
-                                          t2=cfg.t2, t1ce=cfg.t1ce, augment=cfg.augment)
-    sup_loss = torch.nn.CrossEntropyLoss()
+                                          t2=cfg.t2, t1ce=cfg.t1ce, augment=cfg.augment, oneHot=cfg.oneHot)
+    # sup_loss = torch.nn.CrossEntropyLoss()
+    sup_loss = soft_dice_loss
     loss_functions = (sup_loss, None)
 
     for epoch in range(start_epoch, n_epochs):
