@@ -142,7 +142,7 @@ def trainUnet_sup(train_sup_loader, model, optimizer, device, loss_functions, ep
         print("subject is : ", batch_sup['subject'])
         sup_outputs = model(b_sup)
         if cfg.oneHot:
-            sf = torch.nn.Sigmoid()
+            sf = torch.nn.Softmax2d()
             sup_outputs = sf(sup_outputs)
         total_loss = unet_compute_loss(sup_outputs, target_sup, loss_functions, is_supervised=True)
         # wandb.log({"batch_id": step + epochid * len(train_sup_loader), "loss": total_loss,"batch_score": dice_score})
@@ -153,7 +153,7 @@ def trainUnet_sup(train_sup_loader, model, optimizer, device, loss_functions, ep
 
         with torch.no_grad():
             if cfg.oneHot:
-                sf = torch.nn.Sigmoid()
+                sf = torch.nn.Softmax2d()
                 target_sup[target_sup >= 1] = 1
                 target_sup = seg2WT(target_sup, 1, oneHot=cfg.oneHot)
             else:
@@ -245,7 +245,7 @@ def evaluateUnet(model, dataset, device, threshold, cfg, data_mode):
             outputs = model(b)
             # apply softmax
             if cfg.oneHot:
-                sf = torch.nn.Sigmoid()
+                sf = torch.nn.Softmax2d()
             else:
                 sf = torch.nn.Softmax2d()
             y_pred = sf(outputs)
@@ -293,13 +293,13 @@ def eval_per_subjectUnet(model, device, threshold, cfg, data_mode):
             b = b.to(device)
             outputs = model(b)
             if cfg.oneHot:
-                sf = torch.nn.Sigmoid()
+                sf = torch.nn.Softmax2d()
                 outputs = sf(outputs)
             loss_val = loss_fn(outputs, target.type(torch.LongTensor).to(device), 1)
             print("############# LOSS for subject {} is {} ##############".format(subjects[0], loss_val.item()))
 
             if cfg.oneHot:
-                sf = torch.nn.Sigmoid()
+                sf = torch.nn.Softmax2d()
                 target[target >= 1] = 1
                 target_WT = seg2WT(target, 1, oneHot=cfg.oneHot)
             else:
