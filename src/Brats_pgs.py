@@ -27,7 +27,7 @@ sys.path.append('srs/utils')
 # sys.path.append('srs/models')
 # sys.path.append('srs/models')
 
-os.environ['CUDA_VISIBLE_DEVICES'] = "0,1"
+os.environ['CUDA_VISIBLE_DEVICES'] = "2,3"
 
 for p in sys.path:
     print("path  ", p)
@@ -281,7 +281,7 @@ def eval_per_subjectUnet(model, device, threshold, cfg, data_mode):
     model.eval()
     dice_arr = []
     paths = testset.paths
-    loss_fn = soft_dice_loss
+    loss_fn = soft_dice_loss()
 
     with torch.no_grad():
         for path in paths:
@@ -494,12 +494,12 @@ def Unet_train_val(dataset, n_epochs, device, wmh_threshold, output_dir, learnin
 
     # unet = model_utils.load_model('/Users/sinamalakouti/psgnet_best_lr0.001.model', 'cpu').module
     #
-    h = eval_per_subjectUnet(unet, device, 0.5, cfg, cfg.val_mode)
+    # h = eval_per_subjectUnet(unet, device, 0.5, cfg, cfg.val_mode)
     train_sup_loader = utils.get_trainset(dataset, batch_size=cfg.batch_size, intensity_rescale=cfg.intensity_rescale,
                                           mixup_threshold=cfg.mixup_threshold, mode=cfg.train_mode, t1=cfg.t1,
                                           t2=cfg.t2, t1ce=cfg.t1ce, augment=cfg.augment, oneHot=cfg.oneHot)
     # sup_loss = torch.nn.CrossEntropyLoss()
-    sup_loss = soft_dice_loss
+    sup_loss = soft_dice_loss()
     loss_functions = (sup_loss, None)
 
     for epoch in range(start_epoch, n_epochs):

@@ -46,7 +46,7 @@ def DSC_BCE_loss(y_pred, y_true, smooth=1):
     return
 
 
-def soft_dice_loss(y_pred, y_true, epsilon=1):
+class soft_dice_loss(torch.nn.Module):
     '''
     Soft dice loss calculation for arbitrary batch size, number of classes, and number of spatial dimensions.
     Assumes the `channels_last` format.
@@ -65,9 +65,13 @@ def soft_dice_loss(y_pred, y_true, epsilon=1):
         Adapted from https://github.com/Lasagne/Recipes/issues/99#issuecomment-347775022
     '''
 
-    # skip the batch and class axis for calculating Dice score
-    axes = tuple(range(2, len(y_pred.shape)))
-    numerator = 2. * torch.sum(y_pred * y_true, axes)
-    denominator = torch.sum(y_pred ** 2 + y_true ** 2, axes)
+    def __init__(self, ):
+        super(soft_dice_loss, self).__init__()
 
-    return 1 - torch.mean((numerator + epsilon) / (denominator + epsilon))  # average over classes and batch
+    # skip the batch and class axis for calculating Dice score
+    def __call__(self, y_pred, y_true, epsilon=1):
+        axes = tuple(range(2, len(y_pred.shape)))
+        numerator = 2. * torch.sum(y_pred * y_true, axes)
+        denominator = torch.sum(y_pred ** 2 + y_true ** 2, axes)
+
+        return 1 - torch.mean((numerator + epsilon) / (denominator + epsilon))  # average over classes and batch
