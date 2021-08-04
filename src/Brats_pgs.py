@@ -141,6 +141,9 @@ def trainUnet_sup(train_sup_loader, model, optimizer, device, loss_functions, ep
 
         print("subject is : ", batch_sup['subject'])
         sup_outputs = model(b_sup)
+        if cfg.oneHot:
+            sf = torch.nn.Sigmoid()
+            sup_outputs = sf(sup_outputs)
         total_loss = unet_compute_loss(sup_outputs, target_sup, loss_functions, is_supervised=True)
         # wandb.log({"batch_id": step + epochid * len(train_sup_loader), "loss": total_loss,"batch_score": dice_score})
         print("**************** LOSSS  : {} ****************".format(total_loss))
@@ -289,6 +292,9 @@ def eval_per_subjectUnet(model, device, threshold, cfg, data_mode):
             assert len(np.unique(subjects)) == 1, print("More than one subject at a time")
             b = b.to(device)
             outputs = model(b)
+            if cfg.oneHot:
+                sf = torch.nn.Sigmoid()
+                outputs = sf(outputs)
             loss_val = loss_fn(outputs, target.type(torch.LongTensor).to(device), 1)
             print("############# LOSS for subject {} is {} ##############".format(subjects[0], loss_val.item()))
 
