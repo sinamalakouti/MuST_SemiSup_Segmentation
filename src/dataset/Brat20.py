@@ -140,7 +140,7 @@ class Brat20Test(torch.utils.data.Dataset):
         data_Y = []
         data_subject = []
         for sl in range(Y.shape[2]):
-            if X[:, :, sl].sum() == 0 or np.sum((X[:, :, sl] > 0)) / (240 * 240) * 100 < 10:
+            if Y[:,:, sl].sum() == 0 or X[:, :, sl].sum() == 0 or np.sum((X[:, :, sl] > 0)) / (240 * 240) * 100 < 20:
                 continue
             x = X[:, :, sl]
             y = Y[:, :, sl]
