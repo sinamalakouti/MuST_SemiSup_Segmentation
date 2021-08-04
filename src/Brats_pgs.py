@@ -281,8 +281,8 @@ def eval_per_subjectUnet(model, device, threshold, cfg, data_mode):
     model.eval()
     dice_arr = []
     paths = testset.paths
-    loss_fn = soft_dice_loss()
-
+    # loss_fn = soft_dice_loss()
+    loss_fn = torch.nn.BCELoss()
     with torch.no_grad():
         for path in paths:
             batch = testset.get_subject(path)
@@ -499,7 +499,8 @@ def Unet_train_val(dataset, n_epochs, device, wmh_threshold, output_dir, learnin
                                           mixup_threshold=cfg.mixup_threshold, mode=cfg.train_mode, t1=cfg.t1,
                                           t2=cfg.t2, t1ce=cfg.t1ce, augment=cfg.augment, oneHot=cfg.oneHot)
     # sup_loss = torch.nn.CrossEntropyLoss()
-    sup_loss = soft_dice_loss()
+    # sup_loss = soft_dice_loss()
+    sup_loss = torch.nn.BCELoss()
     loss_functions = (sup_loss, None)
 
     for epoch in range(start_epoch, n_epochs):
