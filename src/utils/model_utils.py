@@ -34,4 +34,5 @@ def load_state_dict(model, path):
 
 
 def save_state_dict(model, path):
-    torch.save(model.state_dict(), path)
+    with open(path, 'wb') as f:
+        torch.save(model.state_dict(), f)

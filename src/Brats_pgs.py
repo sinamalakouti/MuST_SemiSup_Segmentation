@@ -312,7 +312,7 @@ def eval_per_subjectUnet(model, device, threshold, cfg, data_mode):
 
             dice_score = dice_coef(target_WT.reshape(y_WT.shape), y_WT)
             print("score for subject {} is {}".format(subjects[0], dice_score))
-            dice_arr.append(dice_score)
+            dice_arr.append(dice_score.item())
     return np.mean(np.array(dice_arr))
 
 

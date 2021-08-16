@@ -1,6 +1,6 @@
 from utils.Constants import *
 from dataset.dataloader import *
-from dataset.Brat20 import *
+from dataset.Brats20_preprocessed import *
 import matplotlib.pyplot as plt
 import os
 import torch
@@ -68,7 +68,7 @@ def get_trainset(dataset, batch_size, intensity_rescale, mixup_threshold=None,
         batch_sz = batch_size
         train = torch.utils.data.DataLoader(
             Brat20(
-                dataroot_dir=f'data/brats20',
+                dataroot_dir=f'../data/brats20',
                 mode=mode,
                 min_slice_index=10,
                 max_slice_index=155,
@@ -120,7 +120,7 @@ def get_testset(dataset, batch_size, intensity_rescale, mixup_threshold=None,
         batch_sz = batch_size
         test = torch.utils.data.DataLoader(
             Brat20(
-                dataroot_dir=f'data/brats20',
+                dataroot_dir=f'../data/brats20',
                 mode=mode,
                 min_slice_index=10,
                 max_slice_index=155,
@@ -232,3 +232,40 @@ def evaluate(dataset, model, output_path):
     text_file = open(output_path + "/result.txt", "w")
     text_file.write(text)
     text_file.close()
+
+
+
+#
+#
+# def get_cluster_assumption_representation(h):
+#     l_rep = h.shape[0]
+#     n_rows = h.shape[1]
+#     n_cols = h.shape[2]
+#     diff = torch.zeros((n_rows, n_cols))
+#
+#     for r in range(1, n_rows - 1):
+#         for c in range(1, n_cols - 1):
+#             main_patch = h[:, r, c]
+#             main_patch = main_patch.reshape(main_patch.shape[0], 1, 1)
+#             patch = h[:, r - 1:r + 2, c - 1:c + 2]
+#             d = torch.sqrt(torch.sum((main_patch - patch) ** 2, axis=0))
+#
+#             diff[r, c] = d.mean()
+#     return diff
+#
+#
+# def get_cluster_assumption(image):
+#     n_rows = image.shape[0]
+#     n_cols = image.shape[1]
+#     size = 1
+#     diff = torch.zeros(image.shape)
+#     for r in range(2 + size, n_rows - 2 - size):
+#         for c in range(2 + size, n_cols - 2 - size):
+#             main_patch = image[r - 1 - size:r + 1 + size, c - 1 - size:c + 1 + size]
+#             for rd in range(-1, 2):
+#                 for cd in range(-1, 2):
+#                     patch = image[(r + rd) - 1 - size:(r + rd) + 1 + size, (c + cd) - 1 - size:(c + cd) + 1 + size]
+#                     diff[r, c] += torch.sqrt(torch.sum((main_patch - patch) ** 2))
+#             diff[r, c] = diff[r, c] / 8
+#
+#     return diff

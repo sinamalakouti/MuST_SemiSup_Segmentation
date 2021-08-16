@@ -4,7 +4,7 @@ import torch
 import torchvision.transforms.functional as augmentor
 import torchvision.transforms as transformer
 import os
-import nibabel as nib
+
 
 
 def get_name_mapping(name_mapping_csv_path):
@@ -104,23 +104,23 @@ class Brat20Test(torch.utils.data.Dataset):
         subjects_root_dir = os.path.join(dataroot_dir, 'MICCAI_BraTS2020_TrainingData')
         self.subjects_name = np.asarray(pd.read_csv(ids_path, header=None)).reshape(-1)
 
-        label_paths = [os.path.join(subjects_root_dir, str(subj_name) + '/{}_seg.nii.gz'.format(subj_name)) for
+        label_paths = [os.path.join(subjects_root_dir, str(subj_name) + '/{}_seg.npy'.format(subj_name)) for
                        subj_name in self.subjects_name]
-        flair_paths = [os.path.join(subjects_root_dir, str(subj_name) + '/{}_flair.nii.gz'.format(subj_name)) for
+        flair_paths = [os.path.join(subjects_root_dir, str(subj_name) + '/{}_flair.npy'.format(subj_name)) for
                        subj_name in self.subjects_name]
         if self.t1:
-            t1_paths = [os.path.join(subjects_root_dir, str(subj_name) + '/{}_t1.nii.gz'.format(subj_name)) for
+            t1_paths = [os.path.join(subjects_root_dir, str(subj_name) + '/{}_t1.npy'.format(subj_name)) for
                         subj_name in self.subjects_name]
         else:
             t1_paths = [None for _ in self.subjects_name]
         if self.t2:
-            t2_paths = [os.path.join(subjects_root_dir, str(subj_name) + '/{}_t2.nii.gz'.format(subj_name)) for
+            t2_paths = [os.path.join(subjects_root_dir, str(subj_name) + '/{}_t2.npy'.format(subj_name)) for
                         subj_name in self.subjects_name]
         else:
             t2_paths = [None for _ in self.subjects_name]
 
         if self.t1ce:
-            t1ce_paths = [os.path.join(subjects_root_dir, str(subj_name) + '/{}_t1ce.nii.gz'.format(subj_name)) for
+            t1ce_paths = [os.path.join(subjects_root_dir, str(subj_name) + '/{}_t1ce.npy'.format(subj_name)) for
                           subj_name in self.subjects_name]
         else:
             t1ce_paths = [None for _ in self.subjects_name]
@@ -141,7 +141,7 @@ class Brat20Test(torch.utils.data.Dataset):
         data_Y = []
         data_subject = []
         for sl in range(Y.shape[2]):
-            if X[:, :, sl].sum() == 0 or np.sum((X[:, :, sl] > 0)) / (240 * 240) * 100 < 10:
+            if X[:, :, sl].sum() == 0 or np.sum((X[:, :, sl] > 0)) / (200 * 200) * 100 < 10:
                 continue
             x = X[:, :, sl]
             y = Y[:, :, sl]
@@ -152,15 +152,9 @@ class Brat20Test(torch.utils.data.Dataset):
             x_t1ce = X_t1ce[:, :, sl] if self.t1ce else None
 
             x, x_t1, x_t2, x_t1ce, y = tensorize(x, x_t1, x_t2, x_t1ce, y)
-            if self.center_cropping:
-                x, x_t1, x_t2, x_t1ce, y = center_crop(x, x_t1, x_t2, x_t1ce, y)
 
             y[y == 4] = 3  # for simplicity in training, substitute label = 3 with 4
             x, x_t1, x_t2, x_t1ce, y = tensorize(x, x_t1, x_t2, x_t1ce, y)
-            x = rescale_intensity(x)
-            x_t1 = rescale_intensity(x_t1) if x_t1 is not None else None
-            x_t2 = rescale_intensity(x_t2) if x_t2 is not None else None
-            x_t1ce = rescale_intensity(x_t1ce) if x_t1ce is not None else None
 
             # result = {'data': x, 'label': y, 'subject': self.subjects_id[index]}
             data_modalities = []
@@ -205,7 +199,7 @@ class Brat20Test(torch.utils.data.Dataset):
         return len(self.data)
 
     def _extract(self, f, slices=(24, 25, 26, 27, 28)):
-        x = nib.load(f).get_data()
+        x = np.load(f)
         slices = np.array(slices)
         return x[:, :, slices].astype('float32')
 
@@ -252,23 +246,23 @@ class Brat20(torch.utils.data.Dataset):
         subjects_root_dir = os.path.join(dataroot_dir, 'MICCAI_BraTS2020_TrainingData')
         self.subjects_name = np.asarray(pd.read_csv(ids_path, header=None)).reshape(-1)
 
-        label_paths = [os.path.join(subjects_root_dir, str(subj_name) + '/{}_seg.nii.gz'.format(subj_name)) for
+        label_paths = [os.path.join(subjects_root_dir, str(subj_name) + '/{}_seg.npy'.format(subj_name)) for
                        subj_name in self.subjects_name]
-        flair_paths = [os.path.join(subjects_root_dir, str(subj_name) + '/{}_flair.nii.gz'.format(subj_name)) for
+        flair_paths = [os.path.join(subjects_root_dir, str(subj_name) + '/{}_flair.npy'.format(subj_name)) for
                        subj_name in self.subjects_name]
         if self.t1:
-            t1_paths = [os.path.join(subjects_root_dir, str(subj_name) + '/{}_t1.nii.gz'.format(subj_name)) for
+            t1_paths = [os.path.join(subjects_root_dir, str(subj_name) + '/{}_t1.npy'.format(subj_name)) for
                         subj_name in self.subjects_name]
         else:
             t1_paths = [None for _ in self.subjects_name]
         if self.t2:
-            t2_paths = [os.path.join(subjects_root_dir, str(subj_name) + '/{}_t2.nii.gz'.format(subj_name)) for
+            t2_paths = [os.path.join(subjects_root_dir, str(subj_name) + '/{}_t2.npy'.format(subj_name)) for
                         subj_name in self.subjects_name]
         else:
             t2_paths = [None for _ in self.subjects_name]
 
         if self.t1ce:
-            t1ce_paths = [os.path.join(subjects_root_dir, str(subj_name) + '/{}_t1ce.nii.gz'.format(subj_name)) for
+            t1ce_paths = [os.path.join(subjects_root_dir, str(subj_name) + '/{}_t1ce.npy'.format(subj_name)) for
                           subj_name in self.subjects_name]
         else:
             t1ce_paths = [None for _ in self.subjects_name]
@@ -288,7 +282,7 @@ class Brat20(torch.utils.data.Dataset):
             subject_id = int(subject_name.split('_')[-1])
             for sl in range(Y.shape[2]):
                 if Y[:, :, sl].sum() == 0 or X[:, :, sl].sum() == 0 or np.sum((X[:, :, sl] > 0)) / (
-                        240 * 240) * 100 < 20:
+                        200 * 200) * 100 < 20:
                     None
                 else:
                     data_map = {'data': X[:, :, sl],
@@ -315,7 +309,7 @@ class Brat20(torch.utils.data.Dataset):
         return len(self.data)
 
     def _extract(self, f, slices=(24, 25, 26, 27, 28)):
-        x = nib.load(f).get_data()
+        x = np.load(f)
         slices = np.array(slices)
         return x[:, :, slices].astype('float32')
 
@@ -328,13 +322,8 @@ class Brat20(torch.utils.data.Dataset):
         y = self.data[index]['label']
 
         x, x_t1, x_t2, x_t1ce, y = tensorize(x, x_t1, x_t2, x_t1ce, y)
-        if self.center_cropping:
-            x, x_t1, x_t2, x_t1ce, y = center_crop(x, x_t1, x_t2, x_t1ce, y)
-
-        # only Whole Tumor (WT) segmentation
-        # y[y >= 1] = 1
-
         y[y == 4] = 3  # for simplicity in training, substitute label = 3 with 4
+
         # rand = np.random.rand(1)
         if self.augment:  # and rand < 0.5:
 
@@ -343,10 +332,7 @@ class Brat20(torch.utils.data.Dataset):
         else:
             x, x_t1, x_t2, x_t1ce, y = tensorize(x, x_t1, x_t2, x_t1ce, y)
 
-        x = rescale_intensity(x)
-        x_t1 = rescale_intensity(x_t1) if x_t1 is not None else None
-        x_t2 = rescale_intensity(x_t2) if x_t2 is not None else None
-        x_t1ce = rescale_intensity(x_t1ce) if x_t1ce is not None else None
+
 
         # result = {'data': x, 'label': y, 'subject': self.subjects_id[index]}
         data_modalities = []
@@ -449,31 +435,6 @@ def adjust_contrast(x, c_factor):
 
 def tensorize(*args):
     return tuple(torch.Tensor(arg).float().unsqueeze(0) if arg is not None else None for arg in args)
-
-
-def center_crop(x, x_t1, x_t2, x_t1ce, y, size=200):
-    cropper = transformer.CenterCrop(size)
-    x_cropped = cropper(x).reshape((size, size))
-    x_t1_cropped = cropper(x_t1).reshape((size, size)) if x_t1 is not None else None
-    x_t2_cropped = cropper(x_t2).reshape((size, size)) if x_t2 is not None else None
-    x_t1ce_cropped = cropper(x_t1ce).reshape((size, size)) if x_t1ce is not None else None
-    y_cropped = cropper(y).reshape((size, size))
-
-    assert y.sum() == y_cropped.sum(), "cropped label part!!!!"
-    return x_cropped, x_t1_cropped, x_t2_cropped, x_t1ce_cropped, y_cropped
-
-
-def rescale_intensity(x):
-    return normalize_quantile(x, 0.99)
-    maximum = x.max()
-    minimum = x.min()
-    return (x - minimum + 0.01) / (maximum - minimum + 0.01)
-
-
-def normalize_quantile(x, threshold):
-    q = torch.quantile(x, threshold)
-    mask = x[x <= q]
-    return x / max(mask)
 
 
 
