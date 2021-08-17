@@ -1,6 +1,7 @@
 from utils.Constants import *
 from dataset.dataloader import *
-from dataset.Brats20_preprocessed import *
+# from dataset.Brats20_preprocessed import *
+from dataset.Brat20 import *
 import matplotlib.pyplot as plt
 import os
 import torch
@@ -68,7 +69,7 @@ def get_trainset(dataset, batch_size, intensity_rescale, mixup_threshold=None,
         batch_sz = batch_size
         train = torch.utils.data.DataLoader(
             Brat20(
-                dataroot_dir=f'../data/brats20',
+                dataroot_dir=f'data/brats20',
                 mode=mode,
                 min_slice_index=10,
                 max_slice_index=155,
@@ -120,7 +121,7 @@ def get_testset(dataset, batch_size, intensity_rescale, mixup_threshold=None,
         batch_sz = batch_size
         test = torch.utils.data.DataLoader(
             Brat20(
-                dataroot_dir=f'../data/brats20',
+                dataroot_dir=f'data/brats20',
                 mode=mode,
                 min_slice_index=10,
                 max_slice_index=155,

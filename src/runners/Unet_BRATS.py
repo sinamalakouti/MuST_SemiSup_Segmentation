@@ -223,7 +223,7 @@ def seg2WT(preds, threshold, oneHot=False):
 
 def train_val(dataset, n_epochs, wmh_threshold, output_dir, learning_rate, args, cfg):
     print("******* TRAINING UNET***********")
-    inputs_dim = [1, 64, 128, 256, 512, 1024, 512, 256, 128]
+    inputs_dim = [4, 64, 128, 256, 512, 1024, 512, 256, 128]
     outputs_dim = [64, 128, 256, 512, 1024, 512, 256, 128, 64]
     kernels = [3, 3, 3, 3, 3, 3, 3, 3, 3]
     paddings = [1, 1, 1, 1, 1, 1, 1, 1, 1]

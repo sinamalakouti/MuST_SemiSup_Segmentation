@@ -7,9 +7,6 @@ import torchvision.transforms.functional as augmentor
 import torchvision.transforms as transformer
 
 
-
-
-
 def rescale_intensity(x):
     return normalize_quantile(x, 0.99)
     maximum = x.max()
@@ -54,7 +51,7 @@ def preprocess_data(raw_dataroot, new_dataroot, all_ids_file):
         X_t1 = nib.load(t1_path).get_fdata().astype('float32').reshape(data_shape)
         X_t2 = nib.load(t2_path).get_fdata().astype('float32').reshape(data_shape)
         X_t1ce = nib.load(t1ce_path).get_fdata().astype('float32').reshape(data_shape)
-        X_seg = nib.load(t1ce_path).get_fdata().astype('float32').reshape(data_shape)
+        X_seg = nib.load(label_path).get_fdata().astype('float32').reshape(data_shape)
 
         X_flair = torch.tensor(X_flair)
         X_t1 = torch.tensor(X_t1)
@@ -73,15 +70,14 @@ def preprocess_data(raw_dataroot, new_dataroot, all_ids_file):
         X_t1 = rescale_intensity(X_t1)
         X_t2 = rescale_intensity(X_t2)
         X_t1ce = rescale_intensity(X_t1ce)
-        X_seg = rescale_intensity(X_seg)
 
         X_flair = X_flair.reshape(output_shape)
         X_t1 = X_t1.reshape(output_shape)
         X_t2 = X_t2.reshape(output_shape)
         X_t1ce = X_t1ce.reshape(output_shape)
-        X_seg = X_seg .reshape(output_shape)
+        X_seg = X_seg.reshape(output_shape)
 
-        flair_out_path = os.path.join(subject_dir_path,'{}_flair.npy'.format(subject_name))
+        flair_out_path = os.path.join(subject_dir_path, '{}_flair.npy'.format(subject_name))
         X_t1_out_path = os.path.join(subject_dir_path, '{}_t1.npy'.format(subject_name))
         X_t2_out_path = os.path.join(subject_dir_path, '{}_t2.npy'.format(subject_name))
         X_t1ce_out_path = os.path.join(subject_dir_path, '{}_t1ce.npy'.format(subject_name))
@@ -98,8 +94,6 @@ def preprocess_data(raw_dataroot, new_dataroot, all_ids_file):
         np.save(X_t2_out_path, X_t2)
         np.save(X_t1ce_out_path, X_t1ce)
         np.save(X_seg_out_path, X_seg)
-
-
 
 
 raw_dataroot = ''
