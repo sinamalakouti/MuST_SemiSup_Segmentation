@@ -61,6 +61,7 @@ def preprocess_data(raw_dataroot, new_dataroot, all_ids_file):
         X_t2 = torch.tensor(X_t2)
         X_t1ce = torch.tensor(X_t1ce)
         X_seg = torch.tensor(X_seg)
+
         cropper = transformer.CenterCrop(200)
         X_flair = cropper(X_flair)
         X_t1 = cropper(X_t1)

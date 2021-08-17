@@ -101,7 +101,7 @@ class Brat20Test(torch.utils.data.Dataset):
         elif mode == "test2019_new":
             ids_path = os.path.join(dataroot_dir, 'valset/brats2019_new.csv')
 
-        subjects_root_dir = os.path.join(dataroot_dir, 'MICCAI_BraTS2020_TrainingData')
+        subjects_root_dir = os.path.join(dataroot_dir, 'preprocess_MICCAI_BraTS2020_TrainingData')
         self.subjects_name = np.asarray(pd.read_csv(ids_path, header=None)).reshape(-1)
 
         label_paths = [os.path.join(subjects_root_dir, str(subj_name) + '/{}_seg.npy'.format(subj_name)) for
@@ -243,7 +243,7 @@ class Brat20(torch.utils.data.Dataset):
         elif mode == "test2019_new":
             ids_path = os.path.join(dataroot_dir, 'valset/brats2019_new.csv')
 
-        subjects_root_dir = os.path.join(dataroot_dir, 'MICCAI_BraTS2020_TrainingData')
+        subjects_root_dir = os.path.join(dataroot_dir, 'preprocess_MICCAI_BraTS2020_TrainingData')
         self.subjects_name = np.asarray(pd.read_csv(ids_path, header=None)).reshape(-1)
 
         label_paths = [os.path.join(subjects_root_dir, str(subj_name) + '/{}_seg.npy'.format(subj_name)) for
@@ -381,6 +381,8 @@ def augment(x, y, m=None, t1=None, t2=None, t1ce=None, intensity_aug=False):
     y = augmentor.to_pil_image(y, mode='F')
 
     if m is not None:
+
+
         m = augmentor.to_pil_image(m, mode='F')
     if t1 is not None:
         ori_t1 = t1
