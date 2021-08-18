@@ -104,6 +104,7 @@ def trainUnet_sup(train_sup_loader, model, optimizer, device, loss_functions, ep
                 target_sup = seg2WT(target_sup, 1, oneHot=cfg.oneHot)
                 y_pred = sup_outputs
             else:
+
                 sf = torch.nn.Softmax2d()
                 target_sup[target_sup >= 1] = 1
                 target_sup = target_sup
@@ -187,7 +188,7 @@ def eval_per_subjectUnet(model, device, threshold, cfg, data_mode):
             if cfg.oneHot:
                 sf = torch.nn.Softmax2d()
                 outputs = sf(outputs)
-            loss_val = loss_fn(outputs, target.type(torch.LongTensor).to(device), 1)
+            loss_val = loss_fn(outputs, target.type(torch.LongTensor).to(device))
             print("############# LOSS for subject {} is {} ##############".format(subjects[0], loss_val.item()))
 
             if cfg.oneHot:

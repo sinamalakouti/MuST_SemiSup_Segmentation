@@ -295,7 +295,7 @@ def eval_per_subjectUnet(model, device, threshold, cfg, data_mode):
             if cfg.oneHot:
                 sf = torch.nn.Softmax2d()
                 outputs = sf(outputs)
-            loss_val = loss_fn(outputs, target.type(torch.LongTensor).to(device), 1)
+            loss_val = loss_fn(outputs, target.type(torch.LongTensor).to(device))
             print("############# LOSS for subject {} is {} ##############".format(subjects[0], loss_val.item()))
 
             if cfg.oneHot:
