@@ -137,7 +137,7 @@ def trainPgs_sup(train_sup_loader, model, optimizer, device, loss_functions, epo
                 sf = torch.nn.Softmax2d()
                 target_sup[target_sup >= 1] = 1
                 target_sup = target_sup
-                y_pred = sf(sup_outputs)
+                y_pred = sf(sup_outputs[-1])
 
             y_WT = seg2WT(y_pred, 0.5, cfg.oneHot)
             dice_score = dice_coef(target_sup.reshape(y_WT.shape), y_WT)
@@ -201,7 +201,7 @@ def eval_per_subjectPgs(model, device, threshold, cfg, data_mode):
             outputs, _ = model(b, True)
             if cfg.oneHot:
                 sf = torch.nn.Softmax2d()
-                outputs = sf(outputs)
+                outputs = sf(outputs[-1])
 
             loss_val = compute_loss(outputs, target, (sup_loss, None), is_supervised=True)
             print("############# LOSS for subject {} is {} ##############".format(subjects[0], loss_val.item()))
@@ -374,7 +374,7 @@ def Pgs_train_val(dataset, n_epochs, wmh_threshold, output_dir, learning_rate, a
         # pgsnet, loss = trainPGS(train_loader, pgsnet, optimizer, device, epoch)
         # pgsnet, loss = trainPgs_semi(train_sup_loader, train_unsup_loader, pgsnet, optimizer, device, epoch)
         # score, segmentations = evaluatePGS(pgsnet, dataset, device, wmh_threshold, cfg, cfg.val_mode)
-        pgsnet, loss = trainPgs_sup(train_sup_loader, pgsnet, optimizer, device, epoch)
+        pgsnet, loss = trainPgs_sup(train_sup_loader, pgsnet, optimizer, device, (torch.nn.CrossEntropyLoss(), None), epoch, cfg)
 
         if epoch % 2 == 0:
             # dsc_score, subject_wise_DSC, segmentations = evaluatePGS(pgsnet, dataset, device, wmh_threshold,

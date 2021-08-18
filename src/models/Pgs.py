@@ -116,12 +116,13 @@ class AttentionBlock(nn.Module):
 
 
 class PGS_attention(nn.Module):
-    def __init__(self, dim_inputs, dim_outputs, kernel_sizes, strides):
+    def __init__(self, dim_inputs, dim_outputs, kernel_sizes, strides, num_labels):
         super(PGS_attention, self).__init__()
         self.dim_inputs = dim_inputs
         self.dim_outputs = dim_outputs
         self.kernel_sizes = kernel_sizes
         self.strides = strides
+        self.num_labels = num_labels
         self.__build_net()
 
     def __build_net(self):
@@ -153,11 +154,11 @@ class PGS_attention(nn.Module):
 
         # classifiers
         print(self.dim_outputs[4])
-        self.cls5 = CLS(self.dim_outputs[4], self.dim_inputs[0])
-        self.cls6 = CLS(self.dim_outputs[5], self.dim_inputs[0])
-        self.cls7 = CLS(self.dim_outputs[6], self.dim_inputs[0])
-        self.cls8 = CLS(self.dim_outputs[7], self.dim_inputs[0])
-        self.cls9 = CLS(self.dim_outputs[8], self.dim_inputs[0])  # main classifier
+        self.cls5 = CLS(self.dim_outputs[4], self.num_labels)
+        self.cls6 = CLS(self.dim_outputs[5], self.num_labels)
+        self.cls7 = CLS(self.dim_outputs[6], self.num_labels)
+        self.cls8 = CLS(self.dim_outputs[7], self.num_labels)
+        self.cls9 = CLS(self.dim_outputs[8], self.num_labels)  # main classifier
 
         # attention layers
         self.attention1 = AttentionBlock()
