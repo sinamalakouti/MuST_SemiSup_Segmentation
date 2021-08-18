@@ -45,17 +45,17 @@ def __fw_sup_loss(y_preds, y_true, sup_loss):
         maxpool = nn.MaxPool2d(kernel_size=2, stride=ratio, padding=0)
         target = maxpool(y_true)
 
-        if target.shape != output.shape:
-            h_diff = output.size()[2] - target.size()[2]
-            w_diff = output.size()[3] - target.size()[3]
+        if target.shape[-1] != output.shape[-1] or target.shape[-2] != output.shape[-2]:
+            h_diff = output.size()[-2] - target.size()[-2]
+            w_diff = output.size()[-1] - target.size()[-1]
             #
             target = F.pad(target, (w_diff // 2, w_diff - w_diff // 2,
                                     h_diff // 2, h_diff - h_diff // 2))
 
-        assert output.shape[2:] == target.shape[2:], "output and target shape is not similar!!"
-        if output.shape[1] != target.shape[1] and type(sup_loss) == torch.nn.CrossEntropyLoss:
+        assert output.shape[-2:] == target.shape[-2:], "output and target shape is not similar!!"
+        if output.shape[1] != target.shape[1] and type(sup_loss) == torch.nn.CrossEntropyLoss and len(target.shape) > 3:
             target = target.reshape((target.shape[0], target.shape[2], target.shape[3])).type(torch.LongTensor)
-        total_loss += sup_loss(output, target.to(output.device))
+        total_loss += sup_loss(output, target.type(torch.LongTensor).to(output.device))
     return total_loss
 
 
@@ -199,6 +199,7 @@ def eval_per_subjectPgs(model, device, threshold, cfg, data_mode):
             assert len(np.unique(subjects)) == 1, print("More than one subject at a time")
             b = b.to(device)
             outputs, _ = model(b, True)
+
             if cfg.oneHot:
                 sf = torch.nn.Softmax2d()
                 outputs = sf(outputs[-1])
@@ -213,7 +214,7 @@ def eval_per_subjectPgs(model, device, threshold, cfg, data_mode):
                 sf = torch.nn.Softmax2d()
                 target[target >= 1] = 1
                 target_WT = target
-                y_pred = sf(outputs)
+                y_pred = sf(outputs[-1])
 
             y_WT = seg2WT(y_pred, threshold, oneHot=cfg.oneHot)
 
@@ -360,6 +361,7 @@ def Pgs_train_val(dataset, n_epochs, wmh_threshold, output_dir, learning_rate, a
     pgsnet.to(device)
     optimizer = torch.optim.SGD(pgsnet.parameters(), learning_rate, momentum=0.9, weight_decay=1e-4)
     # optimizer = torch.optim.Adam(pgsnet.parameters(), lr=1e-2)
+    subject_wise_DSC = eval_per_subjectPgs(pgsnet, device, wmh_threshold, cfg, cfg.val_mode)
     scheduler = lr_scheduler.StepLR(optimizer, step_size=cfg.scheduler_step_size, gamma=cfg.lr_gamma)  # don't use it
 
     train_sup_loader = utils.get_trainset(dataset, batch_size=cfg.batch_size, intensity_rescale=cfg.intensity_rescale,
@@ -486,6 +488,7 @@ def main():
 
     dataset = utils.Constants.Datasets.Brat20
     args = parser.parse_args()
+
     with open(args.config, "r") as f:
         cfg = edict(yaml.safe_load(f))
 
