@@ -36,6 +36,25 @@ utils.Constants.USE_CUDA = True
 parser = argparse.ArgumentParser()
 
 
+def __fw_outputwise_unsup_loss(y_stud, y_teach, loss_functions):
+    (_, unsup_loss) = loss_functions
+    total_loss = 0
+    assert len(y_teach) == len(y_stud), "Error! unsup_preds and sup_preds have to have same length"
+    num_preds = len(y_teach)
+
+    for i in range(num_preds):
+        teach_pred = y_teach[i]
+
+        stud_pred = y_stud[i]
+        assert teach_pred.shape == stud_pred.shape, "Error! for preds number {}, supervised and unsupervised" \
+                                                    " prediction shape is not similar!".format(i)
+
+        total_loss = - torch.mean(
+            torch.sum(torch.nn.functional.softmax(teach_pred).detach()
+                      * torch.nn.functional.log_softmax(stud_pred, dim=1), dim=1))
+    return total_loss
+
+
 def __fw_sup_loss(y_preds, y_true, sup_loss):
     total_loss = 0
     # iterate over all level's output
@@ -60,57 +79,93 @@ def __fw_sup_loss(y_preds, y_true, sup_loss):
 
 
 def compute_loss(y_preds, y_true, loss_functions, is_supervised):
-    total_loss = 0
     if is_supervised:
         total_loss = __fw_sup_loss(y_preds, y_true, loss_functions[0])
-        # supervised binary loss
-        # total_loss = __fw_sup_loss(y_preds, y_true, loss_functions)
-    else:
-        None
-        # for comparing outputs together!
-        # total_loss = self.__fw_self_unsup_loss(y_preds, loss_functions)
 
-        # consistency of original output and noisy output
-        # total_loss = __fw_outputwise_unsup_loss(y_preds, y_true, loss_functions)
+        ''' y_preds is students preds and y_true is teacher_preds!
+                    for comparing outputs together!  # consistency of original output and noisy output 
+        '''
+
+    else:
+        total_loss = __fw_outputwise_unsup_loss(y_preds, y_true, loss_functions)
 
     return total_loss
 
 
-def trainPgs_semi(train_sup_loader, train_unsup_loader, model, optimizer, device, epochid):
+def trainPgs_semi(train_sup_loader, train_unsup_loader, model, optimizer, device, loss_functions, epochid, cfg):
+    total_loss = 0
     model.train()
 
-    for step, (batch_sup, batch_unsup) in enumerate(zip(train_sup_loader, train_unsup_loader)):
+    # for step, (batch_sup, batch_unsup) in enumerate(zip(train_sup_loader, train_unsup_loader)):
+    for sup_step, batch_sup in enumerate(train_sup_loader):
         optimizer.zero_grad()
         b_sup = batch_sup['data']
-        b_unsup = batch_unsup['data']
-        b_sup = b_sup.to(device)
-        b_unsup = b_unsup.to(device)
+        # b_unsup = batch_unsup['data']
         target_sup = batch_sup['label'].to(device)
-        continue
-        # unsup_loss = nn.BCELoss()
-        # sup_loss = torch.nn.BCELoss()
-        unsup_loss = nn.CrossEntropyLoss()
-        loss_functions = (sup_loss, unsup_loss)
 
-        print("subject is : ", batch_sup['subject'])
-        print("subject is : ", batch_unsup['subject'])
+        b_sup = b_sup.to(device)
+        # b_unsup = b_unsup.to(device)
+
+        print(" supervised subjects are : ", batch_sup['subject'])
+        # print(" unsupervised subjects is : ", batch_unsup['subject'])
         sup_outputs, _ = model(b_sup, is_supervised=True)
+        sLoss = compute_loss(sup_outputs, target_sup, loss_functions, is_supervised=True)
+        # teacher_outputs, student_outputs = model(b_unsup, is_supervised=False)
+        # uLoss = compute_loss(student_outputs, teacher_outputs, loss_functions, is_supervised=False)
 
-        total_loss = Pgs.compute_loss(sup_outputs, target_sup, loss_functions, is_supervised=True)
-        wandb.log({"sup_loss": total_loss})
-        sup_outputs, unsup_outputs = model(b_unsup, is_supervised=False)
-        unsup_loss = Pgs.compute_loss(unsup_outputs, sup_outputs, loss_functions, is_supervised=False)
-        total_loss += unsup_loss
-        wandb.log({"unsup_loss": unsup_loss})
-        print("**************** LOSSS  : {} ****************".format(total_loss))
-        wandb.log({"loss": total_loss})
+        total_loss = sLoss + 0
+        print("**************** SUP LOSSS  : {} ****************".format(total_loss))
 
         total_loss.backward()
         optimizer.step()
+
+        with torch.no_grad():
+            sf = torch.nn.Softmax2d()
+            target_sup[target_sup >= 1] = 1
+            target_sup = target_sup
+            y_pred = sf(sup_outputs[-1])
+            y_WT = seg2WT(y_pred, 0.5, cfg.oneHot)
+            dice_score = dice_coef(target_sup.reshape(y_WT.shape), y_WT)
+            wandb.log(
+                {"sup_batch_id": sup_step + epochid * len(train_sup_loader), "sup loss": sLoss, "batch_score": dice_score})
+
+    for unsup_step, batch_unsup in enumerate(train_unsup_loader):
+        optimizer.zero_grad()
+            # b_sup = batch_sup['data']
+        b_unsup = batch_unsup['data']
+            # target_sup = batch_sup['label'].to(device)
+
+            # b_sup = b_sup.to(device)
+        b_unsup = b_unsup.to(device)
+
+            # print(" supervised subjects are : ", batch_sup['subject'])
+        print(" unsupervised subjects is : ", batch_unsup['subject'])
+            # sup_outputs, _ = model(b_sup, is_supervised=True)
+            # sLoss = compute_loss(sup_outputs, target_sup, loss_functions, is_supervised=True)
+        teacher_outputs, student_outputs = model(b_unsup, is_supervised=False)
+        uLoss = compute_loss(student_outputs, teacher_outputs, loss_functions, is_supervised=False)
+
+        total_loss =  uLoss
+        print("**************** UNSUP LOSSS  : {} ****************".format(total_loss))
+
+        total_loss.backward()
+        optimizer.step()
+
+        with torch.no_grad():
+            # sf = torch.nn.Softmax2d()
+            # target_sup[target_sup >= 1] = 1
+            # target_sup = target_sup
+            # y_pred = sf(sup_outputs[-1])
+            # y_WT = seg2WT(y_pred, 0.5, cfg.oneHot)
+            # dice_score = dice_coef(target_sup.reshape(y_WT.shape), y_WT)
+            wandb.log(
+                {"batch_id": unsup_step + epochid * len(train_unsup_loader),
+                 "unsup loss": uLoss})
     return model, total_loss
 
 
 def trainPgs_sup(train_sup_loader, model, optimizer, device, loss_functions, epochid, cfg):
+    total_loss = 0
     model.train()
     sup_loss = loss_functions[0]
 
@@ -149,6 +204,7 @@ def trainPgs_sup(train_sup_loader, model, optimizer, device, loss_functions, epo
 
 def trainPGS(train_loader, model, optimizer, device, epochid):
     model.train()
+    total_loss = 0
     for step, batch in enumerate(train_loader):
         optimizer.zero_grad()
         b = batch['data']
@@ -316,8 +372,6 @@ def Pgs_train_val(dataset, n_epochs, wmh_threshold, output_dir, learning_rate, a
             os.mkdir(output_dir, 0o777)
         except OSError:
             print("Creation of the directory %s failed" % output_dir)
-    else:
-        None
 
     output_model_dir = os.path.join(output_dir, "best_model")
 
@@ -328,16 +382,12 @@ def Pgs_train_val(dataset, n_epochs, wmh_threshold, output_dir, learning_rate, a
             os.mkdir(output_model_dir, 0o777)
         except OSError:
             print("Creation of the directory %s failed" % output_model_dir)
-    else:
-        None
 
     if not os.path.isdir(os.path.join(output_dir, "runs")):
         try:
             os.mkdir(os.path.join(output_dir, "runs"), 0o777)
         except OSError:
             print("Creation of the directory %s failed" % os.path.join(output_dir, "runs"))
-    else:
-        None
 
     output_image_dir = os.path.join(output_dir, "result_images/")
 
@@ -346,13 +396,12 @@ def Pgs_train_val(dataset, n_epochs, wmh_threshold, output_dir, learning_rate, a
             os.mkdir(output_image_dir, 0o777)
         except OSError:
             print("Creation of the directory %s failed" % output_image_dir)
-    else:
-        None
 
     pgsnet = Pgs.PGS(inputs_dim, outputs_dim, kernels, strides)
 
-    if torch.cuda.is_available() and type(pgsnet) is not torch.nn.DataParallel:
-        pgsnet = torch.nn.DataParallel(pgsnet)
+    if torch.cuda.is_available():
+        if type(pgsnet) is not torch.nn.DataParallel and cfg.parallel and cfg.parallel:
+            pgsnet = torch.nn.DataParallel(pgsnet)
         device = 'cuda'
     elif not torch.cuda.is_available():
         device = 'cpu'
@@ -361,22 +410,29 @@ def Pgs_train_val(dataset, n_epochs, wmh_threshold, output_dir, learning_rate, a
     pgsnet.to(device)
     optimizer = torch.optim.SGD(pgsnet.parameters(), learning_rate, momentum=0.9, weight_decay=1e-4)
     # optimizer = torch.optim.Adam(pgsnet.parameters(), lr=1e-2)
-    subject_wise_DSC = eval_per_subjectPgs(pgsnet, device, wmh_threshold, cfg, cfg.val_mode)
     scheduler = lr_scheduler.StepLR(optimizer, step_size=cfg.scheduler_step_size, gamma=cfg.lr_gamma)  # don't use it
-
+    
     train_sup_loader = utils.get_trainset(dataset, batch_size=cfg.batch_size, intensity_rescale=cfg.intensity_rescale,
-                                          mixup_threshold=cfg.mixup_threshold, mode=cfg.train_mode, t1=cfg.t1,
+                                          mixup_threshold=cfg.mixup_threshold, mode=cfg.train_sup_mode, t1=cfg.t1,
                                           t2=cfg.t2, t1ce=cfg.t1ce, augment=cfg.augment)
-    print('size of training set: number of subjects:    ', len(train_sup_loader.dataset.subjects_name))
+    train_unsup_loader = utils.get_trainset(dataset, batch_size=32, intensity_rescale=cfg.intensity_rescale,
+                                            mixup_threshold=cfg.mixup_threshold,
+                                            mode=cfg.train_unsup_mode, t1=cfg.t1, t2=cfg.t2, t1ce=cfg.t1ce, augment=cfg.augment)
+
+    print('size of labeled training set: number of subjects:    ', len(train_sup_loader.dataset.subjects_name))
+    print('size of unlabeled training set: number of subjects:    ', len(train_unsup_loader.dataset.subjects_name))
     for epoch in range(start_epoch, n_epochs):
         print("iteration:  ", epoch)
 
-        # train_unsup_loader = utils.get_trainset(dataset, batch_size=32, intensity_rescale=True, mixup_threshold=None,
-        #                                       mode='train_semi_unsup', t1=False, t2=False, t1ce=False, augment=True)
+
         # pgsnet, loss = trainPGS(train_loader, pgsnet, optimizer, device, epoch)
-        # pgsnet, loss = trainPgs_semi(train_sup_loader, train_unsup_loader, pgsnet, optimizer, device, epoch)
+        if cfg.experiment_mode == 'semi':
+            pgsnet, loss = trainPgs_semi(train_sup_loader, train_unsup_loader, pgsnet, optimizer, device,
+                                         (torch.nn.CrossEntropyLoss(), torch.nn.CrossEntropyLoss()), epoch, cfg )
         # score, segmentations = evaluatePGS(pgsnet, dataset, device, wmh_threshold, cfg, cfg.val_mode)
-        pgsnet, loss = trainPgs_sup(train_sup_loader, pgsnet, optimizer, device, (torch.nn.CrossEntropyLoss(), None), epoch, cfg)
+        else:
+            pgsnet, loss = trainPgs_sup(train_sup_loader, pgsnet, optimizer, device, (torch.nn.CrossEntropyLoss(), None),
+                                    epoch, cfg)
 
         if epoch % 2 == 0:
             # dsc_score, subject_wise_DSC, segmentations = evaluatePGS(pgsnet, dataset, device, wmh_threshold,
@@ -409,8 +465,7 @@ def save_score(dir_path, score, iter):
             os.mkdir(dir_path, 0o777)
         except OSError:
             print("Creation of the directory %s failed" % dir_path)
-    else:
-        None
+
     output_score_path = os.path.join(dir_path, "result.txt")
     with open(output_score_path, "w") as f:
         f.write("average dice score per subject (5 image) at iter {}  :   {}".format(iter, score))
@@ -423,8 +478,6 @@ def save_predictions(y_pred, threshold, dir_path, score, iter):
             os.mkdir(dir_path, 0o777)
         except OSError:
             print("Creation of the directory %s failed" % dir_path)
-    else:
-        None
 
     output_score_path = os.path.join(dir_path, "result.txt")
     with open(output_score_path, "w") as f:
@@ -434,8 +487,6 @@ def save_predictions(y_pred, threshold, dir_path, score, iter):
             os.mkdir(dir_path, 0o777)
         except OSError:
             print("Creation of the directory %s failed" % dir_path)
-    else:
-        None
 
     for image_id, image in enumerate(y_pred):
         image = image >= threshold

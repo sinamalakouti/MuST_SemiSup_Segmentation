@@ -4,14 +4,18 @@ test_mode: "only_test2018"
 n_epochs: 200
 lr: 0.001
 scheduler_step_size: 3
-batch_size: 64
+batch_size: 32
 lr_gamma: 0.3
-t1: False
-t2: False
-t1ce: False
+t1: True
+t2: True
+t1ce: True
 augment: True
 wmh_threshold: 0.5
 optimizer: "SGD" #SGD OR ADAM
 mixup_threshold: None
 intensity_rescale: True
 oneHot: False
+experiment_mode: "semi"
+parallel: False
+train_unsup_mode: "train2018_semi_unsup"
+train_sup_mode: "train2018_semi_sup"

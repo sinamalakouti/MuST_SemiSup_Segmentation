@@ -247,9 +247,10 @@ class Brat20(torch.utils.data.Dataset):
         elif mode == "only_val2018":
             ids_path = os.path.join(dataroot_dir, 'only2018/val2018_ids.csv')
         elif mode == "train2018_semi_sup":
-            None  # todo
+            ids_path = os.path.join(dataroot_dir, 'trainset/train18_sup_ids.csv')
         elif mode == "train2018_semi_unsup":
-            None  # todo
+            ids_path = os.path.join(dataroot_dir, 'trainset/train18_unsup_ids.csv')
+
         elif mode == "test2019_new":
             ids_path = os.path.join(dataroot_dir, 'valset/brats2019_new.csv')
 

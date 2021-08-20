@@ -46,8 +46,6 @@ class CLS(nn.Module):
     def __build_module(self):
         return nn.Sequential(
             nn.Conv2d(self.dim_in, self.dim_out, 1),
-            # nn.Sigmoid(),
-            # nn.Softmax2d()
         )
 
     def forward(self, X):
@@ -102,7 +100,7 @@ class AttentionBlock(nn.Module):
                                 nn.BatchNorm2d(int_channels))
         self.psi = nn.Sequential(nn.Conv2d(int_channels, 1, kernel_size=1),
                                  nn.BatchNorm2d(1),
-                                 nn.Sigmoid()) #todo? What iare these sigmoids for
+                                 nn.Sigmoid())  # todo? What iare these sigmoids for
 
     def forward(self, x, g):
         # apply the Wx to the skip connection
@@ -112,7 +110,6 @@ class AttentionBlock(nn.Module):
         out = self.psi(nn.ReLU()(x1 + g1))
         out = nn.Sigmoid()(out)
         return out * x
-
 
 
 class PGS_attention(nn.Module):
@@ -164,7 +161,7 @@ class PGS_attention(nn.Module):
         self.attention1 = AttentionBlock()
         self.attention2 = AttentionBlock()
         self.attention3 = AttentionBlock()
-        self.attention4  = AttentionBlock()
+        self.attention4 = AttentionBlock()
 
     def forward(self, X, is_supervised):
         type_unsup = 'layerwise'
@@ -227,7 +224,7 @@ class PGS_attention(nn.Module):
         c8 = self.__fw_expand_2layer(up3)
         output8_sup = self.cls8(c8)
 
-        up3, output8_sup = transformer(up3, output8_sup,cascade=cascade)
+        up3, output8_sup = transformer(up3, output8_sup, cascade=cascade)
         c8_unsup = self.__fw_expand_2layer(up3)
         output8_unsup = self.cls8(c8_unsup)
 
@@ -237,7 +234,7 @@ class PGS_attention(nn.Module):
         c9 = self.__fw_expand_1layer(up4)  # output9 is the main output of the network
         output9_sup = self.cls9(c9)
 
-        up4, output9_sup = transformer(up4, output9_sup,cascade=True)
+        up4, output9_sup = transformer(up4, output9_sup, cascade=True)
         c9_unsup = self.__fw_expand_1layer(up4)
         output9_unsup = self.cls9(c9_unsup)
 
@@ -321,28 +318,6 @@ class PGS_attention(nn.Module):
         # bottleneck
         #  add some noise
 
-        # uni_dist = Uniform(-0.3, 0.3)
-        # uni_dist = Normal(torch.tensor([0.0]), torch.tensor([1.0]))
-
-        # noise_vector = uni_dist.sample(d4.shape[1:]).to(d4.device)#.unsqueeze(0)
-        # noise_vector = noise_vector.reshape(d4.shape[1:])
-        # d4 = d4.mul(noise_vector) + d4
-
-        # noise_vector = uni_dist.sample(c1.shape[1:]).to(c1.device)#.unsqueeze(0)
-        # noise_vector = noise_vector.reshape(c1.shape[1:])
-        # c1 = c1.mul(noise_vector) + c1
-
-        # noise_vector = uni_dist.sample(c2.shape[1:]).to(c2.device)#.unsqueeze(0)
-        # noise_vector = noise_vector.reshape(c2.shape[1:])
-        # c2 = c2.mul(noise_vector) + c2
-
-        # noise_vector = uni_dist.sample(c3.shape[1:]).to(c3.device)#.unsqueeze(0)
-        # noise_vector = noise_vector.reshape(c3.shape[1:])
-        # c3 = c3.mul(noise_vector) + c3
-
-        # noise_vector = uni_dist.sample(c4.shape[1:]).to(c4.device)# .unsqueeze(0)
-        # noise_vector = noise_vector.reshape(c4.shape[1:])
-        # c4 = c4.mul(noise_vector) + c4
         rand_thresh = random.uniform(0, 1)
         rand_thresh = 0.3
         uni_dist = Uniform(-1 * rand_thresh, rand_thresh)
@@ -352,9 +327,6 @@ class PGS_attention(nn.Module):
 
         c5, output5 = self.__fw_bottleneck(d4)
         output5 = self.cls5(c5)
-        # noise_vector = uni_dist.sample(c5.shape[1:]).to(c5.device)  # .unsqueeze(0)
-        # noise_vector = noise_vector.reshape(c5.shape[1:])
-        # c5 = c5.mul(noise_vector) + c5
 
         # expanding path
         rand_thresh = random.uniform(0, 1)
@@ -543,6 +515,7 @@ class PGS_attention(nn.Module):
 
         return total_loss
 
+
 class PGS(nn.Module):
     def __init__(self, dim_inputs, dim_outputs, kernel_sizes, strides):
         super(PGS, self).__init__()
@@ -586,6 +559,7 @@ class PGS(nn.Module):
         self.cls7 = CLS(self.dim_outputs[6], self.dim_outputs[-1])
         self.cls8 = CLS(self.dim_outputs[7], self.dim_outputs[-1])
         self.cls9 = CLS(self.dim_outputs[8], self.dim_outputs[-1])  # main classifier
+
     def get_expanding_layers_outputs(self, X):
 
         c1, d1, c2, d2, c3, d3, c4, d4 = self.__fw_contracting_path(X)
@@ -616,7 +590,6 @@ class PGS(nn.Module):
         up4 = self.__fw_up(c8, c1, self.up4)
         c9 = self.__fw_expand_1layer(up4)
         output9 = self.cls9(c9)
-
 
     def forward(self, X, is_supervised):
         type_unsup = 'layerwise'
@@ -679,7 +652,7 @@ class PGS(nn.Module):
         c8 = self.__fw_expand_2layer(up3)
         output8_sup = self.cls8(c8)
 
-        up3, output8_sup = transformer(up3, output8_sup,cascade=cascade)
+        up3, output8_sup = transformer(up3, output8_sup, cascade=cascade)
         c8_unsup = self.__fw_expand_2layer(up3)
         output8_unsup = self.cls8(c8_unsup)
 
@@ -689,7 +662,7 @@ class PGS(nn.Module):
         c9 = self.__fw_expand_1layer(up4)  # output9 is the main output of the network
         output9_sup = self.cls9(c9)
 
-        up4, output9_sup = transformer(up4, output9_sup,cascade=True)
+        up4, output9_sup = transformer(up4, output9_sup, cascade=True)
         c9_unsup = self.__fw_expand_1layer(up4)
         output9_unsup = self.cls9(c9_unsup)
 
@@ -727,7 +700,6 @@ class PGS(nn.Module):
         up4 = self.__fw_up(c8, c1, self.up4)
         c9 = self.__fw_expand_1layer(up4)
         output9 = self.cls9(c9)
-
 
         return output5, output6, output7, output8, output9
 
@@ -882,7 +854,8 @@ class PGS(nn.Module):
         # output9 = self.cls9(c9)
         return c9
 
-def __fw_sup_loss( y_preds, y_true, loss_functions):
+
+def __fw_sup_loss(y_preds, y_true, loss_functions):
     (sup_loss, unsup_loss) = loss_functions
     total_loss = 0
 
@@ -904,6 +877,7 @@ def __fw_sup_loss( y_preds, y_true, loss_functions):
         assert output.shape == target.shape, "output and target shape is not similar!!"
         total_loss += sup_loss(output, target)
     return total_loss
+
 
 def __fw_self_unsup_loss(y_preds, loss_functions):
     main_output = y_preds[-1].detach()
@@ -934,7 +908,8 @@ def __fw_self_unsup_loss(y_preds, loss_functions):
         total_loss += unsup_loss(y_preds[i], pooled_main_output)
     return total_loss
 
-def __fw_outputwise_unsup_loss( y_noisy, y_orig, loss_functions):
+
+def __fw_outputwise_unsup_loss(y_noisy, y_orig, loss_functions):
     (_, unsup_loss) = loss_functions
     total_loss = 0
     assert len(y_orig) == len(y_noisy), "Error! unsup_preds and sup_preds have to have same length"
@@ -948,8 +923,8 @@ def __fw_outputwise_unsup_loss( y_noisy, y_orig, loss_functions):
         total_loss += unsup_loss(noisy_pred, orig_pred.detach())
     return total_loss
 
-def compute_loss( y_preds, y_true, loss_functions, is_supervised):
 
+def compute_loss(y_preds, y_true, loss_functions, is_supervised):
     if is_supervised:
         total_loss = __fw_sup_loss(y_preds, y_true, loss_functions)
     else:
