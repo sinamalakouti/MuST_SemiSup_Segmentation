@@ -104,7 +104,7 @@ def trainPgs_semi(train_sup_loader, train_unsup_loader, model, optimizer, device
         b_unsup = b_unsup.to(device)
 
         try:
-            batch_sup = next(train_sup_iterator
+            batch_sup = next(train_sup_iterator)
             sup_step += 1
         except StopIteration:
             train_sup_iterator = iter(train_sup_loader)
@@ -113,9 +113,9 @@ def trainPgs_semi(train_sup_loader, train_unsup_loader, model, optimizer, device
 
         b_sup = batch_sup['data']
         target_sup = batch_sup['label'].to(device)
-
-        sLoss = compute_loss(sup_outputs, target_sup, loss_functions, is_supervised=True)
+        
         sup_outputs, _ = model(b_sup, is_supervised=True)
+        sLoss = compute_loss(sup_outputs, target_sup, loss_functions, is_supervised=True)
         teacher_outputs, student_outputs = model(b_unsup, is_supervised=False)
         uLoss = compute_loss(student_outputs, teacher_outputs, loss_functions, is_supervised=False)
 
