@@ -3,8 +3,8 @@ import pandas as pd
 import torch
 import torchvision.transforms.functional as augmentor
 import torchvision.transforms as transformer
-import os
 import nibabel as nib
+import os
 
 
 def get_name_mapping(name_mapping_csv_path):
@@ -469,17 +469,21 @@ def center_crop(x, x_t1, x_t2, x_t1ce, y, size=200):
 
 
 def rescale_intensity(x):
-    return normalize_quantile(x, 0.99)
+    # return normalize_quantile(x, 0.99)
+    return normalize_guassian(x)
     maximum = x.max()
     minimum = x.min()
     return (x - minimum + 0.01) / (maximum - minimum + 0.01)
+
+
+def normalize_guassian(x):
+    avg = x.mean()
+    std = x.std()
+
+    return (x - avg) / (std + 0.001)
 
 
 def normalize_quantile(x, threshold):
     q = torch.quantile(x, threshold)
     mask = x[x <= q]
     return x / max(mask)
-
-
-
-

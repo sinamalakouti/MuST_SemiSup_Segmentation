@@ -2,9 +2,11 @@ import numpy as np
 import torchvision.transforms.functional as F
 from torch.distributions.uniform import Uniform
 import random
+import torch
 
 
 def augment(x, y, cascade=False):
+    # y = torch.nn.functional.softmax(x)
     angle = np.random.uniform(-180, 180)
     scale = np.random.uniform(.8, 1.2)
     # shear = np.random.uniform(-30, 30)
@@ -12,7 +14,7 @@ def augment(x, y, cascade=False):
     uni_dist = Uniform(-1 * rand_thresh, rand_thresh)
 
     random_selector = np.random.randint(3)
-
+    # print("random selector is ", random_selector)
     if cascade:
 
         x_transform = F.affine(x,
