@@ -45,6 +45,7 @@ def __fw_outputwise_unsup_loss(y_stud, y_teach, loss_functions):
     for i in range(num_preds):
         teach_pred = y_teach[i]
 
+
         stud_pred = y_stud[i]
         assert teach_pred.shape == stud_pred.shape, "Error! for preds number {}, supervised and unsupervised" \
                                                     " prediction shape is not similar!".format(i)
@@ -100,7 +101,7 @@ def trainPgs_semi(train_sup_loader, train_unsup_loader, model, optimizer, device
     train_sup_iterator = iter(train_sup_loader)
     sup_step = 0
     for unsup_step, batch_unsup in enumerate(train_unsup_loader):
-
+        optimizer.zero_grad()
         b_unsup = batch_unsup['data']
         b_unsup = b_unsup.to(device)
 
@@ -396,12 +397,16 @@ def Pgs_train_val(dataset, n_epochs, wmh_threshold, output_dir, learning_rate, a
     train_sup_loader = utils.get_trainset(dataset, batch_size=cfg.batch_size, intensity_rescale=cfg.intensity_rescale,
                                           mixup_threshold=cfg.mixup_threshold, mode=cfg.train_sup_mode, t1=cfg.t1,
                                           t2=cfg.t2, t1ce=cfg.t1ce, augment=cfg.augment)
-    train_unsup_loader = utils.get_trainset(dataset, batch_size=32, intensity_rescale=cfg.intensity_rescale,
-                                            mixup_threshold=cfg.mixup_threshold,
-                                            mode=cfg.train_unsup_mode, t1=cfg.t1, t2=cfg.t2, t1ce=cfg.t1ce, augment=cfg.augment)
-    train_unsup_loader= train_sup_loader
+
+
     print('size of labeled training set: number of subjects:    ', len(train_sup_loader.dataset.subjects_name))
-    # print('size of unlabeled training set: number of subjects:    ', len(train_unsup_loader.dataset.subjects_name))
+    if cfg.experiment_mode == 'semi':
+
+        train_unsup_loader = utils.get_trainset(dataset, batch_size=32, intensity_rescale=cfg.intensity_rescale,
+                                            mixup_threshold=cfg.mixup_threshold,
+                                            mode=cfg.train_unsup_mode, t1=cfg.t1, t2=cfg.t2, t1ce=cfg.t1ce,
+                                            augment=cfg.augment)
+        print('size of unlabeled training set: number of subjects:    ', len(train_unsup_loader.dataset.subjects_name))
     for epoch in range(start_epoch, n_epochs):
         print("iteration:  ", epoch)
 
@@ -413,7 +418,7 @@ def Pgs_train_val(dataset, n_epochs, wmh_threshold, output_dir, learning_rate, a
         # score, segmentations = evaluatePGS(pgsnet, dataset, device, wmh_threshold, cfg, cfg.val_mode)
         else:
             pgsnet, loss = trainPgs_sup(train_sup_loader, pgsnet, optimizer, device, (torch.nn.CrossEntropyLoss(), None),
-                                    epoch, cfg)
+                                        epoch, cfg)
 
         if epoch % 2 == 0:
             # dsc_score, subject_wise_DSC, segmentations = evaluatePGS(pgsnet, dataset, device, wmh_threshold,
