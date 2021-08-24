@@ -48,10 +48,11 @@ def __fw_outputwise_unsup_loss(y_stud, y_teach, loss_functions):
         stud_pred = y_stud[i]
         assert teach_pred.shape == stud_pred.shape, "Error! for preds number {}, supervised and unsupervised" \
                                                     " prediction shape is not similar!".format(i)
-
-        total_loss += - torch.mean(
-            torch.sum(torch.nn.functional.softmax(teach_pred).detach()
-                      * torch.nn.functional.log_softmax(stud_pred, dim=1), dim=1))
+        mse_loss = torch.nn.MSELoss()
+        total_loss +=  mse_loss(stud_pred, teach_pred)
+        # total_loss += - torch.mean(
+        #     torch.sum(torch.nn.functional.softmax(teach_pred).detach()
+        #               * torch.nn.functional.log_softmax(stud_pred, dim=1), dim=1))
     return total_loss
 
 
@@ -113,7 +114,7 @@ def trainPgs_semi(train_sup_loader, train_unsup_loader, model, optimizer, device
 
         b_sup = batch_sup['data']
         target_sup = batch_sup['label'].to(device)
-        
+
         sup_outputs, _ = model(b_sup, is_supervised=True)
         sLoss = compute_loss(sup_outputs, target_sup, loss_functions, is_supervised=True)
         teacher_outputs, student_outputs = model(b_unsup, is_supervised=False)
