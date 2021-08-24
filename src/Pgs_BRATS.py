@@ -49,10 +49,10 @@ def __fw_outputwise_unsup_loss(y_stud, y_teach, loss_functions):
         assert teach_pred.shape == stud_pred.shape, "Error! for preds number {}, supervised and unsupervised" \
                                                     " prediction shape is not similar!".format(i)
         mse_loss = torch.nn.MSELoss()
-        total_loss +=  mse_loss(stud_pred, teach_pred)
-        # total_loss += - torch.mean(
-        #     torch.sum(torch.nn.functional.softmax(teach_pred).detach()
-        #               * torch.nn.functional.log_softmax(stud_pred, dim=1), dim=1))
+        # total_loss +=  mse_loss(stud_pred, teach_pred)
+        total_loss += - torch.mean(
+            torch.sum(teach_pred
+                      * torch.nn.functional.log_softmax(stud_pred, dim=1), dim=1))
     return total_loss
 
 
