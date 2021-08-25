@@ -45,7 +45,6 @@ def __fw_outputwise_unsup_loss(y_stud, y_teach, loss_functions):
     for i in range(num_preds):
         teach_pred = y_teach[i]
 
-
         stud_pred = y_stud[i]
         assert teach_pred.shape == stud_pred.shape, "Error! for preds number {}, supervised and unsupervised" \
                                                     " prediction shape is not similar!".format(i)
@@ -97,7 +96,7 @@ def compute_loss(y_preds, y_true, loss_functions, is_supervised):
 def trainPgs_semi(train_sup_loader, train_unsup_loader, model, optimizer, device, loss_functions, epochid, cfg):
     total_loss = 0
     model.train()
-    
+
     train_sup_iterator = iter(train_sup_loader)
     sup_step = 0
     for unsup_step, batch_unsup in enumerate(train_unsup_loader):
@@ -107,11 +106,10 @@ def trainPgs_semi(train_sup_loader, train_unsup_loader, model, optimizer, device
 
         try:
             batch_sup = next(train_sup_iterator)
-            sup_step += 1
+
         except StopIteration:
             train_sup_iterator = iter(train_sup_loader)
             batch_sup = next(train_sup_iterator)
-            sup_step += 1
 
         b_sup = batch_sup['data']
         target_sup = batch_sup['label'].to(device)
@@ -121,13 +119,11 @@ def trainPgs_semi(train_sup_loader, train_unsup_loader, model, optimizer, device
         teacher_outputs, student_outputs = model(b_unsup, is_supervised=False)
         uLoss = compute_loss(student_outputs, teacher_outputs, loss_functions, is_supervised=False)
 
-
         print("**************** UNSUP LOSSS  : {} ****************".format(uLoss))
         print("**************** SUP LOSSS  : {} ****************".format(sLoss))
         total_loss = uLoss + sLoss
         total_loss.backward()
         optimizer.step()
-
 
         with torch.no_grad():
             sf = torch.nn.Softmax2d()
@@ -137,12 +133,11 @@ def trainPgs_semi(train_sup_loader, train_unsup_loader, model, optimizer, device
             y_WT = seg2WT(y_pred, 0.5, cfg.oneHot)
             dice_score = dice_coef(target_sup.reshape(y_WT.shape), y_WT)
             wandb.log(
-                {"sup_batch_id": sup_step + epochid * len(train_sup_loader), "sup loss": sLoss,
+                {"sup_batch_id": sup_step + epochid * len(train_unsup_loader), "sup loss": sLoss,
                  "unsup_batch_id": unsup_step + epochid * len(train_unsup_loader),
                  "unsup loss": uLoss,
-                 "batch_score": dice_score})
-
-
+                 " ": dice_score})
+        sup_step += 1
     return model, total_loss
 
 
@@ -398,26 +393,24 @@ def Pgs_train_val(dataset, n_epochs, wmh_threshold, output_dir, learning_rate, a
                                           mixup_threshold=cfg.mixup_threshold, mode=cfg.train_sup_mode, t1=cfg.t1,
                                           t2=cfg.t2, t1ce=cfg.t1ce, augment=cfg.augment)
 
-
     print('size of labeled training set: number of subjects:    ', len(train_sup_loader.dataset.subjects_name))
     if cfg.experiment_mode == 'semi':
-
         train_unsup_loader = utils.get_trainset(dataset, batch_size=32, intensity_rescale=cfg.intensity_rescale,
-                                            mixup_threshold=cfg.mixup_threshold,
-                                            mode=cfg.train_unsup_mode, t1=cfg.t1, t2=cfg.t2, t1ce=cfg.t1ce,
-                                            augment=cfg.augment)
+                                                mixup_threshold=cfg.mixup_threshold,
+                                                mode=cfg.train_unsup_mode, t1=cfg.t1, t2=cfg.t2, t1ce=cfg.t1ce,
+                                                augment=cfg.augment)
         print('size of unlabeled training set: number of subjects:    ', len(train_unsup_loader.dataset.subjects_name))
     for epoch in range(start_epoch, n_epochs):
         print("iteration:  ", epoch)
 
-
         # pgsnet, loss = trainPGS(train_loader, pgsnet, optimizer, device, epoch)
         if cfg.experiment_mode == 'semi':
             pgsnet, loss = trainPgs_semi(train_sup_loader, train_unsup_loader, pgsnet, optimizer, device,
-                                         (torch.nn.CrossEntropyLoss(), torch.nn.CrossEntropyLoss()), epoch, cfg )
+                                         (torch.nn.CrossEntropyLoss(), torch.nn.CrossEntropyLoss()), epoch, cfg)
         # score, segmentations = evaluatePGS(pgsnet, dataset, device, wmh_threshold, cfg, cfg.val_mode)
         else:
-            pgsnet, loss = trainPgs_sup(train_sup_loader, pgsnet, optimizer, device, (torch.nn.CrossEntropyLoss(), None),
+            pgsnet, loss = trainPgs_sup(train_sup_loader, pgsnet, optimizer, device,
+                                        (torch.nn.CrossEntropyLoss(), None),
                                         epoch, cfg)
 
         if epoch % 2 == 0:

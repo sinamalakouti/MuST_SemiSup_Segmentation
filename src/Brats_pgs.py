@@ -498,8 +498,7 @@ def Unet_train_val(dataset, n_epochs, device, wmh_threshold, output_dir, learnin
     train_sup_loader = utils.get_trainset(dataset, batch_size=cfg.batch_size, intensity_rescale=cfg.intensity_rescale,
                                           mixup_threshold=cfg.mixup_threshold, mode=cfg.train_mode, t1=cfg.t1,
                                           t2=cfg.t2, t1ce=cfg.t1ce, augment=cfg.augment, oneHot=cfg.oneHot)
-    # sup_loss = torch.nn.CrossEntropyLoss()
-    # sup_loss = soft_dice_loss()
+    
     sup_loss = torch.nn.CrossEntropyLoss()
     loss_functions = (sup_loss, None)
 
@@ -507,7 +506,7 @@ def Unet_train_val(dataset, n_epochs, device, wmh_threshold, output_dir, learnin
         print("iteration:  ", epoch)
 
         unet, loss = trainUnet_sup(train_sup_loader, unet, optimizer, device, loss_functions, epoch, cfg)
-        if epoch % 1 == 0:
+        if epoch % 2 == 0:
             # regular_score, subject_wise_score = evaluateUnet(unet, dataset, device, wmh_threshold, cfg, cfg.val_mode)
             subject_wise_score = eval_per_subjectUnet(unet, device, wmh_threshold, cfg, cfg.val_mode)
             print("** SUBJECT WISE SCORE @ Iteration {} is {} **".format(epoch, subject_wise_score))
