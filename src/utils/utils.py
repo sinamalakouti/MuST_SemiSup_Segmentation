@@ -1,6 +1,5 @@
 from utils.Constants import *
 from dataset.dataloader import *
-# from dataset.Brats20_preprocessed import *
 from dataset.Brat20 import *
 import matplotlib.pyplot as plt
 import os

@@ -28,7 +28,7 @@ def id19_to_id20(name_map):
 
 
 # return brats2020 ids that were in brats2018
-def id18_to_id20(name_map):
+def get_id18(name_map):
     ids = []
     for id_2020 in name_map:
         if name_map[id_2020]['brats18'] is not np.nan:
@@ -38,12 +38,12 @@ def id18_to_id20(name_map):
 
 def generate_train_val_test_2018(all_data_csv, root_dir, val_size=50, test_size=50):
     name_map = get_name_mapping(all_data_csv)
-    all_ids = id18_to_id20(name_map)
+    all_ids = get_id18(name_map)
     val_test_ids = np.random.choice(all_ids, val_size + test_size, replace=False)
-    tr_ids = np.setdiff1d(all_ids, val_test_ids)
+    train_ids = np.setdiff1d(all_ids, val_test_ids)
     test_ids = np.random.choice(val_test_ids, test_size, replace=False)
     val_ids = np.setdiff1d(val_test_ids, test_ids)
-    np.savetxt(root_dir + "only2018/some_train2018.csv", tr_ids.astype(np.str), delimiter=',', fmt='%s')
+    np.savetxt(root_dir + "only2018/some_train2018.csv", train_ids.astype(np.str), delimiter=',', fmt='%s')
     np.savetxt(root_dir + "only2018/val2018_ids.csv", val_ids.astype(np.str), delimiter=',', fmt='%s')
     np.savetxt(root_dir + "only2018/test2018_ids.csv", test_ids.astype(np.str), delimiter=',', fmt='%s')
 
@@ -65,13 +65,13 @@ def train_val_split(all_data_csv, train_dir_path, val_dir_path, val_size=69):
     np.savetxt(val_dir_path + "/val_ids.csv", val_ids.astype(np.str), delimiter=',', fmt='%s')
 
 
-def semi_sup_split(train_dir_csv, sup_dir_path, unsup_dir_path, ratio=0.5):
-    all_train = np.asarray(pd.read_csv(train_dir_csv, header=None)).reshape(-1)
+def semi_sup_split(all_train_csv, sup_dir_path, unsup_dir_path, ratio=0.5):
+    all_train = np.asarray(pd.read_csv(all_train_csv, header=None)).reshape(-1)
     unsup_size = int(ratio * len(all_train))
     unsup_ids = np.random.choice(all_train, unsup_size, replace=False)
     sup_ids = np.setdiff1d(all_train, unsup_ids)
-    np.savetxt(sup_dir_path + "/train_sup_ids.csv", sup_ids.astype(np.str), delimiter=',', fmt='%s')
-    np.savetxt(unsup_dir_path + "/train_unsup_ids.csv", unsup_ids.astype(np.str), delimiter=',', fmt='%s')
+    np.savetxt(sup_dir_path + "/train18_sup_ids.csv", sup_ids.astype(np.str), delimiter=',', fmt='%s')
+    np.savetxt(unsup_dir_path + "/train18_unsup_ids.csv", unsup_ids.astype(np.str), delimiter=',', fmt='%s')
 
 
 class Brat20Test(torch.utils.data.Dataset):
@@ -487,3 +487,29 @@ def normalize_quantile(x, threshold):
     q = torch.quantile(x, threshold)
     mask = x[x <= q]
     return x / max(mask)
+
+
+def seg2WT(preds, threshold, oneHot=False):
+    if oneHot:
+        preds = preds >= threshold
+        WT_pred = preds[:, 1:4, :, :].sum(1) >= 1
+    else:
+        max_val, max_indx = torch.max(preds, dim=1)
+        max_val = (max_val >= threshold).float()
+        max_indx[max_indx >= 1] = 1
+        WT_pred = torch.multiply(max_indx, max_val)
+
+    # WT_pred = preds[:, 1:4, :, :].sum(1) >= 1
+    return WT_pred
+
+
+def seg2ET(preds, threshold, oneHot=False):
+    ET_preds = (preds[:, 3, :, :] >= threshold).float()
+    return ET_preds
+
+
+def seg2TC(preds, threshold):
+    NET_preds = (preds[:, 1, :, :] >= threshold).float()
+    ET_preds = (preds[:, 3, :, :] >= threshold).floa()
+    TC_preds = (NET_preds + ET_preds >= 1).float()
+    return TC_preds

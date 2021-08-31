@@ -8,7 +8,8 @@ from utils import utils
 from utils import model_utils
 
 from evaluation_metrics import dice_coef, get_dice_coef_per_subject
-from dataset.Brat20 import Brat20Test
+from dataset.Brat20 import Brat20Test, seg2WT, seg2TC, seg2ET, semi_sup_split
+
 from models import Pgs
 import matplotlib.pyplot as plt
 import torch.nn.functional as F
@@ -23,15 +24,13 @@ import wandb
 sys.path.append('src')
 sys.path.append('src/utils/Constants')
 sys.path.append('srs/utils')
-# sys.path.append('srs/models')
-# sys.path.append('srs/models')
 
 os.environ['CUDA_VISIBLE_DEVICES'] = "2,3"
 
 for p in sys.path:
     print("path  ", p)
-torch.manual_seed(42)
-np.random.seed(42)
+random_seeds = [42, 43, 44]
+
 utils.Constants.USE_CUDA = True
 parser = argparse.ArgumentParser()
 
@@ -220,7 +219,10 @@ def eval_per_subjectPgs(model, device, threshold, cfg, data_mode):
                          augment=False, center_cropping=True, t1=cfg.t1, t2=cfg.t2, t1ce=cfg.t1ce, oneHot=cfg.oneHot)
 
     model.eval()
-    dice_arr = []
+    dice_arrWT = []
+    dice_arrTC = []
+    dice_arrET = []
+
     paths = testset.paths
     sup_loss = torch.nn.CrossEntropyLoss()
     with torch.no_grad():
@@ -245,17 +247,26 @@ def eval_per_subjectPgs(model, device, threshold, cfg, data_mode):
                 y_pred = outputs
             else:
                 sf = torch.nn.Softmax2d()
-                target[target >= 1] = 1
-                target_WT = target
+                targetWT = target.clone()
+                targetWT[targetWT >= 1] = 1
+                targetTC = ((target[:, (1, 3), :, :]).sum(dim=1) >= 1).float()
                 y_pred = sf(outputs[-1])
 
             y_WT = seg2WT(y_pred, threshold, oneHot=cfg.oneHot)
+            y_ET = seg2ET(y_pred, threshold)
+            y_TC = seg2TC(y_pred, threshold)
 
-            dice_score = dice_coef(target_WT.reshape(y_WT.shape), y_WT)
-            print("score for subject {} is {}".format(subjects[0], dice_score))
-            dice_arr.append(dice_score.item())
+            dice_scoreWT = dice_coef(target_WT.reshape(y_WT.shape), y_WT)
+            dice_scoreET = dice_coef(target[:, 3, :, :].reshape(y_ET.shape), y_ET)
+            dice_scoreTC = dice_coef(targetTC.reshape(y_TC.shape), y_TC)
+            print("DICE SCORE (WT) for subject {} is {}".format(subjects[0], dice_scoreWT))
+            print("DICE SCORE (ET) for subject {} is {}".format(subjects[0], dice_scoreET))
+            print("DICE SCORE (TC) for subject {} is {}".format(subjects[0], dice_scoreTC))
+            dice_arrWT.append(dice_scoreWT.item())
+            dice_arrET.append(dice_scoreET.item())
+            dice_arrTC.append(dice_scoreTC.item())
 
-    return np.mean(np.array(dice_arr))
+    return np.mean(np.array(dice_arrWT)), np.mean(np.array(dice_arrET)), np.mean(np.array(dice_arrTC))
 
 
 def evaluatePGS(model, dataset, device, threshold, cfg, training_mode):
@@ -310,21 +321,7 @@ def evaluatePGS(model, dataset, device, threshold, cfg, training_mode):
     return np.mean(np.array(dice_arr)), subject_wise_DSC, segmentation_outputs
 
 
-def seg2WT(preds, threshold, oneHot=False):
-    if oneHot:
-        preds = preds >= threshold
-        WT_pred = preds[:, 1:4, :, :].sum(1) >= 1
-    else:
-        max_val, max_indx = torch.max(preds, dim=1)
-        max_val = (max_val >= threshold).float()
-        max_indx[max_indx >= 1] = 1
-        WT_pred = torch.multiply(max_indx, max_val)
-
-    # WT_pred = preds[:, 1:4, :, :].sum(1) >= 1
-    return WT_pred
-
-
-def Pgs_train_val(dataset, n_epochs, wmh_threshold, output_dir, learning_rate, args, cfg):
+def Pgs_train_val(dataset, n_epochs, wmh_threshold, output_dir, learning_rate, args, cfg, seed):
     inputs_dim = [4, 64, 96, 128, 256, 768, 384, 224, 160]
     outputs_dim = [64, 96, 128, 256, 512, 256, 128, 96, 64, 4]
     kernels = [5, 3, 3, 3, 3, 3, 3, 3, 3]
@@ -333,9 +330,15 @@ def Pgs_train_val(dataset, n_epochs, wmh_threshold, output_dir, learning_rate, a
         args=args,
         config=cfg
     )
-    wandb.init(project="fully_sup_brats", config=config_params)
-    wandb.run.name = wandb.run.id
 
+    wandb.init(project="fully_sup_brats", config=config_params)
+    wandb.run.name = "{}_PGS_{}_{}_supRate{}_seed{}_".format(cfg.experiment_mode, "trainALL2018", "valNew2019",
+                                                             cfg.train_sup_rate, seed)
+    dataroot_dir = f'data/brats20'
+    all_train_csv = os.path.join(dataroot_dir, 'trainset/brats2018.csv')
+    supdir_path = os.path.join(dataroot_dir, 'trainset')
+    semi_sup_split(all_train_csv=all_train_csv, supdir_path=supdir_path, unsup_dir_path=supdir_path,
+                   ratio=cfg.train_sup_rate / 100)
     print("learning_rate is    ", learning_rate)
     step_size = cfg.scheduler_step_size
     print("scheduler step size is :   ", step_size)
@@ -344,6 +347,13 @@ def Pgs_train_val(dataset, n_epochs, wmh_threshold, output_dir, learning_rate, a
 
     print("******* TRAINING PGS ***********")
     print("output_dir is    ", output_dir)
+
+    if not os.path.isdir(output_dir):
+        try:
+            os.mkdir(output_dir, 0o777)
+        except OSError:
+            print("Creation of the directory %s failed" % output_dir)
+    output_dir = os.path.joind(output_dir, "seed_{}".format(seed))
     if not os.path.isdir(output_dir):
         try:
             os.mkdir(output_dir, 0o777)
@@ -416,13 +426,17 @@ def Pgs_train_val(dataset, n_epochs, wmh_threshold, output_dir, learning_rate, a
         if epoch % 2 == 0:
             # dsc_score, subject_wise_DSC, segmentations = evaluatePGS(pgsnet, dataset, device, wmh_threshold,
             #                                                          cfg, cfg.val_mode)
-            subject_wise_DSC = eval_per_subjectPgs(pgsnet, device, wmh_threshold, cfg, cfg.val_mode)
-            print("** SUBJECT WISE SCORE @ Iteration {} is {} **".format(epoch, subject_wise_DSC))
+            WTsubject_wise_DSC, ETsubject_wise_DSC, TCsubject_wise_DSC = eval_per_subjectPgs(pgsnet, device,
+                                                                                             wmh_threshold, cfg,
+                                                                                             cfg.val_mode)
+            print("** (WT) SUBJECT WISE SCORE @ Iteration {} is {} **".format(epoch, WTsubject_wise_DSC))
+            print("** (ET) SUBJECT WISE SCORE @ Iteration {} is {} **".format(epoch, ETsubject_wise_DSC))
+            print("** (TC) SUBJECT WISE SCORE @ Iteration {} is {} **".format(epoch, TCsubject_wise_DSC))
             # print("** REGULAR SCORE @ Iteration {} is {} **".format(epoch, dsc_score))
-            if subject_wise_DSC > best_score:
+            if WTsubject_wise_DSC > best_score:
                 print("****************** BEST SCORE @ ITERATION {} is {} ******************".format(epoch,
-                                                                                                     subject_wise_DSC))
-                best_score = subject_wise_DSC
+                                                                                                     WTsubject_wise_DSC))
+                best_score = WTsubject_wise_DSC
                 path = os.path.join(output_model_dir, 'psgnet_best_lr{}.model'.format(learning_rate))
                 with open(path, 'wb') as f:
                     torch.save(pgsnet, f)
@@ -431,9 +445,10 @@ def Pgs_train_val(dataset, n_epochs, wmh_threshold, output_dir, learning_rate, a
                 subject_wise_test_DSC = eval_per_subjectPgs(pgsnet, device, wmh_threshold, cfg, cfg.test_mode)
 
                 wandb.log({"epoch_id": epoch, "subject_wise_test_DSC": subject_wise_test_DSC})
-                save_score(output_image_dir, subject_wise_DSC, epoch)
+                save_score(output_image_dir, (WTsubject_wise_DSC, ETsubject_wise_DSC, TCsubject_wise_DSC), epoch)
 
-            wandb.log({"epoch_id": epoch, "subject_wise_val_DSC": subject_wise_DSC})
+            wandb.log({"epoch_id": epoch, "WT_subject_wise_val_DSC": WTsubject_wise_DSC,
+                       "ET_subject_wise_val_DSC": ETsubject_wise_DSC, "TC_subject_wise_val_DSC": TCsubject_wise_DSC})
         scheduler.step()
 
 
@@ -447,7 +462,9 @@ def save_score(dir_path, score, iter):
 
     output_score_path = os.path.join(dir_path, "result.txt")
     with open(output_score_path, "w") as f:
-        f.write("average dice score per subject (5 image) at iter {}  :   {}".format(iter, score))
+        f.write("average WT dice score per subject at iter {}  :   {}\n"
+                "average ET dice score per subject   {}\n"
+                "average TC dice score per subject    {}\n".format(iter, score[0], score[1], score[2]))
 
 
 def save_predictions(y_pred, threshold, dir_path, score, iter):
@@ -477,12 +494,7 @@ def save_predictions(y_pred, threshold, dir_path, score, iter):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "--cuda",
-        default="1",
-        type=str,
-        help="cuda indices 0,1,2,3"
-    )
+
     parser.add_argument(
         "--output_dir",
         default="dasfdsfsaf",
@@ -491,16 +503,9 @@ def main():
     )
 
     parser.add_argument(
-        "--num_supervised",
-        default=2,
-        type=int,
-        help="number of supervised samples"
-    )
-
-    parser.add_argument(
         "--config",
         type=str,
-        default='config.yaml'
+        default='PGS_config.yaml'
     )
 
     parser.add_argument(
@@ -510,19 +515,15 @@ def main():
         help="training mode supervised (sup), n subject supervised (n_sup), all supervised (all_sup)"
     )
 
-    parser.add_argument(
-        "--supervised_subjects",
-        type=str,
-        help="<subject1>_<subject2> ... <subjectn> or all for all subjects"
-    )
-
     dataset = utils.Constants.Datasets.Brat20
     args = parser.parse_args()
 
     with open(args.config, "r") as f:
         cfg = edict(yaml.safe_load(f))
-
-    Pgs_train_val(dataset, cfg.n_epochs, cfg.wmh_threshold, args.output_dir, cfg.lr, args, cfg)
+    for seed in random_seeds:
+        torch.manual_seed(seed)
+        np.random.seed(seed)
+        Pgs_train_val(dataset, cfg.n_epochs, cfg.wmh_threshold, args.output_dir, cfg.lr, args, cfg, seed)
 
 
 if __name__ == '__main__':
