@@ -17,7 +17,7 @@ resultImage is predicted image
 
 def do_eval(testImage, resultImage):
     """Main function"""
-    # testImage, resultImage = getImages(groundTruth, our_result)
+    testImage, resultImage = getImages(testImage, resultImage)
     testImage = sitk.GetImageFromArray(testImage)
     resultImage = sitk.GetImageFromArray(resultImage)
     dsc = getDSC(testImage, resultImage)
