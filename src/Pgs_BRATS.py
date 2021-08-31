@@ -329,9 +329,9 @@ def eval_per_subjectPgs2(model, device, threshold, cfg, data_mode):
             y_ET = seg2ET(y_pred, threshold)
             y_TC = seg2TC(y_pred, threshold)
 
-            metrics_WT = eval_utils.do_eval(targetWT.reshape(y_WT).cpu(), y_WT.cpu())
+            metrics_WT = eval_utils.do_eval(targetWT.reshape(y_WT.shape).cpu(), y_WT.cpu())
             metrics_ET = eval_utils.do_eval(targetET.cpu(), y_ET.cpu())
-            metrics_TC = eval_utils.do_eval(targetTC.reshape(y_TC).cpu(), y_TC.cpu())
+            metrics_TC = eval_utils.do_eval(targetTC.reshape(y_TC.shape).cpu(), y_TC.cpu())
 
             running_dice['WT'].append(metrics_WT['dsc'])
             running_dice['ET'].append(metrics_ET['dsc'])
