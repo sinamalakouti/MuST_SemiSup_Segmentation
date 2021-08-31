@@ -6,7 +6,7 @@ import torch
 
 
 def augment(x, y, cascade=False):
-    y = torch.nn.functional.softmax(y)
+    y = torch.nn.functional.softmax(y,dim=1)
     angle = np.random.uniform(-180, 180)
     scale = np.random.uniform(.8, 1.2)
     # shear = np.random.uniform(-30, 30)

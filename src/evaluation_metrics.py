@@ -43,8 +43,8 @@ def get_confusionMatrix_metrics(y_true, y_pred):
     FP = ytrue_negatives @ y_pred
     FN = y_true @ pred_negatives
 
-    PPV = 0 if TP == 0 else TP / (TP + FP)
-    sensitivity = 0 if TP == 0 else TP / (TP + FP)
+    PPV = torch.tensor(0)  if TP == 0 else TP / (TP + FP)
+    sensitivity = torch.tensor(0) if TP == 0 else TP / (TP + FN)
 
     return PPV, sensitivity
 
