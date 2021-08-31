@@ -16,7 +16,7 @@ mixup_threshold: None
 intensity_rescale: True
 oneHot: False
 experiment_mode: "semi"
-parallel: False
+parallel: True
 train_unsup_mode: "train2018_semi_unsup"
 train_sup_mode: "train2018_semi_sup"
 train_sup_rate: 20

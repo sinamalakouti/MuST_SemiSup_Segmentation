@@ -110,11 +110,12 @@ def trainPgs_semi(train_sup_loader, train_unsup_loader, model, optimizer, device
             train_sup_iterator = iter(train_sup_loader)
             batch_sup = next(train_sup_iterator)
 
-        b_sup = batch_sup['data']
+        b_sup = batch_sup['data'].to(device)
         target_sup = batch_sup['label'].to(device)
 
         sup_outputs, _ = model(b_sup, is_supervised=True)
         sLoss = compute_loss(sup_outputs, target_sup, loss_functions, is_supervised=True)
+
         teacher_outputs, student_outputs = model(b_unsup, is_supervised=False)
         uLoss = compute_loss(student_outputs, teacher_outputs, loss_functions, is_supervised=False)
 
@@ -248,8 +249,11 @@ def eval_per_subjectPgs(model, device, threshold, cfg, data_mode):
             else:
                 sf = torch.nn.Softmax2d()
                 targetWT = target.clone()
+                targetET = target.clone()
+                targetTC = target.clone()
                 targetWT[targetWT >= 1] = 1
-                targetTC = ((target[:, (1, 3), :, :]).sum(dim=1) >= 1).float()
+                targetET[targetET == 3] = 1
+                targetTC[targetTC == 3 or targetTC == 1] = 1
                 y_pred = sf(outputs[-1])
 
             y_WT = seg2WT(y_pred, threshold, oneHot=cfg.oneHot)
@@ -257,7 +261,7 @@ def eval_per_subjectPgs(model, device, threshold, cfg, data_mode):
             y_TC = seg2TC(y_pred, threshold)
 
             dice_scoreWT = dice_coef(target_WT.reshape(y_WT.shape), y_WT)
-            dice_scoreET = dice_coef(target[:, 3, :, :].reshape(y_ET.shape), y_ET)
+            dice_scoreET = dice_coef(targetET, y_ET)
             dice_scoreTC = dice_coef(targetTC.reshape(y_TC.shape), y_TC)
             print("DICE SCORE (WT) for subject {} is {}".format(subjects[0], dice_scoreWT))
             print("DICE SCORE (ET) for subject {} is {}".format(subjects[0], dice_scoreET))
@@ -337,7 +341,7 @@ def Pgs_train_val(dataset, n_epochs, wmh_threshold, output_dir, learning_rate, a
     dataroot_dir = f'data/brats20'
     all_train_csv = os.path.join(dataroot_dir, 'trainset/brats2018.csv')
     supdir_path = os.path.join(dataroot_dir, 'trainset')
-    semi_sup_split(all_train_csv=all_train_csv, supdir_path=supdir_path, unsup_dir_path=supdir_path,
+    semi_sup_split(all_train_csv=all_train_csv, sup_dir_path=supdir_path, unsup_dir_path=supdir_path,
                    ratio=cfg.train_sup_rate / 100)
     print("learning_rate is    ", learning_rate)
     step_size = cfg.scheduler_step_size
@@ -353,7 +357,7 @@ def Pgs_train_val(dataset, n_epochs, wmh_threshold, output_dir, learning_rate, a
             os.mkdir(output_dir, 0o777)
         except OSError:
             print("Creation of the directory %s failed" % output_dir)
-    output_dir = os.path.joind(output_dir, "seed_{}".format(seed))
+    output_dir = os.path.join(output_dir, "seed_{}".format(seed))
     if not os.path.isdir(output_dir):
         try:
             os.mkdir(output_dir, 0o777)
@@ -520,6 +524,8 @@ def main():
 
     with open(args.config, "r") as f:
         cfg = edict(yaml.safe_load(f))
+
+    os.environ['CUDA_VISIBLE_DEVICES'] = cfg.cuda
     for seed in random_seeds:
         torch.manual_seed(seed)
         np.random.seed(seed)
