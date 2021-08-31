@@ -40,13 +40,15 @@ def get_confusionMatrix_metrics(y_true, y_pred):
     TP = y_true @ y_pred
     ytrue_negatives = (y_true == 0).float()
     pred_negatives = (y_pred == 0).float()
+
     FP = ytrue_negatives @ y_pred
     FN = y_true @ pred_negatives
-
+    TN = ytrue_negatives @ pred_negatives
     PPV = torch.tensor(0)  if TP == 0 else TP / (TP + FP)
     sensitivity = torch.tensor(0) if TP == 0 else TP / (TP + FN)
+    specificity = torch.tensor(0) if TN == 0 else TN / (TN + FP)
 
-    return PPV, sensitivity
+    return PPV, sensitivity, specificity
 
 
 def get_dice_coef_per_subject(y_true, y_pred, subjects):
