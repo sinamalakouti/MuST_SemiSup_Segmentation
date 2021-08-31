@@ -1,9 +1,9 @@
 train_mode: "all_train2018_sup"
 val_mode: "test2019_new"
 test_mode: "only_test2018"
-n_epochs: 100
+n_epochs: 40
 lr: 0.001
-scheduler_step_size: 3
+scheduler_step_size: 5
 batch_size: 32
 lr_gamma: 0.3
 t1: True

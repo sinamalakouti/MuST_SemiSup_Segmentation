@@ -29,7 +29,7 @@ os.environ['CUDA_VISIBLE_DEVICES'] = "2,3"
 
 for p in sys.path:
     print("path  ", p)
-random_seeds = [42, 43, 44]
+random_seeds = [41, 42, 44]
 
 utils.Constants.USE_CUDA = True
 parser = argparse.ArgumentParser()
@@ -133,10 +133,11 @@ def trainPgs_semi(train_sup_loader, train_unsup_loader, model, optimizer, device
             y_WT = seg2WT(y_pred, 0.5, cfg.oneHot)
             dice_score = dice_coef(target_sup.reshape(y_WT.shape), y_WT)
             wandb.log(
-                {"sup_batch_id": sup_step + epochid * len(train_unsup_loader), "sup loss": sLoss,
+                {"sup_batch_id": sup_step + epochid * len(train_unsup_loader),
+                 "sup loss": sLoss,
                  "unsup_batch_id": unsup_step + epochid * len(train_unsup_loader),
                  "unsup loss": uLoss,
-                 " ": dice_score})
+                 "batch_score": dice_score})
         sup_step += 1
     return model, total_loss
 
@@ -252,15 +253,17 @@ def eval_per_subjectPgs(model, device, threshold, cfg, data_mode):
                 targetET = target.clone()
                 targetTC = target.clone()
                 targetWT[targetWT >= 1] = 1
-                targetET[targetET == 3] = 1
-                targetTC[targetTC == 3 or targetTC == 1] = 1
+                targetET[~ (targetET == 3)] = 0
+                targetET[(targetET == 3)] = 1
+                targetTC[~ ((targetTC == 3) | (targetTC == 1))] = 0
+                targetTC[(targetTC == 3) | (targetTC == 1)] = 1
                 y_pred = sf(outputs[-1])
 
             y_WT = seg2WT(y_pred, threshold, oneHot=cfg.oneHot)
             y_ET = seg2ET(y_pred, threshold)
             y_TC = seg2TC(y_pred, threshold)
 
-            dice_scoreWT = dice_coef(target_WT.reshape(y_WT.shape), y_WT)
+            dice_scoreWT = dice_coef(targetWT.reshape(y_WT.shape), y_WT)
             dice_scoreET = dice_coef(targetET, y_ET)
             dice_scoreTC = dice_coef(targetTC.reshape(y_TC.shape), y_TC)
             print("DICE SCORE (WT) for subject {} is {}".format(subjects[0], dice_scoreWT))

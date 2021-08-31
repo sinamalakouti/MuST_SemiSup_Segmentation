@@ -510,6 +510,6 @@ def seg2ET(preds, threshold, oneHot=False):
 
 def seg2TC(preds, threshold):
     NET_preds = (preds[:, 1, :, :] >= threshold).float()
-    ET_preds = (preds[:, 3, :, :] >= threshold).floa()
+    ET_preds = (preds[:, 3, :, :] >= threshold).float()
     TC_preds = (NET_preds + ET_preds >= 1).float()
     return TC_preds
