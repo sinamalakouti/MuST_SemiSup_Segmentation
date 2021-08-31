@@ -410,13 +410,13 @@ def Pgs_train_val(dataset, n_epochs, wmh_threshold, output_dir, learning_rate, a
                                           mixup_threshold=cfg.mixup_threshold, mode=cfg.train_sup_mode, t1=cfg.t1,
                                           t2=cfg.t2, t1ce=cfg.t1ce, augment=cfg.augment)
 
-    print('size of labeled training set: number of subjects:    ', len(train_sup_loader.dataset.subjects_name))
+    print('size of labeled training set: number of subjects:    ', (train_sup_loader.dataset.subjects_name))
     if cfg.experiment_mode == 'semi':
         train_unsup_loader = utils.get_trainset(dataset, batch_size=32, intensity_rescale=cfg.intensity_rescale,
                                                 mixup_threshold=cfg.mixup_threshold,
                                                 mode=cfg.train_unsup_mode, t1=cfg.t1, t2=cfg.t2, t1ce=cfg.t1ce,
                                                 augment=cfg.augment)
-        print('size of unlabeled training set: number of subjects:    ', len(train_unsup_loader.dataset.subjects_name))
+        print('size of unlabeled training set: number of subjects:    ', (train_unsup_loader.dataset.subjects_name))
     for epoch in range(start_epoch, n_epochs):
         print("iteration:  ", epoch)
 
