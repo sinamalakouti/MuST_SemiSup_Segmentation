@@ -329,9 +329,9 @@ def eval_per_subjectPgs2(model, device, threshold, cfg, data_mode):
             y_ET = seg2ET(y_pred, threshold)
             y_TC = seg2TC(y_pred, threshold)
 
-            metrics_WT = eval_utils.do_eval(targetWT.reshape(y_WT.shape).cpu(), y_WT.cpu())
-            metrics_ET = eval_utils.do_eval(targetET.cpu(), y_ET.cpu())
-            metrics_TC = eval_utils.do_eval(targetTC.reshape(y_TC.shape).cpu(), y_TC.cpu())
+            metrics_WT,_,_ = eval_utils.do_eval(targetWT.reshape(y_WT.shape).cpu(), y_WT.cpu())
+            metrics_ET ,_,_= eval_utils.do_eval(targetET.cpu(), y_ET.cpu())
+            metrics_TC ,_,_ = eval_utils.do_eval(targetTC.reshape(y_TC.shape).cpu(), y_TC.cpu())
 
             running_dice['WT'].append(metrics_WT['dsc'])
             running_dice['ET'].append(metrics_ET['dsc'])
@@ -518,62 +518,62 @@ def Pgs_train_val(dataset, n_epochs, wmh_threshold, output_dir, learning_rate, a
                                         epoch, cfg)
 
         if epoch % 2 == 0:
-            final_dice, final_hd, final_PPV, final_sensitivity = eval_per_subjectPgs2(pgsnet, device, wmh_threshold,
-                                                                                      cfg, cfg.val_mode)
+            # final_dice, final_hd, final_PPV, final_sensitivity = eval_per_subjectPgs2(pgsnet, device, wmh_threshold,
+            #                                                                           cfg, cfg.val_mode)
+            #
+            # print("** (WT) SUBJECT WISE SCORE @ Iteration {} is DICE: {}, H95: {}, PPV:{}, Sensitivity:{} **".
+            #       format(epoch, final_dice['WT'], final_hd['WT'], final_PPV['WT'], final_sensitivity['WT']))
+            # print("** (ET) SUBJECT WISE SCORE @ Iteration {} is DICE: {}, H95: PPV{}, PPV:{}, Sensitivity:{} **".
+            #       format(epoch, final_dice['ET'], final_hd['ET'], final_PPV['ET'], final_sensitivity['WT']))
+            # print("** (TC) SUBJECT WISE SCORE @ Iteration {} is DICE: {}, H95: PPV{}, PPV:{}, Sensitivity:{} **".
+            #       format(epoch, final_dice['TC'], final_hd['TC'], final_PPV['TC'], final_sensitivity['TC']))
 
-            print("** (WT) SUBJECT WISE SCORE @ Iteration {} is DICE: {}, H95: {}, PPV:{}, Sensitivity:{} **".
-                  format(epoch, final_dice['WT'], final_hd['WT'], final_PPV['WT'], final_sensitivity['WT']))
-            print("** (ET) SUBJECT WISE SCORE @ Iteration {} is DICE: {}, H95: PPV{}, PPV:{}, Sensitivity:{} **".
-                  format(epoch, final_dice['ET'], final_hd['ET'], final_PPV['ET'], final_sensitivity['WT']))
-            print("** (TC) SUBJECT WISE SCORE @ Iteration {} is DICE: {}, H95: PPV{}, PPV:{}, Sensitivity:{} **".
-                  format(epoch, final_dice['TC'], final_hd['TC'], final_PPV['TC'], final_sensitivity['TC']))
-
-            if final_dice['WT'] > best_score:
-                print("****************** BEST SCORE @ ITERATION {} is {} ******************".format(epoch,
-                                                                                                     final_dice['WT']))
-                best_score = final_dice['WT']
-                path = os.path.join(output_model_dir, 'pgsnet_best_lr{}.model'.format(learning_rate))
-                model_utils.save_state_dict(pgsnet, path)
-
-            save_score_all(output_image_dir, (final_dice, final_hd, final_PPV, final_sensitivity), epoch)
-            wandb.log({'epoch_id': epoch,
-                       'WT_subject_wise_val_DSC': final_dice['WT'], 'WT_subject_wise_val_H95': final_hd['WT'],
-                       'WT_subject_wise_val_PPV': final_PPV['WT'],
-                       'WT_subject_wise_val_SENSITIVITY': final_sensitivity['WT'],
-                       'ET_subject_wise_val_DSC': final_dice['ET'], 'ET_subject_wise_val_H95': final_hd['ET'],
-                       'ET_subject_wise_val_PPV': final_PPV['ET'],
-                       'ET_subject_wise_val_SENSITIVITY': final_sensitivity['ET'],
-                       'TC_subject_wise_val_DSC': final_dice['TC'], 'TC_subject_wise_val_H95': final_hd['TC'],
-                       'TC_subject_wise_val_PPV': final_PPV['TC'],
-                       'TC_subject_wise_val_SENSITIVITY': final_sensitivity['TC']
-                       })
+            # if final_dice['WT'] > best_score:
+            #     print("****************** BEST SCORE @ ITERATION {} is {} ******************".format(epoch,
+            #                                                                                          final_dice['WT']))
+            #     best_score = final_dice['WT']
+            #     path = os.path.join(output_model_dir, 'pgsnet_best_lr{}.model'.format(learning_rate))
+            #     model_utils.save_state_dict(pgsnet, path)
+            #
+            # save_score_all(output_image_dir, (final_dice, final_hd, final_PPV, final_sensitivity), epoch)
+            # wandb.log({'epoch_id': epoch,
+            #            'WT_subject_wise_val_DSC': final_dice['WT'], 'WT_subject_wise_val_H95': final_hd['WT'],
+            #            'WT_subject_wise_val_PPV': final_PPV['WT'],
+            #            'WT_subject_wise_val_SENSITIVITY': final_sensitivity['WT'],
+            #            'ET_subject_wise_val_DSC': final_dice['ET'], 'ET_subject_wise_val_H95': final_hd['ET'],
+            #            'ET_subject_wise_val_PPV': final_PPV['ET'],
+            #            'ET_subject_wise_val_SENSITIVITY': final_sensitivity['ET'],
+            #            'TC_subject_wise_val_DSC': final_dice['TC'], 'TC_subject_wise_val_H95': final_hd['TC'],
+            #            'TC_subject_wise_val_PPV': final_PPV['TC'],
+            #            'TC_subject_wise_val_SENSITIVITY': final_sensitivity['TC']
+            #            })
 
             # ***  BOTTOM: WHEN I USE THE OTHER IMPLEMENTATION ( MY IMPLEMENTATION) ****#
-            # dsc_score, subject_wise_DSC, segmentations = evaluatePGS(pgsnet, dataset, device, wmh_threshold,
-            #                                                          cfg, cfg.val_mode)
-            # WTsubject_wise_DSC, ETsubject_wise_DSC, TCsubject_wise_DSC = eval_per_subjectPgs(pgsnet, device,
-            #                                                                                  wmh_threshold, cfg,
-            #                                                                                  cfg.val_mode)
-            # print("** (WT) SUBJECT WISE SCORE @ Iteration {} is {} **".format(epoch, WTsubject_wise_DSC))
-            # print("** (ET) SUBJECT WISE SCORE @ Iteration {} is {} **".format(epoch, ETsubject_wise_DSC))
-            # print("** (TC) SUBJECT WISE SCORE @ Iteration {} is {} **".format(epoch, TCsubject_wise_DSC))
-            # # print("** REGULAR SCORE @ Iteration {} is {} **".format(epoch, dsc_score))
-            # if WTsubject_wise_DSC > best_score:
-            #     print("****************** BEST SCORE @ ITERATION {} is {} ******************".format(epoch,
-            #                                                                                          WTsubject_wise_DSC))
-            #     best_score = WTsubject_wise_DSC
-            #     path = os.path.join(output_model_dir, 'psgnet_best_lr{}.model'.format(learning_rate))
-            #     with open(path, 'wb') as f:
-            #         torch.save(pgsnet, f)
-            #     # batch_wise_test_DSC, subject_wise_test_DSC, _ = evaluatePGS(pgsnet, dataset, device, wmh_threshold,
-            #     #                                                             cfg, cfg.test_mode)
-            #     subject_wise_test_DSC = eval_per_subjectPgs(pgsnet, device, wmh_threshold, cfg, cfg.test_mode)
-            #
-            #     wandb.log({"epoch_id": epoch, "subject_wise_test_DSC": subject_wise_test_DSC})
-            #
-            # save_score(output_image_dir, (WTsubject_wise_DSC, ETsubject_wise_DSC, TCsubject_wise_DSC), epoch)
-            # wandb.log({"epoch_id": epoch, "WT_subject_wise_val_DSC": WTsubject_wise_DSC,
-            #            "ET_subject_wise_val_DSC": ETsubject_wise_DSC, "TC_subject_wise_val_DSC": TCsubject_wise_DSC})
+            dsc_score, subject_wise_DSC, segmentations = evaluatePGS(pgsnet, dataset, device, wmh_threshold,
+                                                                     cfg, cfg.val_mode)
+            WTsubject_wise_DSC, ETsubject_wise_DSC, TCsubject_wise_DSC = eval_per_subjectPgs(pgsnet, device,
+                                                                                             wmh_threshold, cfg,
+                                                                                             cfg.val_mode)
+            print("** (WT) SUBJECT WISE SCORE @ Iteration {} is {} **".format(epoch, WTsubject_wise_DSC))
+            print("** (ET) SUBJECT WISE SCORE @ Iteration {} is {} **".format(epoch, ETsubject_wise_DSC))
+            print("** (TC) SUBJECT WISE SCORE @ Iteration {} is {} **".format(epoch, TCsubject_wise_DSC))
+            # print("** REGULAR SCORE @ Iteration {} is {} **".format(epoch, dsc_score))
+            if WTsubject_wise_DSC > best_score:
+                print("****************** BEST SCORE @ ITERATION {} is {} ******************".format(epoch,
+                                                                                                     WTsubject_wise_DSC))
+                best_score = WTsubject_wise_DSC
+                path = os.path.join(output_model_dir, 'psgnet_best_lr{}.model'.format(learning_rate))
+                with open(path, 'wb') as f:
+                    torch.save(pgsnet, f)
+                # batch_wise_test_DSC, subject_wise_test_DSC, _ = evaluatePGS(pgsnet, dataset, device, wmh_threshold,
+                #                                                             cfg, cfg.test_mode)
+                subject_wise_test_DSC = eval_per_subjectPgs(pgsnet, device, wmh_threshold, cfg, cfg.test_mode)
+
+                wandb.log({"epoch_id": epoch, "subject_wise_test_DSC": subject_wise_test_DSC})
+
+            save_score(output_image_dir, (WTsubject_wise_DSC, ETsubject_wise_DSC, TCsubject_wise_DSC), epoch)
+            wandb.log({"epoch_id": epoch, "WT_subject_wise_val_DSC": WTsubject_wise_DSC,
+                       "ET_subject_wise_val_DSC": ETsubject_wise_DSC, "TC_subject_wise_val_DSC": TCsubject_wise_DSC})
         scheduler.step()
 
 
