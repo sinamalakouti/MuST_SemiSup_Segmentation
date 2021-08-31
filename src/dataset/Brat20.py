@@ -67,9 +67,9 @@ def train_val_split(all_data_csv, train_dir_path, val_dir_path, val_size=69):
 
 def semi_sup_split(all_train_csv, sup_dir_path, unsup_dir_path, ratio=0.5):
     all_train = np.asarray(pd.read_csv(all_train_csv, header=None)).reshape(-1)
-    unsup_size = int(ratio * len(all_train))
-    unsup_ids = np.random.choice(all_train, unsup_size, replace=False)
-    sup_ids = np.setdiff1d(all_train, unsup_ids)
+    sup_size = int(ratio * len(all_train))
+    sup_ids = np.random.choice(all_train, sup_size, replace=False)
+    unsup_ids = np.setdiff1d(all_train, sup_ids)
     np.savetxt(sup_dir_path + "/train18_sup_ids.csv", sup_ids.astype(np.str), delimiter=',', fmt='%s')
     np.savetxt(unsup_dir_path + "/train18_unsup_ids.csv", unsup_ids.astype(np.str), delimiter=',', fmt='%s')
 
