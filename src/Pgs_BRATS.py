@@ -475,7 +475,7 @@ def Pgs_train_val(dataset, n_epochs, wmh_threshold, output_dir, learning_rate, a
         except OSError:
             print("Creation of the directory %s failed" % output_dir)
     if cfg.experiment_mode == 'semi':
-        output_dir = os.path.join(output_dir, "sup_ratio_{}".format(cfg.ratio))
+        output_dir = os.path.join(output_dir, "sup_ratio_{}".format(cfg.train_sup_rate))
         if not os.path.isdir(output_dir):
             try:
                 os.mkdir(output_dir, 0o777)
