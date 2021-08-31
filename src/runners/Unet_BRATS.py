@@ -313,7 +313,7 @@ def train_val(dataset, n_epochs, wmh_threshold, output_dir, learning_rate, args,
                 print("****************** BEST SCORE @ ITERATION {} is {} ******************".format(epoch,
                                                                                                      subject_wise_score))
                 best_score = subject_wise_score
-                path = os.path.join(output_model_dir, 'psgnet_best_lr{}.model'.format(learning_rate))
+                path = os.path.join(output_model_dir, 'unet_best_lr{}.model'.format(learning_rate))
                 model_utils.save_state_dict(unet, path)
 
                 subject_wise_test_score = eval_per_subjectUnet(unet, device, wmh_threshold, cfg, cfg.test_mode)
