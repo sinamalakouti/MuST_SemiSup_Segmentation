@@ -177,6 +177,7 @@ class Brat20Test(torch.utils.data.Dataset):
                 data_modalities.append(x_t1ce)
 
             x_final = torch.cat(data_modalities, dim=0)
+            del data_modalities
             data_X.append(x_final)
             if self.oneHot:
                 y_true = torch.zeros(4, 200, 200)
@@ -261,26 +262,26 @@ class Brat20(torch.utils.data.Dataset):
         subjects_root_dir = os.path.join(dataroot_dir, 'MICCAI_BraTS2020_TrainingData')
         self.subjects_name = np.asarray(pd.read_csv(ids_path, header=None)).reshape(-1)
 
-        label_paths = [os.path.join(subjects_root_dir, str(subj_name) + '/{}_seg.nii.gz'.format(subj_name)) for
-                       subj_name in self.subjects_name]
-        flair_paths = [os.path.join(subjects_root_dir, str(subj_name) + '/{}_flair.nii.gz'.format(subj_name)) for
-                       subj_name in self.subjects_name]
+        label_paths = np.array([os.path.join(subjects_root_dir, str(subj_name) + '/{}_seg.nii.gz'.format(subj_name)) for
+                       subj_name in self.subjects_name])
+        flair_paths = np.array([os.path.join(subjects_root_dir, str(subj_name) + '/{}_flair.nii.gz'.format(subj_name)) for
+                       subj_name in self.subjects_name])
         if self.t1:
-            t1_paths = [os.path.join(subjects_root_dir, str(subj_name) + '/{}_t1.nii.gz'.format(subj_name)) for
-                        subj_name in self.subjects_name]
+            t1_paths = np.array([os.path.join(subjects_root_dir, str(subj_name) + '/{}_t1.nii.gz'.format(subj_name)) for
+                        subj_name in self.subjects_name])
         else:
-            t1_paths = [None for _ in self.subjects_name]
+            t1_paths = np.array([None for _ in self.subjects_name])
         if self.t2:
-            t2_paths = [os.path.join(subjects_root_dir, str(subj_name) + '/{}_t2.nii.gz'.format(subj_name)) for
-                        subj_name in self.subjects_name]
+            t2_paths = np.array([os.path.join(subjects_root_dir, str(subj_name) + '/{}_t2.nii.gz'.format(subj_name)) for
+                        subj_name in self.subjects_name])
         else:
-            t2_paths = [None for _ in self.subjects_name]
+            t2_paths = np.array([None for _ in self.subjects_name])
 
         if self.t1ce:
-            t1ce_paths = [os.path.join(subjects_root_dir, str(subj_name) + '/{}_t1ce.nii.gz'.format(subj_name)) for
-                          subj_name in self.subjects_name]
+            t1ce_paths = np.array([os.path.join(subjects_root_dir, str(subj_name) + '/{}_t1ce.nii.gz'.format(subj_name)) for
+                          subj_name in self.subjects_name])
         else:
-            t1ce_paths = [None for _ in self.subjects_name]
+            t1ce_paths = np.array([None for _ in self.subjects_name])
         paths = zip(flair_paths, t1_paths, t2_paths, t1ce_paths, label_paths, self.subjects_name)
 
         self.data = []
@@ -319,6 +320,7 @@ class Brat20(torch.utils.data.Dataset):
                         data_map['data_t1ce'] = None
 
                     self.data.append(data_map)
+            self.data = np.array(self.data)
 
     def __len__(self):
         return len(self.data)
@@ -484,7 +486,7 @@ def normalize_guassian(x):
     avg = x.mean()
     std = x.std()
 
-    return (x - avg) / (std + 0.001)
+    return (x - avg + 0.001) / (std + 0.001)
 
 
 def normalize_quantile(x, threshold):
