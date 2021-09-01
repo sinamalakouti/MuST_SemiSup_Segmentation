@@ -110,7 +110,8 @@ def trainPgs_semi(train_sup_loader, train_unsup_loader, model, optimizer, device
 
         b_sup = batch_sup['data'].to(device)
         target_sup = batch_sup['label'].to(device)
-
+        del batch_sup
+        del batch_unsup
         sup_outputs, _ = model(b_sup, is_supervised=True)
         sLoss = compute_loss(sup_outputs, target_sup, loss_functions, is_supervised=True)
 
@@ -463,7 +464,7 @@ def eval_per_subjectPgs2(model, device, threshold, cfg, data_mode):
             running_sensitivity['ET'].append(metrics_ET['sensitivity'])
             running_sensitivity['TC'].append(metrics_TC['sensitivity'])
 
-            
+
     final_dice = {'WT': np.mean(running_dice['WT']), 'ET': np.mean(running_dice['ET']),
                   'TC': np.mean(running_dice['TC'])}
     final_hd = {'WT': np.mean(running_hd['WT']), 'ET': np.mean(running_hd['ET']), 'TC': np.mean(running_hd['TC'])}
@@ -720,8 +721,8 @@ def Pgs_train_val(dataset, n_epochs, wmh_threshold, output_dir, learning_rate, a
 
 
     #
-    save_score_all(output_image_dir, (final_dice, final_hd, final_PPV, final_sensitivity), epoch)
-    wandb.log({'epoch_id': epoch,
+    save_score_all(output_image_dir, (final_dice, final_hd, final_PPV, final_sensitivity), 40)
+    wandb.log({'epoch_id': 40,
                'WT_subject_wise_val_DSC': final_dice['WT'], 'WT_subject_wise_val_H95': final_hd['WT'],
                'WT_subject_wise_val_PPV': final_PPV['WT'],
                'WT_subject_wise_val_SENSITIVITY': final_sensitivity['WT'],
