@@ -320,7 +320,7 @@ class Brat20(torch.utils.data.Dataset):
                         data_map['data_t1ce'] = None
 
                     self.data.append(data_map)
-            self.data = np.array(self.data)
+        self.data = np.array(self.data)
 
     def __len__(self):
         return len(self.data)
