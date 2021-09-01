@@ -365,18 +365,16 @@ class Brat20(torch.utils.data.Dataset):
         x_t1ce = rescale_intensity(x_t1ce) if x_t1ce is not None else None
 
         # result = {'data': x, 'label': y, 'subject': self.subjects_id[index]}
-        data_modalities = []
-        if x is not None:
-            data_modalities.append(x)
+
         if x_t1 is not None:
             # result['data_t1'] = x_t1
-            data_modalities.append(x_t1)
+            x = torch.cat((x, x_t1))
         if x_t2 is not None:
             # result['data_t2'] = x_t2
-            data_modalities.append(x_t2)
+            x = torch.cat((x, x_t2))
         if x_t1ce is not None:
             # result['data_t1ce'] = x_t1ce
-            data_modalities.append(x_t1ce)
+            x = torch.cat((x, x_t1ce))
         if self.oneHot:
             y_true = torch.zeros(4, 200, 200)
             y_true[0, :, :] = y == 0
@@ -384,8 +382,8 @@ class Brat20(torch.utils.data.Dataset):
             y_true[2, :, :] = y == 2
             y_true[3, :, :] = y == 3
             y = y_true
-        x_final = torch.cat(data_modalities, dim=0)
-        del data_modalities
+        x_final = x
+
         result = {'data': x_final, 'label': y, 'subject': self.data[index]['subject_id'],
                   'slice': self.data[index]['slice']}
         return result

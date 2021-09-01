@@ -381,9 +381,9 @@ def eval_per_subjectPgs3(model, device, threshold, cfg, data_mode):
             print("(ET) :  DICE SCORE   {}".format(dice_scoreET))
             print("(TC) :  DICE SCORE   {}".format(dice_scoreTC))
 
-            dice_arrWT.append(dice_scoreWT.item())
-            dice_arrET.append(dice_scoreET.item())
-            dice_arrTC.append(dice_scoreTC.item())
+            dice_arrWT.append(dice_scoreWT.detach().item())
+            dice_arrET.append(dice_scoreET.detach().item())
+            dice_arrTC.append(dice_scoreTC.detach().item())
 
     final_dice = {'WT': np.mean(dice_arrWT), 'ET': np.mean(dice_arrET), 'TC': np.mean(dice_arrTC)}
 
@@ -512,7 +512,7 @@ def evaluatePGS(model, dataset, device, threshold, cfg, training_mode):
             target[target >= 1] = 1
             target_WT = target
             dice_score = dice_coef(target_WT.reshape(y_WT.shape), y_WT)
-            dice_arr.append(dice_score.item())
+            dice_arr.append(dice_score.detach().item())
             outputs = predictions[-1].reshape(predictions[-1].shape[0], predictions[-1].shape[1],
                                               predictions[-1].shape[2],
                                               predictions[-1].shape[3])
