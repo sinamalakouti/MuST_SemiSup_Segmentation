@@ -70,8 +70,8 @@ def semi_sup_split(all_train_csv, sup_dir_path, unsup_dir_path, ratio=0.5):
     sup_size = int(ratio * len(all_train))
     sup_ids = np.random.choice(all_train, sup_size, replace=False)
     unsup_ids = np.setdiff1d(all_train, sup_ids)
-    np.savetxt(sup_dir_path + "/train18_sup_ids{}.csv".format(ratio  * 100), sup_ids.astype(np.str), delimiter=',', fmt='%s')
-    np.savetxt(unsup_dir_path + "/train18_unsup_ids{}.csv".format(ratio * 100), unsup_ids.astype(np.str), delimiter=',', fmt='%s')
+    np.savetxt(sup_dir_path + "/train18_sup_ids{}.csv".format(int(ratio  * 100)), sup_ids.astype(np.str), delimiter=',', fmt='%s')
+    np.savetxt(unsup_dir_path + "/train18_unsup_ids{}.csv".format(int(ratio * 100)), unsup_ids.astype(np.str), delimiter=',', fmt='%s')
 
 
 class Brat20Test(torch.utils.data.Dataset):
@@ -380,6 +380,7 @@ class Brat20(torch.utils.data.Dataset):
             y_true[3, :, :] = y == 3
             y = y_true
         x_final = torch.cat(data_modalities, dim=0)
+        del data_modalities
         result = {'data': x_final, 'label': y, 'subject': self.data[index]['subject_id'],
                   'slice': self.data[index]['slice']}
         return result
