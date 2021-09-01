@@ -17,9 +17,9 @@ resultImage is predicted image
 
 def do_eval(testImage, resultImage):
     """Main function"""
-    testImage, resultImage = getImages(testImage, resultImage)
     testImage = sitk.GetImageFromArray(testImage)
     resultImage = sitk.GetImageFromArray(resultImage)
+    testImage, resultImage = getImages(testImage, resultImage)
     dsc = getDSC(testImage, resultImage)
     h95 = getHausdorff(testImage, resultImage)
     avd = getAVD(testImage, resultImage)
@@ -43,8 +43,8 @@ def getImages(testImage, resultImage):
     # Remove non-WMH from the test and result images, since we don't evaluate on that
     maskedTestImage = sitk.BinaryThreshold(testImage, 0.5, 1.5, 1,
                                            0)  # WMH == 1
-    nonWMHImage = sitk.BinaryThreshold(testImage, 1.5, 2.5, 0,
-                                       1)  # non-WMH == 2
+    nonWMHImage = sitk.BinaryThreshold(testImage, -0.5, 0.5, 0,
+                                       1)  # non-WMH == 0
     maskedResultImage = sitk.Mask(resultImage, nonWMHImage)
 
     # Convert to binary mask
