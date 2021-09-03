@@ -426,7 +426,7 @@ def eval_per_subjectPgs2(model, device, threshold, cfg, data_mode):
 
     paths = testset.paths
     sup_loss = torch.nn.CrossEntropyLoss()
-    model = model.module
+
     with torch.no_grad():
         for path in paths:
             batch = testset.get_subject(path)
@@ -613,7 +613,7 @@ def Pgs_train_val(dataset, n_epochs, wmh_threshold, output_dir, learning_rate, a
             print("Creation of the directory %s failed" % output_image_dir)
 
     pgsnet = Pgs.PGS(inputs_dim, outputs_dim, kernels, strides)
-    
+
 
     if torch.cuda.is_available():
         if type(pgsnet) is not torch.nn.DataParallel and cfg.parallel and cfg.parallel:
@@ -621,8 +621,7 @@ def Pgs_train_val(dataset, n_epochs, wmh_threshold, output_dir, learning_rate, a
         device = 'cuda'
     elif not torch.cuda.is_available():
         device = 'cpu'
-    final_dice, final_hd, final_PPV, final_sensitivity = eval_per_subjectPgs2(pgsnet, device, wmh_threshold,
-                                                                              cfg, cfg.val_mode)
+
     device = torch.device(device)
     pgsnet.to(device)
     optimizer = torch.optim.SGD(pgsnet.parameters(), learning_rate, momentum=0.9, weight_decay=1e-4)
