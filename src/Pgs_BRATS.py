@@ -7,7 +7,7 @@ from torch.optim import lr_scheduler
 from utils import utils, eval_utils
 from utils import model_utils
 
-from evaluation_metrics import dice_coef, get_dice_coef_per_subject, get_confusionMatrix_metrics
+from evaluation_metrics import dice_coef, get_dice_coef_per_subject, get_confusionMatrix_metrics, do_eval
 from dataset.Brat20 import Brat20Test, seg2WT, seg2TC, seg2ET, semi_sup_split
 
 from models import Pgs
@@ -27,7 +27,7 @@ sys.path.append('srs/utils')
 
 for p in sys.path:
     print("path  ", p)
-random_seeds = [41, 42, 43]
+# random_seeds = [41, 42, 43]
 
 utils.Constants.USE_CUDA = True
 parser = argparse.ArgumentParser()
@@ -236,6 +236,10 @@ def eval_per_subjectPgs(model, device, threshold, cfg, data_mode):
     specificity_arrTC = []
     specificity_arrET = []
 
+    hd_arrWT = []
+    hd_arrTC = []
+    hd_arrET = []
+
     paths = testset.paths
     sup_loss = torch.nn.CrossEntropyLoss()
     with torch.no_grad():
@@ -274,44 +278,56 @@ def eval_per_subjectPgs(model, device, threshold, cfg, data_mode):
             y_ET = seg2ET(y_pred, threshold)
             y_TC = seg2TC(y_pred, threshold)
 
-            dice_scoreWT = dice_coef(targetWT.reshape(y_WT.shape), y_WT)
-            dice_scoreET = dice_coef(targetET, y_ET)
-            dice_scoreTC = dice_coef(targetTC.reshape(y_TC.shape), y_TC)
+            # dice_scoreWT = dice_coef(targetWT.reshape(y_WT.shape), y_WT)
+            # dice_scoreET = dice_coef(targetET, y_ET)
+            # dice_scoreTC = dice_coef(targetTC.reshape(y_TC.shape), y_TC)
+            #
+            # PPV_scoreWT, sensitivity_WT, specificity_WT = get_confusionMatrix_metrics(targetWT.reshape(y_WT.shape),
+            #                                                                           y_WT)
+            # PPV_scoreET, sensitivity_ET, specificity_ET = get_confusionMatrix_metrics(targetET, y_ET)
+            # PPV_scoreTC, sensitivity_TC, specificity_TC = get_confusionMatrix_metrics(targetTC.reshape(y_TC.shape),
+            #                                                                           y_TC)
 
-            PPV_scoreWT, sensitivity_WT, specificity_WT = get_confusionMatrix_metrics(targetWT.reshape(y_WT.shape),
-                                                                                      y_WT)
-            PPV_scoreET, sensitivity_ET, specificity_ET = get_confusionMatrix_metrics(targetET, y_ET)
-            PPV_scoreTC, sensitivity_TC, specificity_TC = get_confusionMatrix_metrics(targetTC.reshape(y_TC.shape),
-                                                                                      y_TC)
+            metrics_WT = do_eval(targetWT.reshape(y_WT), y_WT)
+            metrics_ET = do_eval(targetET.reshape(y_ET), y_ET)
+            metrics_TC = do_eval(targetTC.reshape(y_TC), y_TC)
+
             print("*** EVALUATION METRICS FOR SUBJECT {} IS: ".format(subjects[0]))
             print(
-                "(WT) :  DICE SCORE   {}, PPV  {},  Sensitivity: {}, Specificity: {}".format(dice_scoreWT, PPV_scoreWT,
-                                                                                             sensitivity_WT,
-                                                                                             specificity_WT))
+                "(WT) :  DICE SCORE   {}, PPV  {},  Sensitivity: {}, Specificity: {}, Hausdorff: {}".format(
+                    metrics_WT['dsc'], metrics_WT['ppv'],
+                    metrics_WT['sens'],
+                    metrics_WT['spec'], metrics_WT['hd']))
             print(
-                "(ET) :  DICE SCORE   {}, PPV  {},  Sensitivity: {}, Specificity: {}".format(dice_scoreET, PPV_scoreET,
-                                                                                             sensitivity_ET,
-                                                                                             specificity_ET))
+                "(ET) :  DICE SCORE   {}, PPV  {},  Sensitivity: {}, Specificity: {},  Hausdorff: {}".format(
+                    metrics_ET['dsc'], metrics_ET['ppv'],
+                    metrics_ET['sens'],
+                    metrics_ET['spec'], metrics_ET['hd']))
             print(
-                "(TC) :  DICE SCORE   {}, PPV  {},  Sensitivity: {}, Specificity: {}".format(dice_scoreTC, PPV_scoreTC,
-                                                                                             sensitivity_TC,
-                                                                                             specificity_TC))
+                "(TC) :  DICE SCORE   {}, PPV  {},  Sensitivity: {}, Specificity: {}, Hausdorff: {}".format(
+                    metrics_TC['dsc'], metrics_TC['ppv'],
+                    metrics_TC['sens'],
+                    metrics_TC['spec'], metrics_TC['hd']))
 
-            dice_arrWT.append(dice_scoreWT.item())
-            dice_arrET.append(dice_scoreET.item())
-            dice_arrTC.append(dice_scoreTC.item())
+            dice_arrWT.append(metrics_WT['dsc'].item())
+            dice_arrET.append(metrics_ET['dsc'].item())
+            dice_arrTC.append(metrics_TC['dsc'].item())
 
-            PPV_arrWT.append(PPV_scoreWT.item())
-            PPV_arrTC.append(PPV_scoreTC.item())
-            PPV_arrET.append(PPV_scoreET.item())
+            PPV_arrWT.append(metrics_WT['ppv'].item())
+            PPV_arrTC.append(metrics_ET['ppv'].item())
+            PPV_arrET.append(metrics_TC['ppv'].item())
 
-            sensitivity_arrWT.append(sensitivity_WT.item())
-            sensitivity_arrTC.append(sensitivity_TC.item())
-            sensitivity_arrET.append(sensitivity_ET.item())
+            sensitivity_arrWT.append(metrics_WT['sens'].item())
+            sensitivity_arrTC.append(metrics_ET['sens'].item())
+            sensitivity_arrET.append(metrics_TC['sens'].item())
 
-            specificity_arrWT.append(specificity_WT.item())
-            specificity_arrET.append(specificity_ET.item())
-            specificity_arrTC.append(specificity_TC.item())
+            specificity_arrWT.append(metrics_WT['sens'].item())
+            specificity_arrET.append(metrics_ET['sens'].item())
+            specificity_arrTC.append(metrics_TC['sens'].item())
+
+            hd_arrWT.append(metrics_WT['hd'].item())
+            hd_arrET.append(metrics_ET['hd'].item())
+            hd_arrTC.append(metrics_TC['hd'].item())
 
     final_dice = {'WT': np.mean(dice_arrWT), 'ET': np.mean(dice_arrET), 'TC': np.mean(dice_arrTC)}
     final_PPV = {'WT': np.mean(PPV_arrWT), 'ET': np.mean(PPV_arrET), 'TC': np.mean(PPV_arrTC)}
@@ -319,7 +335,9 @@ def eval_per_subjectPgs(model, device, threshold, cfg, data_mode):
                          'TC': np.mean(sensitivity_arrTC)}
     final_specificity = {'WT': np.mean(specificity_arrWT), 'ET': np.mean(specificity_arrET),
                          'TC': np.mean(specificity_arrTC)}
-    return final_dice, final_PPV, final_sensitivity, final_specificity
+    final_hd = {'WT': np.mean(hd_arrWT), 'ET': np.mean(hd_arrET),
+                'TC': np.mean(hd_arrTC)}
+    return final_dice, final_PPV, final_sensitivity, final_specificity, final_hd
     # return np.mean(np.array(dice_arrWT)), np.mean(np.array(dice_arrET)), np.mean(np.array(dice_arrTC))
 
 
@@ -408,6 +426,7 @@ def eval_per_subjectPgs2(model, device, threshold, cfg, data_mode):
 
     paths = testset.paths
     sup_loss = torch.nn.CrossEntropyLoss()
+    model = model.module
     with torch.no_grad():
         for path in paths:
             batch = testset.get_subject(path)
@@ -416,6 +435,7 @@ def eval_per_subjectPgs2(model, device, threshold, cfg, data_mode):
             subjects = batch['subjects']
             assert len(np.unique(subjects)) == 1, print("More than one subject at a time")
             b = b.to(device)
+
             outputs, _ = model(b, True)
 
             if cfg.oneHot:
@@ -463,7 +483,6 @@ def eval_per_subjectPgs2(model, device, threshold, cfg, data_mode):
             running_sensitivity['WT'].append(metrics_WT['sensitivity'])
             running_sensitivity['ET'].append(metrics_ET['sensitivity'])
             running_sensitivity['TC'].append(metrics_TC['sensitivity'])
-
 
     final_dice = {'WT': np.mean(running_dice['WT']), 'ET': np.mean(running_dice['ET']),
                   'TC': np.mean(running_dice['TC'])}
@@ -537,8 +556,9 @@ def Pgs_train_val(dataset, n_epochs, wmh_threshold, output_dir, learning_rate, a
     dataroot_dir = f'data/brats20'
     all_train_csv = os.path.join(dataroot_dir, 'trainset/brats2018.csv')
     supdir_path = os.path.join(dataroot_dir, 'trainset')
-    semi_sup_split(all_train_csv=all_train_csv, sup_dir_path=supdir_path, unsup_dir_path=supdir_path,
-                   ratio=cfg.train_sup_rate / 100, seed=cfg.seed)
+
+    # semi_sup_split(all_train_csv=all_train_csv, sup_dir_path=supdir_path, unsup_dir_path=supdir_path,
+    #                ratio=cfg.train_sup_rate / 100, seed=cfg.seed)
     print("learning_rate is    ", learning_rate)
     step_size = cfg.scheduler_step_size
     print("scheduler step size is :   ", step_size)
@@ -593,7 +613,7 @@ def Pgs_train_val(dataset, n_epochs, wmh_threshold, output_dir, learning_rate, a
             print("Creation of the directory %s failed" % output_image_dir)
 
     pgsnet = Pgs.PGS(inputs_dim, outputs_dim, kernels, strides)
-
+    pgsnet = model_utils.load_model('/Users/sinamalakouti/Desktop/pgsnet_best_lr0.001.model', 'cpu')
 
     if torch.cuda.is_available():
         if type(pgsnet) is not torch.nn.DataParallel and cfg.parallel and cfg.parallel:
@@ -601,7 +621,8 @@ def Pgs_train_val(dataset, n_epochs, wmh_threshold, output_dir, learning_rate, a
         device = 'cuda'
     elif not torch.cuda.is_available():
         device = 'cpu'
-
+    final_dice, final_hd, final_PPV, final_sensitivity = eval_per_subjectPgs2(pgsnet, device, wmh_threshold,
+                                                                              cfg, cfg.val_mode)
     device = torch.device(device)
     pgsnet.to(device)
     optimizer = torch.optim.SGD(pgsnet.parameters(), learning_rate, momentum=0.9, weight_decay=1e-4)
@@ -635,23 +656,73 @@ def Pgs_train_val(dataset, n_epochs, wmh_threshold, output_dir, learning_rate, a
                                         epoch, cfg)
 
         if epoch % 2 == 0:
+            final_dice, final_PPV, final_sensitivity, final_specificity, final_hd = eval_per_subjectPgs(pgsnet, device,
+                                                                                                        wmh_threshold,
+                                                                                                        cfg,
+                                                                                                        cfg.val_mode)
+            print(
+                "** (WT) SUBJECT WISE SCORE @ Iteration {} is DICE: {}, HD: {}, PPV:{}, Sensitivity: {}, Specificity: {}  **".
+                    format(epoch, final_dice['WT'], final_hd['WT'], final_PPV['WT'], final_sensitivity['WT'],
+                           final_specificity['WT']))
+            print(
+                "** (ET) SUBJECT WISE SCORE @ Iteration {} is DICE: {}, HD: {}, :{}, Sensitivity:{}, Specificity: {}  **".
+                    format(epoch, final_dice['ET'], final_hd['ET'], final_PPV['ET'], final_sensitivity['ET'],
+                           final_specificity['ET']))
+            print(
+                "** (TC) SUBJECT WISE SCORE @ Iteration {} is DICE: {}, HD: {}, PPV:{}, Sensitivity:{}, Specificity: {}  **".
+                    format(epoch, final_dice['TC'], final_hd['TC'], final_PPV['TC'], final_sensitivity['TC'],
+                           final_specificity['TC']))
+
+            if final_dice['WT'] > best_score:
+                print("****************** BEST SCORE @ ITERATION {} is {} ******************".format(epoch,
+                                                                                                     final_dice['WT']))
+                best_score = final_dice['WT']
+                path = os.path.join(output_model_dir, 'pgsnet_best_lr{}.model'.format(learning_rate))
+                with open(path, 'wb') as f:
+                    torch.save(pgsnet, f)
+            save_score_all(output_image_dir, (final_dice, final_hd, final_PPV, final_sensitivity, final_specificity),
+                           epoch)
+            wandb.log({'epoch_id': epoch,
+                       'WT_subject_wise_val_DSC': final_dice['WT'],
+                       'WT_subject_wise_val_HD': final_hd['WT'],
+                       'WT_subject_wise_val_PPV': final_PPV['WT'],
+                       'WT_subject_wise_val_SENSITIVITY': final_sensitivity['WT'],
+                       'WT_subject_wise_val_SPECIFCITY': final_specificity['WT'],
+                       'ET_subject_wise_val_DSC': final_dice['ET'],
+                       'ET_subject_wise_val_HD': final_hd['ET'],
+                       'ET_subject_wise_val_PPV': final_PPV['ET'],
+                       'ET_subject_wise_val_SENSITIVITY': final_sensitivity['ET'],
+                       'ET_subject_wise_val_SPECIFCITY': final_specificity['ET'],
+                       'TC_subject_wise_val_DSC': final_dice['TC'],
+                       'TC_subject_wise_val_HD': final_hd['TC'],
+                       'TC_subject_wise_val_PPV': final_PPV['TC'],
+                       'TC_subject_wise_val_SENSITIVITY': final_sensitivity['TC'],
+                       'TC_subject_wise_val_SPECIFCITY': final_specificity['TC'],
+                       })
+
             # final_dice, final_hd, final_PPV, final_sensitivity = eval_per_subjectPgs2(pgsnet, device, wmh_threshold,
             #                                                                           cfg, cfg.val_mode)
             #
             # print("** (WT) SUBJECT WISE SCORE @ Iteration {} is DICE: {}, H95: {}, PPV:{}, Sensitivity:{} **".
             #       format(epoch, final_dice['WT'], final_hd['WT'], final_PPV['WT'], final_sensitivity['WT']))
-            # print("** (ET) SUBJECT WISE SCORE @ Iteration {} is DICE: {}, H95: PPV{}, PPV:{}, Sensitivity:{} **".
-            #       format(epoch, final_dice['ET'], final_hd['ET'], final_PPV['ET'], final_sensitivity['WT']))
+            # print("** (ET) SUBJECT WISE SCORE @ Iteration {} is DICE: {}, H95: {}, PPV:{}, Sensitivity:{} **".
+            #       format(epoch, final_dice['ET'], final_hd['ET'], final_PPV['ET'], final_sensitivity['ET']))
             # print("** (TC) SUBJECT WISE SCORE @ Iteration {} is DICE: {}, H95: PPV{}, PPV:{}, Sensitivity:{} **".
             #       format(epoch, final_dice['TC'], final_hd['TC'], final_PPV['TC'], final_sensitivity['TC']))
-
+            #
+            #
             # if final_dice['WT'] > best_score:
             #     print("****************** BEST SCORE @ ITERATION {} is {} ******************".format(epoch,
             #                                                                                          final_dice['WT']))
             #     best_score = final_dice['WT']
             #     path = os.path.join(output_model_dir, 'pgsnet_best_lr{}.model'.format(learning_rate))
-            #     model_utils.save_state_dict(pgsnet, path)
-            #
+            #     with open(path, 'wb') as f:
+            #         torch.save(pgsnet, f)
+            #     # batch_wise_test_DSC, subject_wise_test_DSC, _ = evaluatePGS(pgsnet, dataset, device, wmh_threshold,
+            #     #                                                             cfg, cfg.test_mode)
+            #     # subject_wise_test_DSC = eval_per_subjectPgs(pgsnet, device, wmh_threshold, cfg, cfg.test_mode)
+            #     #
+            #     # wandb.log({"epoch_id": epoch, "subject_wise_test_DSC": subject_wise_test_DSC})
             # save_score_all(output_image_dir, (final_dice, final_hd, final_PPV, final_sensitivity), epoch)
             # wandb.log({'epoch_id': epoch,
             #            'WT_subject_wise_val_DSC': final_dice['WT'], 'WT_subject_wise_val_H95': final_hd['WT'],
@@ -665,88 +736,85 @@ def Pgs_train_val(dataset, n_epochs, wmh_threshold, output_dir, learning_rate, a
             #            'TC_subject_wise_val_SENSITIVITY': final_sensitivity['TC']
             #            })
 
-            # ***  BOTTOM: WHEN I USE THE OTHER IMPLEMENTATION ( MY IMPLEMENTATION) ****#
-            # dsc_score, subject_wise_DSC, segmentations = evaluatePGS(pgsnet, dataset, device, wmh_threshold,
-            #                                                          cfg, cfg.val_mode)
-            # final_dice = eval_per_subjectPgs3(pgsnet, device, wmh_threshold, cfg, cfg.val_mode)
-            final_dice, final_hd, final_PPV, final_sensitivity = eval_per_subjectPgs2(pgsnet, device, wmh_threshold,
-                                                                                      cfg, cfg.val_mode)
-
-            print("** (WT) SUBJECT WISE SCORE @ Iteration {} is DICE: {}, H95: {}, PPV:{}, Sensitivity:{} **".
-                  format(epoch, final_dice['WT'], final_hd['WT'], final_PPV['WT'], final_sensitivity['WT']))
-            print("** (ET) SUBJECT WISE SCORE @ Iteration {} is DICE: {}, H95: {}, PPV:{}, Sensitivity:{} **".
-                  format(epoch, final_dice['ET'], final_hd['ET'], final_PPV['ET'], final_sensitivity['ET']))
-            print("** (TC) SUBJECT WISE SCORE @ Iteration {} is DICE: {}, H95: PPV{}, PPV:{}, Sensitivity:{} **".
-                  format(epoch, final_dice['TC'], final_hd['TC'], final_PPV['TC'], final_sensitivity['TC']))
-
-
-            if final_dice['WT'] > best_score:
-                print("****************** BEST SCORE @ ITERATION {} is {} ******************".format(epoch,
-                                                                                                     final_dice['WT']))
-                best_score = final_dice['WT']
-                path = os.path.join(output_model_dir, 'pgsnet_best_lr{}.model'.format(learning_rate))
-                with open(path, 'wb') as f:
-                    torch.save(pgsnet, f)
-                # batch_wise_test_DSC, subject_wise_test_DSC, _ = evaluatePGS(pgsnet, dataset, device, wmh_threshold,
-                #                                                             cfg, cfg.test_mode)
-                # subject_wise_test_DSC = eval_per_subjectPgs(pgsnet, device, wmh_threshold, cfg, cfg.test_mode)
-
-                # wandb.log({"epoch_id": epoch, "subject_wise_test_DSC": subject_wise_test_DSC})
-            save_score_all(output_image_dir, (final_dice, final_hd, final_PPV, final_sensitivity), cfg.n_epochs)
-            wandb.log({'epoch_id': cfg.n_epochs,
-                       'WT_subject_wise_val_DSC': final_dice['WT'], 'WT_subject_wise_val_H95': final_hd['WT'],
-                       'WT_subject_wise_val_PPV': final_PPV['WT'],
-                       'WT_subject_wise_val_SENSITIVITY': final_sensitivity['WT'],
-                       'ET_subject_wise_val_DSC': final_dice['ET'], 'ET_subject_wise_val_H95': final_hd['ET'],
-                       'ET_subject_wise_val_PPV': final_PPV['ET'],
-                       'ET_subject_wise_val_SENSITIVITY': final_sensitivity['ET'],
-                       'TC_subject_wise_val_DSC': final_dice['TC'], 'TC_subject_wise_val_H95': final_hd['TC'],
-                       'TC_subject_wise_val_PPV': final_PPV['TC'],
-                       'TC_subject_wise_val_SENSITIVITY': final_sensitivity['TC']
-                       })
-
         scheduler.step()
-    final_dice, final_hd, final_PPV, final_sensitivity = eval_per_subjectPgs2(pgsnet, device, wmh_threshold,
-                                                                              cfg, cfg.val_mode)
 
-    print("** (WT) SUBJECT WISE SCORE @ Iteration {} is DICE: {}, H95: {}, PPV:{}, Sensitivity:{} **".
-          format(epoch, final_dice['WT'], final_hd['WT'], final_PPV['WT'], final_sensitivity['WT']))
-    print("** (ET) SUBJECT WISE SCORE @ Iteration {} is DICE: {}, H95: {}, PPV:{}, Sensitivity:{} **".
-          format(epoch, final_dice['ET'], final_hd['ET'], final_PPV['ET'], final_sensitivity['ET']))
-    print("** (TC) SUBJECT WISE SCORE @ Iteration {} is DICE: {}, H95: PPV{}, PPV:{}, Sensitivity:{} **".
-          format(epoch, final_dice['TC'], final_hd['TC'], final_PPV['TC'], final_sensitivity['TC']))
+    final_dice, final_PPV, final_sensitivity, final_specificity, final_hd = eval_per_subjectPgs(pgsnet, device,
+                                                                                                wmh_threshold,
+                                                                                                cfg,
+                                                                                                cfg.val_mode)
+    print(
+        "** (WT) SUBJECT WISE SCORE @ Iteration {} is DICE: {}, HD: {}, PPV:{}, Sensitivity: {}, Specificity: {}  **".
+            format(cfg.n_epochs, final_dice['WT'], final_hd['WT'], final_PPV['WT'], final_sensitivity['WT'],
+                   final_specificity['WT']))
+    print(
+        "** (ET) SUBJECT WISE SCORE @ Iteration {} is DICE: {}, HD: {}, :{}, Sensitivity:{}, Specificity: {}  **".
+            format(cfg.n_epochs, final_dice['ET'], final_hd['ET'], final_PPV['ET'], final_sensitivity['ET'],
+                   final_specificity['ET']))
+    print(
+        "** (TC) SUBJECT WISE SCORE @ Iteration {} is DICE: {}, HD: {}, PPV:{}, Sensitivity:{}, Specificity: {}  **".
+            format(cfg.n_epochs, final_dice['TC'], final_hd['TC'], final_PPV['TC'], final_sensitivity['TC'],
+                   final_specificity['TC']))
 
-
-
-    #
-    save_score_all(output_image_dir, (final_dice, final_hd, final_PPV, final_sensitivity), cfg.n_epochs)
+    save_score_all(output_image_dir, (final_dice, final_hd, final_PPV, final_sensitivity, final_specificity),
+                   cfg.n_epochs)
     wandb.log({'epoch_id': cfg.n_epochs,
-               'WT_subject_wise_val_DSC': final_dice['WT'], 'WT_subject_wise_val_H95': final_hd['WT'],
+               'WT_subject_wise_val_DSC': final_dice['WT'],
+               'WT_subject_wise_val_HD': final_hd['WT'],
                'WT_subject_wise_val_PPV': final_PPV['WT'],
                'WT_subject_wise_val_SENSITIVITY': final_sensitivity['WT'],
-               'ET_subject_wise_val_DSC': final_dice['ET'], 'ET_subject_wise_val_H95': final_hd['ET'],
+               'WT_subject_wise_val_SPECIFCITY': final_specificity['WT'],
+               'ET_subject_wise_val_DSC': final_dice['ET'],
+               'ET_subject_wise_val_HD': final_hd['ET'],
                'ET_subject_wise_val_PPV': final_PPV['ET'],
                'ET_subject_wise_val_SENSITIVITY': final_sensitivity['ET'],
-               'TC_subject_wise_val_DSC': final_dice['TC'], 'TC_subject_wise_val_H95': final_hd['TC'],
+               'ET_subject_wise_val_SPECIFCITY': final_specificity['ET'],
+               'TC_subject_wise_val_DSC': final_dice['TC'],
+               'TC_subject_wise_val_HD': final_hd['TC'],
                'TC_subject_wise_val_PPV': final_PPV['TC'],
-               'TC_subject_wise_val_SENSITIVITY': final_sensitivity['TC']
+               'TC_subject_wise_val_SENSITIVITY': final_sensitivity['TC'],
+               'TC_subject_wise_val_SPECIFCITY': final_specificity['TC'],
                })
-
-    # save_score_all(output_image_dir, (final_dice, final_specificity, final_PPV, final_sensitivity), 39)
-    # wandb.log({'epoch_id': epoch,
-    #            'WT_subject_wise_val_DSC': final_dice['WT'],
+    # final_dice, final_hd, final_PPV, final_sensitivity = eval_per_subjectPgs2(pgsnet, device, wmh_threshold,
+    #                                                                           cfg, cfg.val_mode)
+    #
+    # print("** (WT) SUBJECT WISE SCORE @ Iteration {} is DICE: {}, H95: {}, PPV:{}, Sensitivity:{} **".
+    #       format(cfg.n_epochs, final_dice['WT'], final_hd['WT'], final_PPV['WT'], final_sensitivity['WT']))
+    # print("** (ET) SUBJECT WISE SCORE @ Iteration {} is DICE: {}, H95: {}, PPV:{}, Sensitivity:{} **".
+    #       format(cfg.n_epochs, final_dice['ET'], final_hd['ET'], final_PPV['ET'], final_sensitivity['ET']))
+    # print("** (TC) SUBJECT WISE SCORE @ Iteration {} is DICE: {}, H95: PPV{}, PPV:{}, Sensitivity:{} **".
+    #       format(cfg.n_epochs, final_dice['TC'], final_hd['TC'], final_PPV['TC'], final_sensitivity['TC']))
+    #
+    #
+    #
+    # #
+    # save_score_all(output_image_dir, (final_dice, final_hd, final_PPV, final_sensitivity), cfg.n_epochs)
+    # wandb.log({'epoch_id': cfg.n_epochs,
+    #            'WT_subject_wise_val_DSC': final_dice['WT'], 'WT_subject_wise_val_H95': final_hd['WT'],
     #            'WT_subject_wise_val_PPV': final_PPV['WT'],
     #            'WT_subject_wise_val_SENSITIVITY': final_sensitivity['WT'],
-    #            'WT_subject_wise_specificity': final_specificity['WT'],
-    #            'ET_subject_wise_val_DSC': final_dice['ET'],
+    #            'ET_subject_wise_val_DSC': final_dice['ET'], 'ET_subject_wise_val_H95': final_hd['ET'],
     #            'ET_subject_wise_val_PPV': final_PPV['ET'],
     #            'ET_subject_wise_val_SENSITIVITY': final_sensitivity['ET'],
-    #            'ET_subject_wise_specificity': final_specificity['ET'],
-    #            'TC_subject_wise_val_DSC': final_dice['TC'],
+    #            'TC_subject_wise_val_DSC': final_dice['TC'], 'TC_subject_wise_val_H95': final_hd['TC'],
     #            'TC_subject_wise_val_PPV': final_PPV['TC'],
-    #            'TC_subject_wise_val_SENSITIVITY': final_sensitivity['TC'],
-    #            'TC_subject_wise_specificity': final_specificity['TC'],
+    #            'TC_subject_wise_val_SENSITIVITY': final_sensitivity['TC']
     #            })
+    #
+    # # save_score_all(output_image_dir, (final_dice, final_specificity, final_PPV, final_sensitivity), 39)
+    # # wandb.log({'epoch_id': cfg.n_epochs,
+    # #            'WT_subject_wise_val_DSC': final_dice['WT'],
+    # #            'WT_subject_wise_val_PPV': final_PPV['WT'],
+    # #            'WT_subject_wise_val_SENSITIVITY': final_sensitivity['WT'],
+    # #            'WT_subject_wise_specificity': final_specificity['WT'],
+    # #            'ET_subject_wise_val_DSC': final_dice['ET'],
+    # #            'ET_subject_wise_val_PPV': final_PPV['ET'],
+    # #            'ET_subject_wise_val_SENSITIVITY': final_sensitivity['ET'],
+    # #            'ET_subject_wise_specificity': final_specificity['ET'],
+    # #            'TC_subject_wise_val_DSC': final_dice['TC'],
+    # #            'TC_subject_wise_val_PPV': final_PPV['TC'],
+    # #            'TC_subject_wise_val_SENSITIVITY': final_sensitivity['TC'],
+    # #            'TC_subject_wise_specificity': final_specificity['TC'],
+    # #            })
 
 
 def save_score(dir_path, score, iter):
@@ -765,6 +833,31 @@ def save_score(dir_path, score, iter):
 
 
 def save_score_all(dir_path, scores, iter):
+    final_dice = scores[0]
+    final_hd = scores[1]
+    final_PPV = scores[2]
+    final_sensitivity = scores[3]
+    final_specificity = scores[4]
+
+    dir_path = os.path.join(dir_path, "results_iter{}".format(iter))
+    if not os.path.isdir(dir_path):
+        try:
+            os.mkdir(dir_path, 0o777)
+        except OSError:
+            print("Creation of the directory %s failed" % dir_path)
+
+    output_score_path = os.path.join(dir_path, "result.txt")
+    with open(output_score_path, "w") as f:
+        f.write("AVG SCORES PER  SUBJECTS AT ITERATION {}:\n"
+                " **WT**  DICE: {}, PPV:{}, Sensitivity: {}, hd: {}, specificity: {}\n"
+                " **ET**  DICE: {}, PPV:{}, Sensitivity: {}, hd: {}, specificity: {}\n"
+                " **TC**  DICE: {}, PPV:{}, Sensitivity: {}, hd: {}, specificity: {}\n".format(
+            iter, final_dice['WT'], final_PPV['WT'], final_sensitivity['WT'], final_hd['WT'], final_specificity['WT'],
+            final_dice['ET'], final_PPV['ET'], final_sensitivity['ET'], final_hd['ET'], final_specificity['ET'],
+            final_dice['TC'], final_PPV['TC'], final_sensitivity['TC'], final_hd['TC'], final_specificity['TC']))
+
+
+def save_score_all2(dir_path, scores, iter):
     final_dice = scores[0]
     final_hd = scores[1]
     final_PPV = scores[2]
@@ -841,9 +934,12 @@ def main():
 
     with open(args.config, "r") as f:
         cfg = edict(yaml.safe_load(f))
+
     torch.manual_seed(cfg.seed)
     np.random.seed(cfg.seed)
     torch.cuda.manual_seed(cfg.seed)
+    # import random
+    # random.seed(cfg.seed)
 
     if cfg.experiment_mode == 'semi':
         cfg.train_sup_mode = 'train2018_semi_sup' + str(cfg.train_sup_rate)
@@ -853,7 +949,6 @@ def main():
     config_params = dict(args=args, config=cfg)
     wandb.init(project="fully_sup_brats", config=config_params)
     Pgs_train_val(dataset, cfg.n_epochs, cfg.wmh_threshold, args.output_dir, cfg.lr, args, cfg, cfg.seed)
-
 
 
 if __name__ == '__main__':

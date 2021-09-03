@@ -19,7 +19,16 @@ def do_eval(testImage, resultImage):
     """Main function"""
     testImage = sitk.GetImageFromArray(testImage)
     resultImage = sitk.GetImageFromArray(resultImage)
-    testImage, resultImage = getImages(testImage, resultImage)
+    # testImage, resultImage = getImages(testImage, resultImage)
+    if 'integer' in testImage.GetPixelIDTypeAsString():
+        testImage = sitk.BinaryThreshold(testImage, 1, 1000, 1, 0)
+    else:
+        testImage = sitk.BinaryThreshold(testImage, 0.5, 1000, 1, 0)
+
+    if 'integer' in resultImage.GetPixelIDTypeAsString():
+        resultImage = sitk.BinaryThreshold(resultImage, 1, 1000, 1, 0)
+    else:
+        resultImage = sitk.BinaryThreshold(resultImage, 0.5, 1000, 1, 0)
     dsc = getDSC(testImage, resultImage)
     h95 = getHausdorff(testImage, resultImage)
     avd = getAVD(testImage, resultImage)

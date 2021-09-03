@@ -1,5 +1,6 @@
 import numpy as np
 import torch
+from medpy import metric
 
 
 # dice coefficient for predicted class
@@ -10,6 +11,19 @@ def dice_coef(y_true, y_pred, smooth=1):  # in order to get the
     denom = y_true.sum() + y_pred.sum()
     dsc_score = (numer + smooth) / (denom + smooth)
     return dsc_score
+
+
+def do_eval(y_true, y_pred):
+    dsc = dice_coef(y_true, y_pred)
+    hd = getHausdorff(y_true, y_pred)
+    PPV, sensitivity, specificity = get_confusionMatrix_metrics(y_true, y_pred)
+    result = {'dsc': dsc, 'hd': hd, 'ppv': PPV, 'sens': sensitivity, 'spec': specificity}
+
+    return result
+
+
+def getHausdorff(y_true, y_pred):
+    return metric.hd(y_pred, y_true)
 
 
 # def dice_coef(y_true, y_pred, smooth=1):
@@ -33,6 +47,8 @@ def getPPV(y_true, y_pred):
     return TP / (TP + FP)
 
 
+
+
 def get_confusionMatrix_metrics(y_true, y_pred):
     y_pred = y_pred.float().view(-1, 1)
     y_true = y_true.float().view(1, -1)
@@ -44,7 +60,7 @@ def get_confusionMatrix_metrics(y_true, y_pred):
     FP = ytrue_negatives @ y_pred
     FN = y_true @ pred_negatives
     TN = ytrue_negatives @ pred_negatives
-    PPV = torch.tensor(0)  if TP == 0 else TP / (TP + FP)
+    PPV = torch.tensor(0) if TP == 0 else TP / (TP + FP)
     sensitivity = torch.tensor(0) if TP == 0 else TP / (TP + FN)
     specificity = torch.tensor(0) if TN == 0 else TN / (TN + FP)
 
