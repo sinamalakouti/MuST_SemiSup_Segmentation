@@ -1,7 +1,7 @@
 train_mode: "all_train2018_sup"
 val_mode: "test2019_new"
 test_mode: "only_test2018"
-n_epochs: 41
+n_epochs: 50
 lr: 0.001
 scheduler_step_size: 5
 batch_size: 32
@@ -19,5 +19,6 @@ experiment_mode: "semi"
 parallel: True
 train_unsup_mode: "train2018_semi_unsup"
 train_sup_mode: "train2018_semi_sup"
-train_sup_rate: 20
+train_sup_rate: 10
 cuda: "0,1"
+seed: 41
