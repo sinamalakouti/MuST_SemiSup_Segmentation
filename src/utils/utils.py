@@ -32,7 +32,7 @@ import numpy as np
 
 
 def get_trainset(dataset, batch_size, intensity_rescale, mixup_threshold=None,
-                 mode='train', t1=False, t2=False, t1ce=False, augment=False, oneHot=False) -> torch.utils.data.DataLoader:
+                 mode='train', t1=False, t2=False, t1ce=False, augment=False, oneHot=False,seed =None) -> torch.utils.data.DataLoader:
     mem_pin = False
     if Constants.USE_CUDA:
         mem_pin = True
@@ -77,7 +77,8 @@ def get_trainset(dataset, batch_size, intensity_rescale, mixup_threshold=None,
                 t2=t2,
                 t1ce=t1ce,
                 augment=augment,
-                oneHot=oneHot
+                oneHot=oneHot,
+                seed=seed
             ),
             batch_size=batch_sz,
             drop_last=True,

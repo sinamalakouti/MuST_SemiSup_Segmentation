@@ -65,15 +65,25 @@ def train_val_split(all_data_csv, train_dir_path, val_dir_path, val_size=69):
     np.savetxt(val_dir_path + "/val_ids.csv", val_ids.astype(np.str), delimiter=',', fmt='%s')
 
 
-def semi_sup_split(all_train_csv, sup_dir_path, unsup_dir_path, ratio=0.5):
+def semi_sup_split(all_train_csv, sup_dir_path, unsup_dir_path, ratio=0.5, seed=None):
     all_train = np.asarray(pd.read_csv(all_train_csv, header=None)).reshape(-1)
     sup_size = int(ratio * len(all_train))
     sup_ids = np.random.choice(all_train, sup_size, replace=False)
     unsup_ids = np.setdiff1d(all_train, sup_ids)
-    np.savetxt(sup_dir_path + "/train18_sup_ids{}.csv".format(int(ratio * 100)), sup_ids.astype(np.str), delimiter=',',
-               fmt='%s')
-    np.savetxt(unsup_dir_path + "/train18_unsup_ids{}.csv".format(int(ratio * 100)), unsup_ids.astype(np.str),
-               delimiter=',', fmt='%s')
+    if seed is None:
+        np.savetxt(sup_dir_path + "/train18_sup_ids{}.csv".format(int(ratio * 100)), sup_ids.astype(np.str), delimiter=',',
+                   fmt='%s')
+    else:
+        np.savetxt(sup_dir_path + "/train18_sup_ids{}_seed{}.csv".format(int(ratio * 100), seed), sup_ids.astype(np.str),
+                   delimiter=',',
+                   fmt='%s')
+    if seed is None:
+        np.savetxt(unsup_dir_path + "/train18_unsup_ids{}.csv".format(int(ratio * 100)), unsup_ids.astype(np.str),
+                   delimiter=',', fmt='%s')
+    else:
+        np.savetxt(unsup_dir_path + "/train18_unsup_ids{}_seed{}.csv".format(int(ratio * 100), seed), unsup_ids.astype(np.str),
+                   delimiter=',', fmt='%s')
+
 
 
 class Brat20Test(torch.utils.data.Dataset):
@@ -221,7 +231,7 @@ class Brat20(torch.utils.data.Dataset):
 
     def __init__(self, dataroot_dir, mode, min_slice_index, max_slice_index,
                  augment=False, intensity_aug=None, center_cropping=False, t1=False, t2=False, t1ce=False,
-                 oneHot=False):
+                 oneHot=False, seed=None):
         super(Brat20, self).__init__()
 
         self.augment = augment
@@ -232,6 +242,7 @@ class Brat20(torch.utils.data.Dataset):
         self.t2 = t2
         self.t1ce = t1ce
         self.oneHot = oneHot
+        self.seed = seed
 
         if mode == "train2020_sup":
             ids_path = os.path.join(dataroot_dir, 'trainset/brats20_training_ids.csv')
@@ -250,13 +261,13 @@ class Brat20(torch.utils.data.Dataset):
         elif mode == "only_val2018":
             ids_path = os.path.join(dataroot_dir, 'only2018/val2018_ids.csv')
         elif mode == "train2018_semi_sup20":
-            ids_path = os.path.join(dataroot_dir, 'trainset/train18_sup_ids20.csv')
+            ids_path = os.path.join(dataroot_dir, 'trainset/train18_sup_ids20_seed{}.csv'.format(self.seed))
         elif mode == "train2018_semi_unsup20":
-            ids_path = os.path.join(dataroot_dir, 'trainset/train18_unsup_ids20.csv')
+            ids_path = os.path.join(dataroot_dir, 'trainset/train18_unsup_ids20_seed{}.csv'.format(self.seed))
         elif mode == "train2018_semi_sup10":
-            ids_path = os.path.join(dataroot_dir, 'trainset/train18_sup_ids10.csv')
+            ids_path = os.path.join(dataroot_dir, 'trainset/train18_sup_ids10_seed{}.csv'.format(self.seed))
         elif mode == "train2018_semi_unsup10":
-            ids_path = os.path.join(dataroot_dir, 'trainset/train18_unsup_ids10.csv')
+            ids_path = os.path.join(dataroot_dir, 'trainset/train18_unsup_ids10_seed{}.csv'.format(self.seed))
 
         elif mode == "test2019_new":
             ids_path = os.path.join(dataroot_dir, 'valset/brats2019_new.csv')

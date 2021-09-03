@@ -538,7 +538,7 @@ def Pgs_train_val(dataset, n_epochs, wmh_threshold, output_dir, learning_rate, a
     all_train_csv = os.path.join(dataroot_dir, 'trainset/brats2018.csv')
     supdir_path = os.path.join(dataroot_dir, 'trainset')
     semi_sup_split(all_train_csv=all_train_csv, sup_dir_path=supdir_path, unsup_dir_path=supdir_path,
-                   ratio=cfg.train_sup_rate / 100)
+                   ratio=cfg.train_sup_rate / 100, seed=cfg.seed)
     print("learning_rate is    ", learning_rate)
     step_size = cfg.scheduler_step_size
     print("scheduler step size is :   ", step_size)
@@ -610,7 +610,7 @@ def Pgs_train_val(dataset, n_epochs, wmh_threshold, output_dir, learning_rate, a
 
     train_sup_loader = utils.get_trainset(dataset, batch_size=cfg.batch_size, intensity_rescale=cfg.intensity_rescale,
                                           mixup_threshold=cfg.mixup_threshold, mode=cfg.train_sup_mode, t1=cfg.t1,
-                                          t2=cfg.t2, t1ce=cfg.t1ce, augment=cfg.augment)
+                                          t2=cfg.t2, t1ce=cfg.t1ce, augment=cfg.augment, seed=cfg.seed)
 
     print('size of labeled training set: number of subjects:    ', len(train_sup_loader.dataset.subjects_name))
     print("labeled subjects  ", train_sup_loader.dataset.subjects_name)
@@ -618,7 +618,7 @@ def Pgs_train_val(dataset, n_epochs, wmh_threshold, output_dir, learning_rate, a
         train_unsup_loader = utils.get_trainset(dataset, batch_size=32, intensity_rescale=cfg.intensity_rescale,
                                                 mixup_threshold=cfg.mixup_threshold,
                                                 mode=cfg.train_unsup_mode, t1=cfg.t1, t2=cfg.t2, t1ce=cfg.t1ce,
-                                                augment=cfg.augment)
+                                                augment=cfg.augment, seed=cfg.seed)
         print('size of unlabeled training set: number of subjects:    ', len(train_unsup_loader.dataset.subjects_name))
         print("un labeled subjects  ", train_unsup_loader.dataset.subjects_name)
     for epoch in range(start_epoch, n_epochs):
@@ -668,29 +668,18 @@ def Pgs_train_val(dataset, n_epochs, wmh_threshold, output_dir, learning_rate, a
             # ***  BOTTOM: WHEN I USE THE OTHER IMPLEMENTATION ( MY IMPLEMENTATION) ****#
             # dsc_score, subject_wise_DSC, segmentations = evaluatePGS(pgsnet, dataset, device, wmh_threshold,
             #                                                          cfg, cfg.val_mode)
-            final_dice = eval_per_subjectPgs3(pgsnet, device, wmh_threshold, cfg, cfg.val_mode)
+            # final_dice = eval_per_subjectPgs3(pgsnet, device, wmh_threshold, cfg, cfg.val_mode)
+            final_dice, final_hd, final_PPV, final_sensitivity = eval_per_subjectPgs2(pgsnet, device, wmh_threshold,
+                                                                                      cfg, cfg.val_mode)
 
-            print(
-                "** (WT) SUBJECT WISE SCORE @ Iteration {} is DICE: {}**".
-                    format(epoch, final_dice['WT']))
-            print(
-                "** (ET) SUBJECT WISE SCORE @ Iteration {} is DICE: {}**".
-                    format(epoch, final_dice['ET']))
-            print(
-                "** (TC) SUBJECT WISE SCORE @ Iteration {} is DICE: {} **".
-                    format(epoch, final_dice['TC']))
+            print("** (WT) SUBJECT WISE SCORE @ Iteration {} is DICE: {}, H95: {}, PPV:{}, Sensitivity:{} **".
+                  format(epoch, final_dice['WT'], final_hd['WT'], final_PPV['WT'], final_sensitivity['WT']))
+            print("** (ET) SUBJECT WISE SCORE @ Iteration {} is DICE: {}, H95: {}, PPV:{}, Sensitivity:{} **".
+                  format(epoch, final_dice['ET'], final_hd['ET'], final_PPV['ET'], final_sensitivity['ET']))
+            print("** (TC) SUBJECT WISE SCORE @ Iteration {} is DICE: {}, H95: PPV{}, PPV:{}, Sensitivity:{} **".
+                  format(epoch, final_dice['TC'], final_hd['TC'], final_PPV['TC'], final_sensitivity['TC']))
 
-            # print(
-            #     "** (WT) SUBJECT WISE SCORE @ Iteration {} is DICE:   {}, PPV:  {}, Sensitivity:  {}, Specificity: {} **".
-            #     format(epoch, final_dice['WT'], final_PPV['WT'], final_sensitivity['WT'], final_specificity['WT']))
-            # print(
-            #     "** (ET) SUBJECT WISE SCORE @ Iteration {} is DICE: {}, PPV:  {}, Sensitivity:  {}, Specificity: {} **".
-            #     format(epoch, final_dice['ET'], final_PPV['ET'], final_sensitivity['ET'], final_specificity['ET']))
-            # print(
-            #     "** (TC) SUBJECT WISE SCORE @ Iteration {} is DICE: {}, PPV:  {}, Sensitivity:    {}, Specificity: {} **".
-            #     format(epoch, final_dice['TC'], final_PPV['TC'], final_sensitivity['TC'], final_specificity['TC']))
 
-            # print("** REGULAR SCORE @ Iteration {} is {} **".format(epoch, dsc_score))
             if final_dice['WT'] > best_score:
                 print("****************** BEST SCORE @ ITERATION {} is {} ******************".format(epoch,
                                                                                                      final_dice['WT']))
@@ -703,10 +692,18 @@ def Pgs_train_val(dataset, n_epochs, wmh_threshold, output_dir, learning_rate, a
                 # subject_wise_test_DSC = eval_per_subjectPgs(pgsnet, device, wmh_threshold, cfg, cfg.test_mode)
 
                 # wandb.log({"epoch_id": epoch, "subject_wise_test_DSC": subject_wise_test_DSC})
-            wandb.log(
-                {"epoch_id": epoch, "WTsubject_wise_val_DSC": final_dice['WT'],"ETsubject_wise_val_DSC": final_dice['ET'],
-                 "TCsubject_wise_val_DSC": final_dice['TC']})
-            save_score(output_image_dir, final_dice, epoch)
+            save_score_all(output_image_dir, (final_dice, final_hd, final_PPV, final_sensitivity), cfg.n_epochs)
+            wandb.log({'epoch_id': cfg.n_epochs,
+                       'WT_subject_wise_val_DSC': final_dice['WT'], 'WT_subject_wise_val_H95': final_hd['WT'],
+                       'WT_subject_wise_val_PPV': final_PPV['WT'],
+                       'WT_subject_wise_val_SENSITIVITY': final_sensitivity['WT'],
+                       'ET_subject_wise_val_DSC': final_dice['ET'], 'ET_subject_wise_val_H95': final_hd['ET'],
+                       'ET_subject_wise_val_PPV': final_PPV['ET'],
+                       'ET_subject_wise_val_SENSITIVITY': final_sensitivity['ET'],
+                       'TC_subject_wise_val_DSC': final_dice['TC'], 'TC_subject_wise_val_H95': final_hd['TC'],
+                       'TC_subject_wise_val_PPV': final_PPV['TC'],
+                       'TC_subject_wise_val_SENSITIVITY': final_sensitivity['TC']
+                       })
 
         scheduler.step()
     final_dice, final_hd, final_PPV, final_sensitivity = eval_per_subjectPgs2(pgsnet, device, wmh_threshold,
@@ -722,8 +719,8 @@ def Pgs_train_val(dataset, n_epochs, wmh_threshold, output_dir, learning_rate, a
 
 
     #
-    save_score_all(output_image_dir, (final_dice, final_hd, final_PPV, final_sensitivity), 40)
-    wandb.log({'epoch_id': 40,
+    save_score_all(output_image_dir, (final_dice, final_hd, final_PPV, final_sensitivity), cfg.n_epochs)
+    wandb.log({'epoch_id': cfg.n_epochs,
                'WT_subject_wise_val_DSC': final_dice['WT'], 'WT_subject_wise_val_H95': final_hd['WT'],
                'WT_subject_wise_val_PPV': final_PPV['WT'],
                'WT_subject_wise_val_SENSITIVITY': final_sensitivity['WT'],
@@ -844,18 +841,19 @@ def main():
 
     with open(args.config, "r") as f:
         cfg = edict(yaml.safe_load(f))
+    torch.manual_seed(cfg.seed)
+    np.random.seed(cfg.seed)
+    torch.cuda.manual_seed(cfg.seed)
 
     if cfg.experiment_mode == 'semi':
         cfg.train_sup_mode = 'train2018_semi_sup' + str(cfg.train_sup_rate)
         cfg.train_unsup_mode = 'train2018_semi_unsup' + str(cfg.train_sup_rate)
     os.environ['CUDA_VISIBLE_DEVICES'] = cfg.cuda
-    for seed in random_seeds:
-        config_params = dict(args=args, config=cfg)
-        wandb.init(project="fully_sup_brats", config=config_params, reinit=True)
-        torch.manual_seed(seed)
-        np.random.seed(seed)
-        Pgs_train_val(dataset, cfg.n_epochs, cfg.wmh_threshold, args.output_dir, cfg.lr, args, cfg, seed)
-        wandb.finish()
+
+    config_params = dict(args=args, config=cfg)
+    wandb.init(project="fully_sup_brats", config=config_params)
+    Pgs_train_val(dataset, cfg.n_epochs, cfg.wmh_threshold, args.output_dir, cfg.lr, args, cfg, seed)
+
 
 
 if __name__ == '__main__':
