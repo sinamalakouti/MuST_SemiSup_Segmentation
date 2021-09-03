@@ -613,7 +613,7 @@ def Pgs_train_val(dataset, n_epochs, wmh_threshold, output_dir, learning_rate, a
             print("Creation of the directory %s failed" % output_image_dir)
 
     pgsnet = Pgs.PGS(inputs_dim, outputs_dim, kernels, strides)
-    pgsnet = model_utils.load_model('/Users/sinamalakouti/Desktop/pgsnet_best_lr0.001.model', 'cpu')
+    
 
     if torch.cuda.is_available():
         if type(pgsnet) is not torch.nn.DataParallel and cfg.parallel and cfg.parallel:
