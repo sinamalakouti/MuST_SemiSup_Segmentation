@@ -15,7 +15,7 @@ def dice_coef(y_true, y_pred, smooth=1):  # in order to get the
 
 def do_eval(y_true, y_pred):
     dsc = dice_coef(y_true, y_pred)
-    hd = getHausdorff(np.array(y_true.cpu()), np.array(y_pred.cpu())).cuda()
+    hd = getHausdorff(np.array(y_true.cpu()), np.array(y_pred.cpu()))
     PPV, sensitivity, specificity = get_confusionMatrix_metrics(y_true, y_pred)
     result = {'dsc': dsc, 'hd': hd, 'ppv': PPV, 'sens': sensitivity, 'spec': specificity}
 

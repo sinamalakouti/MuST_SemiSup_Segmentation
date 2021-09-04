@@ -325,9 +325,9 @@ def eval_per_subjectPgs(model, device, threshold, cfg, data_mode):
             specificity_arrET.append(metrics_ET['sens'].item())
             specificity_arrTC.append(metrics_TC['sens'].item())
 
-            hd_arrWT.append(metrics_WT['hd'].item())
-            hd_arrET.append(metrics_ET['hd'].item())
-            hd_arrTC.append(metrics_TC['hd'].item())
+            hd_arrWT.append(metrics_WT['hd'])
+            hd_arrET.append(metrics_ET['hd'])
+            hd_arrTC.append(metrics_TC['hd'])
 
     final_dice = {'WT': np.mean(dice_arrWT), 'ET': np.mean(dice_arrET), 'TC': np.mean(dice_arrTC)}
     final_PPV = {'WT': np.mean(PPV_arrWT), 'ET': np.mean(PPV_arrET), 'TC': np.mean(PPV_arrTC)}
