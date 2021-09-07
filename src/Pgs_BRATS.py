@@ -112,6 +112,7 @@ def trainPgs_semi(train_sup_loader, train_unsup_loader, model, optimizer, device
         target_sup = batch_sup['label'].to(device)
         del batch_sup
         del batch_unsup
+        torch.cuda.empty_cache()
         sup_outputs, _ = model(b_sup, is_supervised=True)
         sLoss = compute_loss(sup_outputs, target_sup, loss_functions, is_supervised=True)
 
