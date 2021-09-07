@@ -319,7 +319,7 @@ def eval_per_subjectPgs(model, device, threshold, cfg, data_mode):
             PPV_arrTC.append(metrics_TC['ppv'].item())
 ### ET <-> TC
             sensitivity_arrWT.append(metrics_WT['sens'].item())
-            sensitivity_arrET.append(metrics_TC['sens'].item())
+            sensitivity_arrET.append(metrics_ET['sens'].item())
             sensitivity_arrTC.append(metrics_TC['sens'].item())
 ### ET <-> TC
             specificity_arrWT.append(metrics_WT['spec'].item())
@@ -615,7 +615,7 @@ def Pgs_train_val(dataset, n_epochs, wmh_threshold, output_dir, learning_rate, a
 
     pgsnet = Pgs.PGS(inputs_dim, outputs_dim, kernels, strides)
 
-    pgsnet = model_utils.load_model('/Users/sinamalakouti/Desktop/pgsnet_best_lr0.001.model', 'cpu')
+    # pgsnet = model_utils.load_model('/Users/sinamalakouti/Desktop/pgsnet_best_lr0.001.model', 'cpu')
     if torch.cuda.is_available():
         if type(pgsnet) is not torch.nn.DataParallel and cfg.parallel and cfg.parallel:
             pgsnet = torch.nn.DataParallel(pgsnet)
@@ -628,10 +628,10 @@ def Pgs_train_val(dataset, n_epochs, wmh_threshold, output_dir, learning_rate, a
     optimizer = torch.optim.SGD(pgsnet.parameters(), learning_rate, momentum=0.9, weight_decay=1e-4)
     # optimizer = torch.optim.Adam(pgsnet.parameters(), lr=1e-2)
     scheduler = lr_scheduler.StepLR(optimizer, step_size=cfg.scheduler_step_size, gamma=cfg.lr_gamma)  # don't use it
-    final_dice, final_PPV, final_sensitivity, final_specificity, final_hd = eval_per_subjectPgs(pgsnet, device,
-                                                                                                wmh_threshold,
-                                                                                                cfg,
-                                                                                                cfg.val_mode)
+    # final_dice, final_PPV, final_sensitivity, final_specificity, final_hd = eval_per_subjectPgs(pgsnet, device,
+    #                                                                                             wmh_threshold,
+    #                                                                                             cfg,
+    #                                                                                             cfg.val_mode)
     train_sup_loader = utils.get_trainset(dataset, batch_size=cfg.batch_size, intensity_rescale=cfg.intensity_rescale,
                                           mixup_threshold=cfg.mixup_threshold, mode=cfg.train_sup_mode, t1=cfg.t1,
                                           t2=cfg.t2, t1ce=cfg.t1ce, augment=cfg.augment, seed=cfg.seed)
