@@ -290,9 +290,9 @@ def eval_per_subjectPgs(model, device, threshold, cfg, data_mode):
             # PPV_scoreTC, sensitivity_TC, specificity_TC = get_confusionMatrix_metrics(targetTC.reshape(y_TC.shape),
             #                                                                           y_TC)
 
-            metrics_WT = do_eval(targetWT.reshape(y_WT.shape), y_WT)
-            metrics_ET = do_eval(targetET.reshape(y_ET.shape), y_ET)
-            metrics_TC = do_eval(targetTC.reshape(y_TC.shape), y_TC)
+            metrics_WT = do_eval(targetWT.reshape(y_WT.shape).cpu(), y_WT.cpu())
+            metrics_ET = do_eval(targetET.reshape(y_ET.shape).cpu(), y_ET.cpu())
+            metrics_TC = do_eval(targetTC.reshape(y_TC.shape).cpu(), y_TC.cpu())
 
             print("*** EVALUATION METRICS FOR SUBJECT {} IS: ".format(subjects[0]))
             print(
