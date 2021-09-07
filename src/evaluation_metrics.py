@@ -23,6 +23,7 @@ def do_eval(y_true, y_pred):
 
 
 def getHausdorff(y_true, y_pred):
+    assert len(np.unique(y_pred)) > 2, " y_true is not binary!!!   {}".format(np.unique(y_pred))
     return metric.hd(y_pred, y_true)
 
 
@@ -47,8 +48,6 @@ def getPPV(y_true, y_pred):
     return TP / (TP + FP)
 
 
-
-
 def get_confusionMatrix_metrics(y_true, y_pred):
     y_pred = y_pred.float().view(-1, 1)
     y_true = y_true.float().view(1, -1)
@@ -63,7 +62,6 @@ def get_confusionMatrix_metrics(y_true, y_pred):
     PPV = torch.tensor(0) if TP == 0 else TP / (TP + FP)
     sensitivity = torch.tensor(0) if TP == 0 else TP / (TP + FN)
     specificity = torch.tensor(0) if TN == 0 else TN / (TN + FP)
-
     return PPV, sensitivity, specificity
 
 

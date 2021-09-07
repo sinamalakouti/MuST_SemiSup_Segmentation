@@ -242,6 +242,7 @@ def eval_per_subjectPgs(model, device, threshold, cfg, data_mode):
 
     paths = testset.paths
     sup_loss = torch.nn.CrossEntropyLoss()
+    model = model.module
     with torch.no_grad():
         for path in paths:
             batch = testset.get_subject(path)
@@ -312,18 +313,18 @@ def eval_per_subjectPgs(model, device, threshold, cfg, data_mode):
             dice_arrWT.append(metrics_WT['dsc'].item())
             dice_arrET.append(metrics_ET['dsc'].item())
             dice_arrTC.append(metrics_TC['dsc'].item())
-
+### ET <-> TC
             PPV_arrWT.append(metrics_WT['ppv'].item())
-            PPV_arrTC.append(metrics_ET['ppv'].item())
-            PPV_arrET.append(metrics_TC['ppv'].item())
-
+            PPV_arrET.append(metrics_ET['ppv'].item())
+            PPV_arrTC.append(metrics_TC['ppv'].item())
+### ET <-> TC
             sensitivity_arrWT.append(metrics_WT['sens'].item())
-            sensitivity_arrTC.append(metrics_ET['sens'].item())
             sensitivity_arrET.append(metrics_TC['sens'].item())
-
-            specificity_arrWT.append(metrics_WT['sens'].item())
-            specificity_arrET.append(metrics_ET['sens'].item())
-            specificity_arrTC.append(metrics_TC['sens'].item())
+            sensitivity_arrTC.append(metrics_TC['sens'].item())
+### ET <-> TC
+            specificity_arrWT.append(metrics_WT['spec'].item())
+            specificity_arrET.append(metrics_ET['spec'].item())
+            specificity_arrTC.append(metrics_TC['spec'].item())
 
             hd_arrWT.append(metrics_WT['hd'])
             hd_arrET.append(metrics_ET['hd'])
@@ -614,7 +615,7 @@ def Pgs_train_val(dataset, n_epochs, wmh_threshold, output_dir, learning_rate, a
 
     pgsnet = Pgs.PGS(inputs_dim, outputs_dim, kernels, strides)
 
-
+    pgsnet = model_utils.load_model('/Users/sinamalakouti/Desktop/pgsnet_best_lr0.001.model', 'cpu')
     if torch.cuda.is_available():
         if type(pgsnet) is not torch.nn.DataParallel and cfg.parallel and cfg.parallel:
             pgsnet = torch.nn.DataParallel(pgsnet)
@@ -627,7 +628,10 @@ def Pgs_train_val(dataset, n_epochs, wmh_threshold, output_dir, learning_rate, a
     optimizer = torch.optim.SGD(pgsnet.parameters(), learning_rate, momentum=0.9, weight_decay=1e-4)
     # optimizer = torch.optim.Adam(pgsnet.parameters(), lr=1e-2)
     scheduler = lr_scheduler.StepLR(optimizer, step_size=cfg.scheduler_step_size, gamma=cfg.lr_gamma)  # don't use it
-
+    final_dice, final_PPV, final_sensitivity, final_specificity, final_hd = eval_per_subjectPgs(pgsnet, device,
+                                                                                                wmh_threshold,
+                                                                                                cfg,
+                                                                                                cfg.val_mode)
     train_sup_loader = utils.get_trainset(dataset, batch_size=cfg.batch_size, intensity_rescale=cfg.intensity_rescale,
                                           mixup_threshold=cfg.mixup_threshold, mode=cfg.train_sup_mode, t1=cfg.t1,
                                           t2=cfg.t2, t1ce=cfg.t1ce, augment=cfg.augment, seed=cfg.seed)
