@@ -23,7 +23,8 @@ def do_eval(y_true, y_pred):
 
 
 def getHausdorff(y_true, y_pred):
-    assert len(np.unique(y_pred)) > 2, " y_true is not binary!!!   {}".format(np.unique(y_pred))
+    if len(np.unique(y_pred)) == 1:
+        return 40
     return metric.hd(y_pred, y_true)
 
 
