@@ -14,7 +14,7 @@ from models import Pgs
 import matplotlib.pyplot as plt
 import torch.nn.functional as F
 import numpy as np
-
+import random
 import argparse
 import yaml
 from easydict import EasyDict as edict
@@ -314,15 +314,15 @@ def eval_per_subjectPgs(model, device, threshold, cfg, data_mode):
             dice_arrWT.append(metrics_WT['dsc'].item())
             dice_arrET.append(metrics_ET['dsc'].item())
             dice_arrTC.append(metrics_TC['dsc'].item())
-### ET <-> TC
+            ### ET <-> TC
             PPV_arrWT.append(metrics_WT['ppv'].item())
             PPV_arrET.append(metrics_ET['ppv'].item())
             PPV_arrTC.append(metrics_TC['ppv'].item())
-### ET <-> TC
+            ### ET <-> TC
             sensitivity_arrWT.append(metrics_WT['sens'].item())
             sensitivity_arrET.append(metrics_ET['sens'].item())
             sensitivity_arrTC.append(metrics_TC['sens'].item())
-### ET <-> TC
+            ### ET <-> TC
             specificity_arrWT.append(metrics_WT['spec'].item())
             specificity_arrET.append(metrics_ET['spec'].item())
             specificity_arrTC.append(metrics_TC['spec'].item())
@@ -942,13 +942,12 @@ def main():
     torch.manual_seed(cfg.seed)
     np.random.seed(cfg.seed)
     torch.cuda.manual_seed(cfg.seed)
-    # import random
-    # random.seed(cfg.seed)
+    random.seed(cfg.seed)
+    os.environ['CUDA_VISIBLE_DEVICES'] = cfg.cuda
 
     if cfg.experiment_mode == 'semi':
         cfg.train_sup_mode = 'train2018_semi_sup' + str(cfg.train_sup_rate)
         cfg.train_unsup_mode = 'train2018_semi_unsup' + str(cfg.train_sup_rate)
-    os.environ['CUDA_VISIBLE_DEVICES'] = cfg.cuda
 
     config_params = dict(args=args, config=cfg)
     wandb.init(project="fully_sup_brats", config=config_params)
