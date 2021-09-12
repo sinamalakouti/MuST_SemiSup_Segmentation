@@ -55,8 +55,8 @@ def __fw_outputwise_unsup_loss(y_stud, y_teach, loss_functions):
 
 def compute_loss(y_preds, y_true, loss_functions, is_supervised):
     if is_supervised:
-        # if y_preds.shape[1] != y_true.shape[1]:
-        #     y_true = y_true.reshape((y_true.shape[0], y_true.shape[2], y_true.shape[3])).type(torch.LongTensor)
+        if y_true.shape[1 ]== 1:
+            y_true = y_true.reshape((y_true.shape[0], y_true.shape[2], y_true.shape[3])).type(torch.LongTensor)
 
         total_loss = loss_functions[0](y_preds, y_true.to(y_preds.device))
 
