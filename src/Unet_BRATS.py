@@ -56,9 +56,9 @@ def __fw_outputwise_unsup_loss(y_stud, y_teach, loss_functions):
 def compute_loss(y_preds, y_true, loss_functions, is_supervised):
     if is_supervised:
         if y_true.shape[1 ]== 1:
-            y_true = y_true.reshape((y_true.shape[0], y_true.shape[2], y_true.shape[3])).type(torch.LongTensor)
+            y_true = y_true.reshape((y_true.shape[0], y_true.shape[2], y_true.shape[3]))
 
-        total_loss = loss_functions[0](y_preds, y_true.to(y_preds.device))
+        total_loss = loss_functions[0](y_preds, y_true.type(torch.LongTensor).to(y_preds.device))
 
         ''' y_preds is students preds and y_true is teacher_preds!
                     for comparing outputs together!  # consistency of original output and noisy output 
