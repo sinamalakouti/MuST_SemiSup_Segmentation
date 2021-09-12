@@ -175,7 +175,7 @@ def trainPgs_sup(train_sup_loader, model, optimizer, device, loss_functions, epo
             y_WT = seg2WT(y_pred, 0.5, cfg.oneHot)
             dice_score = dice_coef(target_sup.reshape(y_WT.shape), y_WT)
             wandb.log(
-                {"batch_id": step + epochid * len(train_sup_loader), "loss": total_loss, "batch_score": dice_score})
+                {"sup_batch_id": step + epochid * len(train_sup_loader), "sup_loss": total_loss, "batch_score": dice_score})
 
     return model, total_loss
 
@@ -582,6 +582,13 @@ def Pgs_train_val(dataset, n_epochs, wmh_threshold, output_dir, learning_rate, a
                 os.mkdir(output_dir, 0o777)
             except OSError:
                 print("Creation of the directory %s failed" % output_dir)
+    elif cfg.experiment_mode == 'partially_sup':
+        output_dir = os.path.join(output_dir, "partiallySup_ratio_{}".format(cfg.train_sup_rate))
+        if not os.path.isdir(output_dir):
+            try:
+                os.mkdir(output_dir, 0o777)
+            except OSError:
+                print("Creation of the directory %s failed" % output_dir)
 
     output_dir = os.path.join(output_dir, "seed_{}".format(seed))
     if not os.path.isdir(output_dir):
@@ -616,7 +623,7 @@ def Pgs_train_val(dataset, n_epochs, wmh_threshold, output_dir, learning_rate, a
 
     pgsnet = Pgs.PGS(inputs_dim, outputs_dim, kernels, strides)
 
-    # pgsnet = model_utils.load_model('/Users/sinamalakouti/Desktop/pgsnet_best_lr0.001.model', 'cpu')
+
     if torch.cuda.is_available():
         if type(pgsnet) is not torch.nn.DataParallel and cfg.parallel and cfg.parallel:
             pgsnet = torch.nn.DataParallel(pgsnet)
@@ -654,7 +661,7 @@ def Pgs_train_val(dataset, n_epochs, wmh_threshold, output_dir, learning_rate, a
             pgsnet, loss = trainPgs_semi(train_sup_loader, train_unsup_loader, pgsnet, optimizer, device,
                                          (torch.nn.CrossEntropyLoss(), torch.nn.CrossEntropyLoss()), epoch, cfg)
         # score, segmentations = evaluatePGS(pgsnet, dataset, device, wmh_threshold, cfg, cfg.val_mode)
-        else:
+        elif cfg.experiment_mode == 'partially_sup':
             pgsnet, loss = trainPgs_sup(train_sup_loader, pgsnet, optimizer, device,
                                         (torch.nn.CrossEntropyLoss(), None),
                                         epoch, cfg)
@@ -948,6 +955,9 @@ def main():
     if cfg.experiment_mode == 'semi':
         cfg.train_sup_mode = 'train2018_semi_sup' + str(cfg.train_sup_rate)
         cfg.train_unsup_mode = 'train2018_semi_unsup' + str(cfg.train_sup_rate)
+    elif cfg.experiment_mode == 'partially_sup':
+        cfg.train_sup_mode = 'train2018_semi_sup' + str(cfg.train_sup_rate)
+        cfg.train_unsup_mode = None
 
     config_params = dict(args=args, config=cfg)
     wandb.init(project="fully_sup_brats", config=config_params)

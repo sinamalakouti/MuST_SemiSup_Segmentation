@@ -15,7 +15,7 @@ optimizer: "SGD" #SGD OR ADAM
 mixup_threshold: None
 intensity_rescale: True
 oneHot: False
-experiment_mode: "semi"
+experiment_mode: "partially_sup"
 parallel: True
 train_unsup_mode: "train2018_semi_unsup"
 train_sup_mode: "train2018_semi_sup"
