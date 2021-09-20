@@ -538,6 +538,13 @@ def Unet_train_val(dataset, n_epochs, wmh_threshold, output_dir, learning_rate, 
                 os.mkdir(output_dir, 0o777)
             except OSError:
                 print("Creation of the directory %s failed" % output_dir)
+    elif cfg.experiment_mode == 'fully_sup':
+        output_dir = os.path.join(output_dir, "fullySup_ratio_{}".format(cfg.train_sup_rate))
+        if not os.path.isdir(output_dir):
+            try:
+                os.mkdir(output_dir, 0o777)
+            except OSError:
+                print("Creation of the directory %s failed" % output_dir)
 
     output_dir = os.path.join(output_dir, "seed_{}".format(seed))
     if not os.path.isdir(output_dir):
@@ -610,6 +617,10 @@ def Unet_train_val(dataset, n_epochs, wmh_threshold, output_dir, learning_rate, 
                                         (torch.nn.CrossEntropyLoss(), torch.nn.CrossEntropyLoss()), epoch, cfg)
         # score, segmentations = evaluatePGS(pgsnet, dataset, device, wmh_threshold, cfg, cfg.val_mode)
         elif cfg.experiment_mode == 'partially_sup':
+            unet, loss = trainUnet_sup(train_sup_loader, unet, optimizer, device,
+                                       (torch.nn.CrossEntropyLoss(), None),
+                                       epoch, cfg)
+        elif cfg.experiment_mode == 'fully_sup':
             unet, loss = trainUnet_sup(train_sup_loader, unet, optimizer, device,
                                        (torch.nn.CrossEntropyLoss(), None),
                                        epoch, cfg)
@@ -906,7 +917,9 @@ def main():
     elif cfg.experiment_mode == 'partially_sup':
         cfg.train_sup_mode = 'train2018_semi_sup' + str(cfg.train_sup_rate)
         cfg.train_unsup_mode = None
-
+    elif cfg.experiment_mode == 'fully_sup':
+        cfg.train_sup_mode = 'all_train2018_sup'
+        cfg.train_unsup_mode = None
     config_params = dict(args=args, config=cfg)
     wandb.init(project="fully_sup_brats", config=config_params)
     Unet_train_val(dataset, cfg.n_epochs, cfg.wmh_threshold, args.output_dir, cfg.lr, args, cfg, cfg.seed)
