@@ -631,7 +631,7 @@ class PGS(nn.Module):
 
         # expanding path
 
-        up1 = self.__fw_up(c5_sup, c4, self.up1)
+        up1 = self.__fw_up(c5_unsup, c4, self.up1)
         c6 = self.__fw_expand_4layer(up1)
         output6_sup = self.cls6(c6)
 
@@ -639,7 +639,7 @@ class PGS(nn.Module):
         c6_unsup = self.__fw_expand_4layer(up1)
         output6_unsup = self.cls6(c6_unsup)
         ######
-        up2 = self.__fw_up(c6, c3, self.up2)
+        up2 = self.__fw_up(c6_unsup, c3, self.up2)
         c7 = self.__fw_expand_3layer(up2)
         output7_sup = self.cls7(c7)
 
@@ -648,7 +648,7 @@ class PGS(nn.Module):
         output7_unsup = self.cls7(c7_unsup)
 
         #####
-        up3 = self.__fw_up(c7, c2, self.up3)
+        up3 = self.__fw_up(c7_unsup, c2, self.up3)
         c8 = self.__fw_expand_2layer(up3)
         output8_sup = self.cls8(c8)
 
@@ -658,7 +658,7 @@ class PGS(nn.Module):
 
         ####
 
-        up4 = self.__fw_up(c8, c1, self.up4)
+        up4 = self.__fw_up(c8_unsup, c1, self.up4)
         c9 = self.__fw_expand_1layer(up4)  # output9 is the main output of the network
         output9_sup = self.cls9(c9)
 
@@ -924,17 +924,17 @@ def __fw_outputwise_unsup_loss(y_noisy, y_orig, loss_functions):
     return total_loss
 
 
-def compute_loss(y_preds, y_true, loss_functions, is_supervised):
-    if is_supervised:
-        total_loss = __fw_sup_loss(y_preds, y_true, loss_functions)
-    else:
-        # for comparing outputs together!
-        # total_loss = self.__fw_self_unsup_loss(y_preds, loss_functions)
-
-        # consistency of original output and noisy output
-        total_loss = __fw_outputwise_unsup_loss(y_preds, y_true, loss_functions)
-
-    return total_loss
+# def compute_loss(y_preds, y_true, loss_functions, is_supervised):
+#     if is_supervised:
+#         total_loss = __fw_sup_loss(y_preds, y_true, loss_functions)
+#     else:
+#         # for comparing outputs together!
+#         # total_loss = self.__fw_self_unsup_loss(y_preds, loss_functions)
+#
+#         # consistency of original output and noisy output
+#         total_loss = __fw_outputwise_unsup_loss(y_preds, y_true, loss_functions)
+#
+#     return total_loss
 
 
 if __name__ == '__main__':
