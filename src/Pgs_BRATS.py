@@ -48,7 +48,7 @@ def __fw_outputwise_unsup_loss(y_stud, y_teach, loss_functions):
         mse_loss = torch.nn.MSELoss()
         # total_loss +=  mse_loss(stud_pred, teach_pred)
         total_loss += - torch.mean(
-            torch.sum(teach_pred
+            torch.sum(teach_pred.detach()
                       * torch.nn.functional.log_softmax(stud_pred, dim=1), dim=1))
     return total_loss
 
