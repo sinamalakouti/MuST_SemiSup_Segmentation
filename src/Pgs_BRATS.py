@@ -38,7 +38,7 @@ def __fw_outputwise_unsup_loss(y_stud, y_teach, loss_functions):
     total_loss = 0
     assert len(y_teach) == len(y_stud), "Error! unsup_preds and sup_preds have to have same length"
     num_preds = len(y_teach)
-
+    losses = []
     for i in range(num_preds):
         teach_pred = y_teach[i]
 
@@ -47,16 +47,18 @@ def __fw_outputwise_unsup_loss(y_stud, y_teach, loss_functions):
                                                     " prediction shape is not similar!".format(i)
         mse_loss = torch.nn.MSELoss()
         # total_loss +=  mse_loss(stud_pred, teach_pred)
-        total_loss += - torch.mean(
+
+        losses.append(- torch.mean(
             torch.sum(teach_pred.detach()
-                      * torch.nn.functional.log_softmax(stud_pred, dim=1), dim=1))
+                      * torch.nn.functional.log_softmax(stud_pred, dim=1), dim=1)))
+    total_loss = sum(losses)
     return total_loss
 
 
 def __fw_sup_loss(y_preds, y_true, sup_loss):
     total_loss = 0
     # iterate over all level's output
-
+    losses = []
     for output in y_preds:
         ratio = int(np.round(y_true.shape[2] / output.shape[2]))
         maxpool = nn.MaxPool2d(kernel_size=2, stride=ratio, padding=0)
@@ -72,7 +74,8 @@ def __fw_sup_loss(y_preds, y_true, sup_loss):
         assert output.shape[-2:] == target.shape[-2:], "output and target shape is not similar!!"
         if output.shape[1] != target.shape[1] and type(sup_loss) == torch.nn.CrossEntropyLoss and len(target.shape) > 3:
             target = target.reshape((target.shape[0], target.shape[2], target.shape[3])).type(torch.LongTensor)
-        total_loss += sup_loss(output, target.type(torch.LongTensor).to(output.device))
+        losses.append(sup_loss(output, target.type(torch.LongTensor).to(output.device)))
+    total_loss = sum(losses)
     return total_loss
 
 

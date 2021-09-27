@@ -456,7 +456,7 @@ class Down(nn.Module):
 #             #
 #             #
 #             assert output.shape == target.shape, "output and target shape is not similar!!"
-#             total_loss += sup_loss(output, target)
+#             total_loss = total_loss + sup_loss(output, target)
 #         return total_loss
 #
 #     def __fw_self_unsup_loss(self, y_preds, loss_functions):
@@ -485,7 +485,7 @@ class Down(nn.Module):
 #                 assert pooled_main_output.shape == y_preds[i].shape, \
 #                     "Error! shapes has to be equal but got {} and {}".format(pooled_main_output.shape,
 #                                                                              y_preds[i].shape)
-#             total_loss += unsup_loss(y_preds[i], pooled_main_output)
+#             total_loss =total_loss +  unsup_loss(y_preds[i], pooled_main_output)
 #         return total_loss
 #
 #     def __fw_outputwise_unsup_loss(self, y_noisy, y_orig, loss_functions):
@@ -499,7 +499,7 @@ class Down(nn.Module):
 #             noisy_pred = y_noisy[i]
 #             assert orig_pred.shape == noisy_pred.shape, "Error! for preds number {}, supervised and unsupervised" \
 #                                                         " prediction shape is not similar!".format(i)
-#             total_loss += unsup_loss(noisy_pred, orig_pred.detach())
+#             total_loss = total_loss +  unsup_loss(noisy_pred, orig_pred.detach())
 #         return total_loss
 #
 #     def compute_loss(self, y_preds, y_true, loss_functions, is_supervised):
@@ -625,7 +625,7 @@ class PGS(nn.Module):
         c5_sup = self.__fw_bottleneck(d4)
         output5_sup = self.cls5(c5_sup)
 
-        d4_unsup, output5_sup = transformer(d4, output5_sup, cascade=cascade)
+        d4_unsup, aug_output5_sup = transformer(d4, output5_sup, cascade=cascade)
         c5_unsup = self.__fw_bottleneck(d4_unsup)
         output5_unsup = self.cls5(c5_unsup)
 
@@ -635,16 +635,16 @@ class PGS(nn.Module):
         c6 = self.__fw_expand_4layer(up1)
         output6_sup = self.cls6(c6)
 
-        up1, output6_sup = transformer(up1, output6_sup, cascade=cascade)
-        c6_unsup = self.__fw_expand_4layer(up1)
+        aug_up1, aug_output6_sup = transformer(up1, output6_sup, cascade=cascade)
+        c6_unsup = self.__fw_expand_4layer(aug_up1)
         output6_unsup = self.cls6(c6_unsup)
         ######
         up2 = self.__fw_up(c6_unsup, c3, self.up2)
         c7 = self.__fw_expand_3layer(up2)
         output7_sup = self.cls7(c7)
 
-        up2, output7_sup = transformer(up2, output7_sup, cascade=cascade)
-        c7_unsup = self.__fw_expand_3layer(up2)
+        aug_up2, aug_output7_sup = transformer(up2, output7_sup, cascade=cascade)
+        c7_unsup = self.__fw_expand_3layer(aug_up2)
         output7_unsup = self.cls7(c7_unsup)
 
         #####
@@ -652,8 +652,8 @@ class PGS(nn.Module):
         c8 = self.__fw_expand_2layer(up3)
         output8_sup = self.cls8(c8)
 
-        up3, output8_sup = transformer(up3, output8_sup, cascade=cascade)
-        c8_unsup = self.__fw_expand_2layer(up3)
+        aug_up3, aug_output8_sup = transformer(up3, output8_sup, cascade=cascade)
+        c8_unsup = self.__fw_expand_2layer(aug_up3)
         output8_unsup = self.cls8(c8_unsup)
 
         ####
@@ -662,11 +662,11 @@ class PGS(nn.Module):
         c9 = self.__fw_expand_1layer(up4)  # output9 is the main output of the network
         output9_sup = self.cls9(c9)
 
-        up4, output9_sup = transformer(up4, output9_sup, cascade=True)
-        c9_unsup = self.__fw_expand_1layer(up4)
+        aug_up4, aug_output9_sup = transformer(up4, output9_sup, cascade=True)
+        c9_unsup = self.__fw_expand_1layer(aug_up4)
         output9_unsup = self.cls9(c9_unsup)
 
-        supervised_outputs = output5_sup, output6_sup, output7_sup, output8_sup, output9_sup
+        supervised_outputs = aug_output5_sup, aug_output6_sup, aug_output7_sup, aug_output8_sup, aug_output9_sup
         unsupervised_outputs = output5_unsup, output6_unsup, output7_unsup, output8_unsup, output9_unsup
         return supervised_outputs, unsupervised_outputs
 
@@ -858,7 +858,7 @@ class PGS(nn.Module):
 def __fw_sup_loss(y_preds, y_true, loss_functions):
     (sup_loss, unsup_loss) = loss_functions
     total_loss = 0
-
+    losses = []
     for output in y_preds:
         ratio = int(np.round(y_true.shape[2] / output.shape[2]))
         maxpool = nn.MaxPool2d(kernel_size=2, stride=ratio, padding=0)
@@ -875,7 +875,8 @@ def __fw_sup_loss(y_preds, y_true, loss_functions):
         #
         #
         assert output.shape == target.shape, "output and target shape is not similar!!"
-        total_loss += sup_loss(output, target)
+        losses.append(sup_loss(output, target))
+    total_loss = sum(losses)
     return total_loss
 
 
@@ -883,7 +884,7 @@ def __fw_self_unsup_loss(y_preds, loss_functions):
     main_output = y_preds[-1].detach()
     (_, unsup_loss) = loss_functions
     total_loss = 0
-
+    losses = []
     for i in range(len(y_preds) - 1):
         # if out
         assert not (main_output.shape == y_preds[i].shape), "Wrong output: comparing main output with itself"
@@ -905,13 +906,15 @@ def __fw_self_unsup_loss(y_preds, loss_functions):
             assert pooled_main_output.shape == y_preds[i].shape, \
                 "Error! shapes has to be equal but got {} and {}".format(pooled_main_output.shape,
                                                                          y_preds[i].shape)
-        total_loss += unsup_loss(y_preds[i], pooled_main_output)
+        losses.append(total_loss + unsup_loss(y_preds[i], pooled_main_output))
+    total_loss = sum(losses)
     return total_loss
 
 
 def __fw_outputwise_unsup_loss(y_noisy, y_orig, loss_functions):
     (_, unsup_loss) = loss_functions
     total_loss = 0
+    losses = []
     assert len(y_orig) == len(y_noisy), "Error! unsup_preds and sup_preds have to have same length"
     num_preds = len(y_orig)
 
@@ -920,7 +923,8 @@ def __fw_outputwise_unsup_loss(y_noisy, y_orig, loss_functions):
         noisy_pred = y_noisy[i]
         assert orig_pred.shape == noisy_pred.shape, "Error! for preds number {}, supervised and unsupervised" \
                                                     " prediction shape is not similar!".format(i)
-        total_loss += unsup_loss(noisy_pred, orig_pred.detach())
+        losses.append(unsup_loss(noisy_pred, orig_pred.detach()))
+    total_loss = sum(losses)
     return total_loss
 
 

@@ -38,7 +38,7 @@ def __fw_outputwise_unsup_loss(y_stud, y_teach, loss_functions):
     total_loss = 0
     assert len(y_teach) == len(y_stud), "Error! unsup_preds and sup_preds have to have same length"
     num_preds = len(y_teach)
-
+    losses = []
     for i in range(num_preds):
         teach_pred = y_teach[i]
 
@@ -47,9 +47,11 @@ def __fw_outputwise_unsup_loss(y_stud, y_teach, loss_functions):
                                                     " prediction shape is not similar!".format(i)
         mse_loss = torch.nn.MSELoss()
         # total_loss +=  mse_loss(stud_pred, teach_pred)
-        total_loss += - torch.mean(
+        losses.append(- torch.mean(
             torch.sum(teach_pred
-                      * torch.nn.functional.log_softmax(stud_pred, dim=1), dim=1))
+                      * torch.nn.functional.log_softmax(stud_pred, dim=1), dim=1)))
+
+    total_loss = sum(losses)
     return total_loss
 
 
