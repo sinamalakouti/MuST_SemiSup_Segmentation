@@ -631,7 +631,7 @@ class PGS(nn.Module):
 
         # expanding path
 
-        up1 = self.__fw_up(c5, c4, self.up1)
+        up1 = self.__fw_up(c5_sup, c4, self.up1)
         c6 = self.__fw_expand_4layer(up1)
         output6_sup = self.cls6(c6)
 

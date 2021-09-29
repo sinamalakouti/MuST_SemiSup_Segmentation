@@ -124,7 +124,7 @@ def trainPgs_semi(train_sup_loader, train_unsup_loader, model, optimizer, device
 
         print("**************** UNSUP LOSSS  : {} ****************".format(uLoss))
         print("**************** SUP LOSSS  : {} ****************".format(sLoss))
-        total_loss = uLoss + sLoss
+        total_loss = uLoss + (len(train_sup_loader)/ (len(train_sup_loader) + len(train_unsup_loader))) * sLoss
         total_loss.backward()
         optimizer.step()
 
@@ -193,8 +193,8 @@ def trainPGS(train_loader, model, optimizer, device, epochid):
         target = batch['label'].to(device)
 
         # unsup_loss = nn.MSELoss()
-        unsup_loss = nn.CrossEntropyLoss(ignore_index=0)
-        sup_loss = torch.nn.CrossEntropyLoss(ignore_index=0)
+        unsup_loss = nn.CrossEntropyLoss()
+        sup_loss = torch.nn.CrossEntropyLoss()
         # sup_loss = reconstruction_loss.dice_coef_loss
         # sup_loss = torch.nn.w
         loss_functions = (sup_loss, unsup_loss)
@@ -245,7 +245,7 @@ def eval_per_subjectPgs(model, device, threshold, cfg, data_mode):
     hd_arrET = []
 
     paths = testset.paths
-    sup_loss = torch.nn.CrossEntropyLoss(ignore_index=0)
+    sup_loss = torch.nn.CrossEntropyLoss()
 
     with torch.no_grad():
         for path in paths:
@@ -358,7 +358,7 @@ def eval_per_subjectPgs3(model, device, threshold, cfg, data_mode):
     dice_arrET = []
 
     paths = testset.paths
-    sup_loss = torch.nn.CrossEntropyLoss(ignore_index=0)
+    sup_loss = torch.nn.CrossEntropyLoss()
     with torch.no_grad():
         for path in paths:
             batch = testset.get_subject(path)
@@ -430,7 +430,7 @@ def eval_per_subjectPgs2(model, device, threshold, cfg, data_mode):
     running_sensitivity = {'WT': [], 'TC': [], 'ET': []}
 
     paths = testset.paths
-    sup_loss = torch.nn.CrossEntropyLoss(ignore_index=0)
+    sup_loss = torch.nn.CrossEntropyLoss()
 
     with torch.no_grad():
         for path in paths:
@@ -669,15 +669,15 @@ def Pgs_train_val(dataset, n_epochs, wmh_threshold, output_dir, learning_rate, a
         # pgsnet, loss = trainPGS(train_loader, pgsnet, optimizer, device, epoch)
         if cfg.experiment_mode == 'semi':
             pgsnet, loss = trainPgs_semi(train_sup_loader, train_unsup_loader, pgsnet, optimizer, device,
-                                         (torch.nn.CrossEntropyLoss(ignore_index=0), torch.nn.CrossEntropyLoss(ignore_index=0)), epoch, cfg)
+                                         (torch.nn.CrossEntropyLoss(), torch.nn.CrossEntropyLoss()), epoch, cfg)
         # score, segmentations = evaluatePGS(pgsnet, dataset, device, wmh_threshold, cfg, cfg.val_mode)
         elif cfg.experiment_mode == 'partially_sup':
             pgsnet, loss = trainPgs_sup(train_sup_loader, pgsnet, optimizer, device,
-                                        (torch.nn.CrossEntropyLoss(ignore_index=0), None),
+                                        (torch.nn.CrossEntropyLoss(), None),
                                         epoch, cfg)
         elif cfg.experiment_mode == 'fully_sup':
             pgsnet, loss = trainPgs_sup(train_sup_loader, pgsnet, optimizer, device,
-                                        (torch.nn.CrossEntropyLoss(ignore_index=0), None),
+                                        (torch.nn.CrossEntropyLoss(), None),
                                         epoch, cfg)
 
         if epoch % 2 == 0:
