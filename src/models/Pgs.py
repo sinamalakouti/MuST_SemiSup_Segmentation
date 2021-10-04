@@ -622,52 +622,52 @@ class PGS(nn.Module):
 
         # bottleneck
 
-        c5_sup = self.__fw_bottleneck(d4)
-        output5_sup = self.cls5(c5_sup)
+        c5_teach = self.__fw_bottleneck(d4).detach()
+        output5_teach = self.cls5(c5_teach).detach()
 
-        d4_unsup, aug_output5_sup = transformer(d4, output5_sup, cascade=cascade)
-        c5_unsup = self.__fw_bottleneck(d4_unsup)
-        output5_unsup = self.cls5(c5_unsup)
+        d4_stud, aug_output5_teach = transformer(d4, output5_teach, cascade=cascade)
+        c5_stud = self.__fw_bottleneck(d4_stud)
+        output5_stud = self.cls5(c5_stud)
 
         # expanding path
 
-        up1 = self.__fw_up(c5_sup, c4, self.up1)
-        c6 = self.__fw_expand_4layer(up1)
-        output6_sup = self.cls6(c6)
+        up1 = self.__fw_up(c5_teach, c4, self.up1)
+        c6_teach = self.__fw_expand_4layer(up1).detach()
+        output6_teach = self.cls6(c6_teach).detach()
 
-        aug_up1, aug_output6_sup = transformer(up1, output6_sup, cascade=cascade)
-        c6_unsup = self.__fw_expand_4layer(aug_up1)
-        output6_unsup = self.cls6(c6_unsup)
+        aug_up1, aug_output6_teach = transformer(up1, output6_teach, cascade=cascade)
+        c6_stud = self.__fw_expand_4layer(aug_up1)
+        output6_stud = self.cls6(c6_stud)
         ######
-        up2 = self.__fw_up(c6, c3, self.up2)
-        c7 = self.__fw_expand_3layer(up2)
-        output7_sup = self.cls7(c7)
+        up2 = self.__fw_up(c6_teach, c3, self.up2)
+        c7_teach = self.__fw_expand_3layer(up2).detach()
+        output7_teach = self.cls7(c7_teach).detach()
 
-        aug_up2, aug_output7_sup = transformer(up2, output7_sup, cascade=cascade)
-        c7_unsup = self.__fw_expand_3layer(aug_up2)
-        output7_unsup = self.cls7(c7_unsup)
+        aug_up2, aug_output7_teach = transformer(up2, output7_teach, cascade=cascade)
+        c7_stud = self.__fw_expand_3layer(aug_up2)
+        output7_stud = self.cls7(c7_stud)
 
         #####
-        up3 = self.__fw_up(c7, c2, self.up3)
-        c8 = self.__fw_expand_2layer(up3)
-        output8_sup = self.cls8(c8)
+        up3 = self.__fw_up(c7_teach, c2, self.up3)
+        c8_teach = self.__fw_expand_2layer(up3).detach()
+        output8_teach = self.cls8(c8_teach).detach()
 
-        aug_up3, aug_output8_sup = transformer(up3, output8_sup, cascade=cascade)
-        c8_unsup = self.__fw_expand_2layer(aug_up3)
-        output8_unsup = self.cls8(c8_unsup)
+        aug_up3, aug_output8_teach = transformer(up3, output8_teach, cascade=cascade)
+        c8_stud = self.__fw_expand_2layer(aug_up3)
+        output8_stud = self.cls8(c8_stud)
 
         ####
 
-        up4 = self.__fw_up(c8, c1, self.up4)
-        c9 = self.__fw_expand_1layer(up4)  # output9 is the main output of the network
-        output9_sup = self.cls9(c9)
+        up4 = self.__fw_up(c8_teach, c1, self.up4)
+        c9_teach = self.__fw_expand_1layer(up4).detach()  # output9 is the main output of the network
+        output9_teach = self.cls9(c9_teach).detach()
 
-        aug_up4, aug_output9_sup = transformer(up4, output9_sup, cascade=True)
-        c9_unsup = self.__fw_expand_1layer(aug_up4)
-        output9_unsup = self.cls9(c9_unsup)
+        aug_up4, aug_output9_teach = transformer(up4, output9_teach, cascade=True)
+        c9_stud = self.__fw_expand_1layer(aug_up4)
+        output9_stud = self.cls9(c9_stud)
 
-        supervised_outputs = aug_output5_sup, aug_output6_sup, aug_output7_sup, aug_output8_sup, aug_output9_sup
-        unsupervised_outputs = output5_unsup, output6_unsup, output7_unsup, output8_unsup, output9_unsup
+        supervised_outputs = aug_output5_teach, aug_output6_teach, aug_output7_teach, aug_output8_teach, aug_output9_teach
+        unsupervised_outputs = output5_stud, output6_stud, output7_stud, output8_stud, output9_stud
         return supervised_outputs, unsupervised_outputs
 
     def __fw_supervised(self, X):
