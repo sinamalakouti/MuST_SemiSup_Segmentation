@@ -15,10 +15,15 @@ optimizer: "SGD" #SGD OR ADAM
 mixup_threshold: None
 intensity_rescale: True
 oneHot: False
-experiment_mode: "partially_sup"
+experiment_mode: "semi"
 parallel: True
 train_unsup_mode: "train2018_semi_unsup"
 train_sup_mode: "train2018_semi_sup"
 train_sup_rate: 10
 cuda: "0,1"
 seed: 41
+loss: 'CE' # CE, DSC, FOCAL, CE_DSC, CE_FOCAL, DSC_FOCAL, CE_FOCAL_DSC
+semi_mode: "shared"   # shared, MT
+gradient_stop_strategy: "stop_feature" #stop_feature, stop_output
+information_passing_strategy: "teacher" #student, teacher
+information: "semi supervised, pass teacher's "  # description
