@@ -525,8 +525,9 @@ def Pgs_train_val(dataset, n_epochs, wmh_threshold, output_dir, learning_rate, a
     kernels = [5, 3, 3, 3, 3, 3, 3, 3, 3]
     strides = [1, 1, 1, 1, 1, 1, 1, 1, 1]
 
-    wandb.run.name = "{}_PGS_{}_{}_supRate{}_seed{}_".format(cfg.experiment_mode, "trainALL2018", "valNew2019",
+    wandb.run.name = "{}_PGSMT_{}_{}_supRate{}_seed{}_".format(cfg.experiment_mode, "trainALL2018", "valNew2019",
                                                              cfg.train_sup_rate, seed)
+
     dataroot_dir = f'data/brats20'
     all_train_csv = os.path.join(dataroot_dir, 'trainset/brats2018.csv')
     supdir_path = os.path.join(dataroot_dir, 'trainset')
@@ -597,8 +598,8 @@ def Pgs_train_val(dataset, n_epochs, wmh_threshold, output_dir, learning_rate, a
         except OSError:
             print("Creation of the directory %s failed" % output_image_dir)
 
-    log_file_path = os.path.join(output_dir, "log.log")
-    sys.stdout = open(log_file_path, "w")
+    # log_file_path = os.path.join(output_dir, "log_{}.log".format(args.training_mode))
+    # sys.stdout = open(log_file_path, "w")
     print("EXPERIMENT DESCRIPTION:   {}".format(cfg.information))
 
     print("******* TRAINING PGS ***********")
@@ -964,6 +965,7 @@ def main():
         cfg.train_unsup_mode = None
 
     config_params = dict(args=args, config=cfg)
+    cfg.model = "PGSMAT"
     wandb.init(project="fully_sup_brats", config=config_params)
     Pgs_train_val(dataset, cfg.n_epochs, cfg.wmh_threshold, args.output_dir, cfg.lr, args, cfg, cfg.seed)
 

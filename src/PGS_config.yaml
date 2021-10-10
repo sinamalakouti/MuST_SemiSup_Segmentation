@@ -26,4 +26,5 @@ loss: 'CE' # CE, DSC, FOCAL, CE_DSC, CE_FOCAL, DSC_FOCAL, CE_FOCAL_DSC
 semi_mode: "shared"   # shared, MT
 gradient_stop_strategy: "stop_feature" #stop_feature, stop_output
 information_passing_strategy: "teacher" #student, teacher
-information: "semi supervised, pass teacher's "  # description
+information: "semi supervised, pass teacher's features, MT, supervised: student, stop gradietn: teacher "  # description
+model: "PGS" #PGS,PGSMT, UNET

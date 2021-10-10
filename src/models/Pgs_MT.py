@@ -152,7 +152,10 @@ class PGS_MT(nn.Module):
     def forward(self, X, is_supervised):
         type_unsup = 'layerwise'
         if is_supervised:
-            sup_outputs = self.__fw_supervised(X)
+            if self.training:
+                sup_outputs = self.__fw_supervised_stud(X)
+            else:
+                sup_outputs = self.__fw_supervised_teach(X)
             return sup_outputs, None
 
         elif type_unsup == 'layerwise':
@@ -168,7 +171,7 @@ class PGS_MT(nn.Module):
         # bottleneck
         with torch.no_grad():
             c5_teach = self.__fw_bottleneck(self.conv5_teach, d4).detach()
-            output5_teach = self.cls5(c5_teach).detach()
+            output5_teach = self.cls5_teach(c5_teach).detach()
 
         d4_stud, aug_output5_teach = transformer(d4, output5_teach, cascade=cascade)
         c5_stud = self.__fw_bottleneck(self.conv5_stud, d4_stud)
@@ -178,7 +181,7 @@ class PGS_MT(nn.Module):
         up1 = self.__fw_up(c5_teach, c4, self.up1) if self.config.information_passing_strategy == 'teacher' \
             else self.__fw_up(c5_stud, c4, self.up1)
         with torch.no_grad():
-            c6_teach = self.__fw_expand_layer(self.conv6_teach,up1).detach()
+            c6_teach = self.__fw_expand_layer(self.conv6_teach, up1).detach()
             output6_teach = self.cls6_teach(c6_teach).detach()
 
         aug_up1, aug_output6_teach = transformer(up1, output6_teach, cascade=cascade)
@@ -213,7 +216,8 @@ class PGS_MT(nn.Module):
             else self.__fw_up(c8_stud, c1, self.up4)
 
         with torch.no_grad():
-            c9_teach = self.__fw_expand_layer(self.conv9_teach, up4).detach()  # output9 is the main output of the network
+            c9_teach = self.__fw_expand_layer(self.conv9_teach,
+                                              up4).detach()  # output9 is the main output of the network
             output9_teach = self.cls9_teach(c9_teach).detach()
 
         aug_up4, aug_output9_teach = transformer(up4, output9_teach, cascade=True)
@@ -228,9 +232,9 @@ class PGS_MT(nn.Module):
 
     def update_params(self, cur_epoch, iter_per_epoch, step):
         self.conv5_stud, self.conv5_teach = model_utils.ema_update(self.conv5_stud, self.conv5_teach,
-                                                              cur_epoch * iter_per_epoch + step, 600)
-        self.cls5_stud, self.cls5_teach = model_utils.ema_update(self.cls5_stud, self.cls5_teach,
                                                                    cur_epoch * iter_per_epoch + step, 600)
+        self.cls5_stud, self.cls5_teach = model_utils.ema_update(self.cls5_stud, self.cls5_teach,
+                                                                 cur_epoch * iter_per_epoch + step, 600)
         self.conv6_stud, self.conv6_teach = model_utils.ema_update(self.conv6_stud, self.conv6_teach,
                                                                    cur_epoch * iter_per_epoch + step, 600)
         self.cls6_stud, self.cls6_teach = model_utils.ema_update(self.cls6_stud, self.cls6_teach,
@@ -248,15 +252,51 @@ class PGS_MT(nn.Module):
         self.cls9_stud, self.cls9_teach = model_utils.ema_update(self.cls9_stud, self.cls9_teach,
                                                                  cur_epoch * iter_per_epoch + step, 600)
 
+   
 
 
-    def __fw_supervised(self, X):
+
+
+    def __fw_supervised_stud(self, X):
 
         c1, d1, c2, d2, c3, d3, c4, d4 = self.__fw_contracting_path(X)
 
         # bottleneck
 
-        c5 = self.__fw_bottleneck(self.conv5_teachd4)
+        c5 = self.__fw_bottleneck(self.conv5_stud, d4)
+        output5 = self.cls5_stud(c5)
+        # expanding path
+        # 4th expanding layer
+
+        up1 = self.__fw_up(c5, c4, self.up1)
+        c6 = self.__fw_expand_layer(self.conv6_stud, up1)
+        output6 = self.cls6_stud(c6)
+        # 3rd expanding layer
+
+        up2 = self.__fw_up(c6, c3, self.up2)
+        c7 = self.__fw_expand_layer(self.conv7_stud, up2)
+        output7 = self.cls7_stud(c7)
+        # 2nd expanding layer
+
+        up3 = self.__fw_up(c7, c2, self.up3)
+        c8 = self.__fw_expand_layer(self.conv8_stud, up3)
+        output8 = self.cls8_stud(c8)
+
+        # 1st expanding layer
+
+        up4 = self.__fw_up(c8, c1, self.up4)
+        c9 = self.__fw_expand_layer(self.conv9_stud, up4)
+        output9 = self.cls9_stud(c9)
+
+        return output5, output6, output7, output8, output9
+
+    def __fw_supervised_teach(self, X):
+
+        c1, d1, c2, d2, c3, d3, c4, d4 = self.__fw_contracting_path(X)
+
+        # bottleneck
+
+        c5 = self.__fw_bottleneck(self.conv5_teach, d4)
         output5 = self.cls5_teach(c5)
         # expanding path
         # 4th expanding layer
