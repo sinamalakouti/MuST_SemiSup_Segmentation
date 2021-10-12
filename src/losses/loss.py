@@ -1,5 +1,5 @@
 import torch
-from src.utils import ramps
+from utils import ramps
 
 
 def mse_power(x, y, power=3):

@@ -244,27 +244,27 @@ class PGS_MT(nn.Module):
 
         # todo
 
-    def update_params(self, cur_epoch, iter_per_epoch, step):
+    def update_params(self, global_step):
         model_utils.ema_update(self.conv5_stud, self.conv5_teach,
-                               cur_epoch * iter_per_epoch + step, 600)
+                               global_step)
         model_utils.ema_update(self.cls5_stud, self.cls5_teach,
-                               cur_epoch * iter_per_epoch + step, 600)
+                               global_step)
         model_utils.ema_update(self.conv6_stud, self.conv6_teach,
-                               cur_epoch * iter_per_epoch + step, 600)
+                               global_step)
         model_utils.ema_update(self.cls6_stud, self.cls6_teach,
-                               cur_epoch * iter_per_epoch + step, 600)
+                               global_step)
         model_utils.ema_update(self.conv7_stud, self.conv7_teach,
-                               cur_epoch * iter_per_epoch + step, 600)
+                               global_step)
         model_utils.ema_update(self.cls7_stud, self.cls7_teach,
-                               cur_epoch * iter_per_epoch + step, 600)
+                               global_step)
         model_utils.ema_update(self.conv8_stud, self.conv8_teach,
-                               cur_epoch * iter_per_epoch + step, 600)
+                               global_step)
         model_utils.ema_update(self.cls8_stud, self.cls8_teach,
-                               cur_epoch * iter_per_epoch + step, 600)
+                               global_step)
         model_utils.ema_update(self.conv9_stud, self.conv9_teach,
-                               cur_epoch * iter_per_epoch + step, 600)
+                               global_step)
         model_utils.ema_update(self.cls9_stud, self.cls9_teach,
-                               cur_epoch * iter_per_epoch + step, 600)
+                               global_step)
 
     def __fw_supervised_stud(self, X):
 

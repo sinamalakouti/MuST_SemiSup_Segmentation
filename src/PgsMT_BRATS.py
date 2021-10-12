@@ -33,6 +33,7 @@ for p in sys.path:
 utils.Constants.USE_CUDA = True
 parser = argparse.ArgumentParser()
 
+global_step = 0
 
 def __fw_outputwise_unsup_loss(y_stud, y_teach, loss_functions):
     (_, unsup_loss) = loss_functions
@@ -96,6 +97,7 @@ def compute_loss(y_preds, y_true, loss_functions, is_supervised):
 
 def trainPgs_semi(train_sup_loader, train_unsup_loader, model, optimizer, device, loss_functions, cons_w_unsup, epochid,
                   cfg):
+    global global_step
     total_loss = 0
     model.train()
 
@@ -128,7 +130,11 @@ def trainPgs_semi(train_sup_loader, train_unsup_loader, model, optimizer, device
         total_loss = sLoss + uLoss
         total_loss.backward()
         optimizer.step()
-        model.module.update_params(epochid, len(train_unsup_loader), unsup_step)
+        global_step += 1
+        if global_step % 100 == 0 and global_step < 1000:
+            print("glboal step is: ", global_step)
+
+        model.update_params(global_step)
 
         with torch.no_grad():
             sf = torch.nn.Softmax2d()
@@ -539,6 +545,7 @@ def Pgs_train_val(dataset, n_epochs, wmh_threshold, output_dir, learning_rate, a
 
     best_score = 0
     start_epoch = 0
+    global global_step
 
     if not os.path.isdir(output_dir):
         try:
