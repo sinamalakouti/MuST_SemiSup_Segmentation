@@ -149,10 +149,24 @@ class PGS_MT(nn.Module):
         self.cls8_stud = CLS(self.dim_outputs[7], self.dim_outputs[-1])
         self.cls9_stud = CLS(self.dim_outputs[8], self.dim_outputs[-1])  # main classifier
 
-    def forward(self, X, is_supervised):
+        # now set teacher parameters to be students parameters
+
+        self.conv5_teach.load_state_dict(self.conv5_stud.state_dict())
+        self.conv6_teach.load_state_dict(self.conv6_stud.state_dict())
+        self.conv7_teach.load_state_dict(self.conv7_stud.state_dict())
+        self.conv8_teach.load_state_dict(self.conv8_stud.state_dict())
+        self.conv9_teach.load_state_dict(self.conv9_stud.state_dict())
+
+        self.cls5_teach.load_state_dict(self.cls5_stud.state_dict())
+        self.cls6_teach.load_state_dict(self.cls6_stud.state_dict())
+        self.cls7_teach.load_state_dict(self.cls7_stud.state_dict())
+        self.cls8_teach.load_state_dict(self.cls8_stud.state_dict())
+        self.cls9_teach.load_state_dict(self.cls9_stud.state_dict())
+
+    def forward(self, X, is_supervised, model_for_sup='stud'):
         type_unsup = 'layerwise'
         if is_supervised:
-            if self.training:
+            if model_for_sup == 'stud':
                 sup_outputs = self.__fw_supervised_stud(X)
             else:
                 sup_outputs = self.__fw_supervised_teach(X)
@@ -231,31 +245,26 @@ class PGS_MT(nn.Module):
         # todo
 
     def update_params(self, cur_epoch, iter_per_epoch, step):
-        self.conv5_stud, self.conv5_teach = model_utils.ema_update(self.conv5_stud, self.conv5_teach,
-                                                                   cur_epoch * iter_per_epoch + step, 600)
-        self.cls5_stud, self.cls5_teach = model_utils.ema_update(self.cls5_stud, self.cls5_teach,
-                                                                 cur_epoch * iter_per_epoch + step, 600)
-        self.conv6_stud, self.conv6_teach = model_utils.ema_update(self.conv6_stud, self.conv6_teach,
-                                                                   cur_epoch * iter_per_epoch + step, 600)
-        self.cls6_stud, self.cls6_teach = model_utils.ema_update(self.cls6_stud, self.cls6_teach,
-                                                                 cur_epoch * iter_per_epoch + step, 600)
-        self.conv7_stud, self.conv7_teach = model_utils.ema_update(self.conv7_stud, self.conv7_teach,
-                                                                   cur_epoch * iter_per_epoch + step, 600)
-        self.cls7_stud, self.cls7_teach = model_utils.ema_update(self.cls7_stud, self.cls7_teach,
-                                                                 cur_epoch * iter_per_epoch + step, 600)
-        self.conv8_stud, self.conv8_teach = model_utils.ema_update(self.conv8_stud, self.conv8_teach,
-                                                                   cur_epoch * iter_per_epoch + step, 600)
-        self.cls8_stud, self.cls8_teach = model_utils.ema_update(self.cls8_stud, self.cls8_teach,
-                                                                 cur_epoch * iter_per_epoch + step, 600)
-        self.conv9_stud, self.conv9_teach = model_utils.ema_update(self.conv9_stud, self.conv9_teach,
-                                                                   cur_epoch * iter_per_epoch + step, 600)
-        self.cls9_stud, self.cls9_teach = model_utils.ema_update(self.cls9_stud, self.cls9_teach,
-                                                                 cur_epoch * iter_per_epoch + step, 600)
-
-   
-
-
-
+        model_utils.ema_update(self.conv5_stud, self.conv5_teach,
+                               cur_epoch * iter_per_epoch + step, 600)
+        model_utils.ema_update(self.cls5_stud, self.cls5_teach,
+                               cur_epoch * iter_per_epoch + step, 600)
+        model_utils.ema_update(self.conv6_stud, self.conv6_teach,
+                               cur_epoch * iter_per_epoch + step, 600)
+        model_utils.ema_update(self.cls6_stud, self.cls6_teach,
+                               cur_epoch * iter_per_epoch + step, 600)
+        model_utils.ema_update(self.conv7_stud, self.conv7_teach,
+                               cur_epoch * iter_per_epoch + step, 600)
+        model_utils.ema_update(self.cls7_stud, self.cls7_teach,
+                               cur_epoch * iter_per_epoch + step, 600)
+        model_utils.ema_update(self.conv8_stud, self.conv8_teach,
+                               cur_epoch * iter_per_epoch + step, 600)
+        model_utils.ema_update(self.cls8_stud, self.cls8_teach,
+                               cur_epoch * iter_per_epoch + step, 600)
+        model_utils.ema_update(self.conv9_stud, self.conv9_teach,
+                               cur_epoch * iter_per_epoch + step, 600)
+        model_utils.ema_update(self.cls9_stud, self.cls9_teach,
+                               cur_epoch * iter_per_epoch + step, 600)
 
     def __fw_supervised_stud(self, X):
 

@@ -116,7 +116,7 @@ def trainPgs_semi(train_sup_loader, train_unsup_loader, model, optimizer, device
         b_sup = batch_sup['data'].to(device)
         target_sup = batch_sup['label'].to(device)
 
-        sup_outputs, _ = model(b_sup, is_supervised=True)
+        sup_outputs, _ = model(b_sup, is_supervised=True, model_for_sup='stud')
         sLoss = compute_loss(sup_outputs, target_sup, loss_functions, is_supervised=True)
 
         teacher_outputs, student_outputs = model(b_unsup, is_supervised=False)
@@ -128,7 +128,7 @@ def trainPgs_semi(train_sup_loader, train_unsup_loader, model, optimizer, device
         total_loss = sLoss + uLoss
         total_loss.backward()
         optimizer.step()
-        model.update_params(epochid, len(train_unsup_loader), unsup_step)
+        model.module.update_params(epochid, len(train_unsup_loader), unsup_step)
 
         with torch.no_grad():
             sf = torch.nn.Softmax2d()
@@ -186,7 +186,7 @@ def trainPgs_sup(train_sup_loader, model, optimizer, device, loss_functions, epo
     return model, total_loss
 
 
-def eval_per_subjectPgs(model, device, threshold, cfg, data_mode):
+def eval_per_subjectPgs(model, device, threshold, cfg, data_mode, model_for_sup):
     print("******************** EVALUATING {}********************".format(data_mode))
 
     testset = Brat20Test(f'data/brats20', data_mode, 10, 155,
@@ -224,7 +224,7 @@ def eval_per_subjectPgs(model, device, threshold, cfg, data_mode):
             subjects = batch['subjects']
             assert len(np.unique(subjects)) == 1, print("More than one subject at a time")
             b = b.to(device)
-            outputs, _ = model(b, True)
+            outputs, _ = model(b, True, model_for_sup=model_for_sup)
 
             if cfg.oneHot:
                 sf = torch.nn.Softmax2d()
@@ -526,7 +526,7 @@ def Pgs_train_val(dataset, n_epochs, wmh_threshold, output_dir, learning_rate, a
     strides = [1, 1, 1, 1, 1, 1, 1, 1, 1]
 
     wandb.run.name = "{}_PGSMT_{}_{}_supRate{}_seed{}_".format(cfg.experiment_mode, "trainALL2018", "valNew2019",
-                                                             cfg.train_sup_rate, seed)
+                                                               cfg.train_sup_rate, seed)
 
     dataroot_dir = f'data/brats20'
     all_train_csv = os.path.join(dataroot_dir, 'trainset/brats2018.csv')
@@ -672,7 +672,8 @@ def Pgs_train_val(dataset, n_epochs, wmh_threshold, output_dir, learning_rate, a
             final_dice, final_PPV, final_sensitivity, final_specificity, final_hd = eval_per_subjectPgs(pgsnet, device,
                                                                                                         wmh_threshold,
                                                                                                         cfg,
-                                                                                                        cfg.val_mode)
+                                                                                                        cfg.val_mode,
+                                                                                                        model_for_sup='teach')
             print(
                 "** (WT) SUBJECT WISE SCORE @ Iteration {} is DICE: {}, HD: {}, PPV:{}, Sensitivity: {}, Specificity: {}  **".
                     format(epoch, final_dice['WT'], final_hd['WT'], final_PPV['WT'], final_sensitivity['WT'],
@@ -695,6 +696,9 @@ def Pgs_train_val(dataset, n_epochs, wmh_threshold, output_dir, learning_rate, a
                     torch.save(pgsnet, f)
             save_score_all(output_image_dir, (final_dice, final_hd, final_PPV, final_sensitivity, final_specificity),
                            epoch)
+
+            final_dice_stud, _, _, _, _ = eval_per_subjectPgs(pgsnet, device, wmh_threshold, cfg, cfg.val_mode,
+                                                              model_for_sup='stud')
             wandb.log({'epoch_id': epoch,
                        'WT_subject_wise_val_DSC': final_dice['WT'],
                        'WT_subject_wise_val_HD': final_hd['WT'],
@@ -711,6 +715,9 @@ def Pgs_train_val(dataset, n_epochs, wmh_threshold, output_dir, learning_rate, a
                        'TC_subject_wise_val_PPV': final_PPV['TC'],
                        'TC_subject_wise_val_SENSITIVITY': final_sensitivity['TC'],
                        'TC_subject_wise_val_SPECIFCITY': final_specificity['TC'],
+                       'Stud_WT_subject_wise_val_DSC': final_dice_stud['WT'],
+                       'Stud_ET_subject_wise_val_DSC': final_dice_stud['ET'],
+                       'Stud_TC_subject_wise_val_DSC': final_dice_stud['TC']
                        })
 
             # final_dice, final_hd, final_PPV, final_sensitivity = eval_per_subjectPgs2(pgsnet, device, wmh_threshold,

@@ -3,6 +3,7 @@ import torch
 
 
 def __ema(p1, p2, factor):
+    p1.data.mul_(factor).add_(1 - factor, p2.data)
     return factor * p1 + (1 - factor) * p2
 
 
@@ -13,11 +14,11 @@ def ema_update(student, teacher, cur_step, L=400):
         alpha = 0.999
 
     for stud_p, teach_p in zip(student.parameters(), teacher.parameters()):
-        teach_p.data = __ema(teach_p.data, stud_p.data, alpha)
+        __ema(teach_p.data, stud_p.data, alpha)
 
     for teach_p, stud_p in zip(teacher.buffers(), student.buffers()):
-        teach_p.data = __ema(teach_p.data, stud_p.data, alpha)
-    return student, teacher
+        __ema(teach_p.data, stud_p.data, alpha)
+
 
 
 def update_adaptiveRate(cur_step, L):
