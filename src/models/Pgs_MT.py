@@ -242,29 +242,39 @@ class PGS_MT(nn.Module):
         unsupervised_outputs = output5_stud, output6_stud, output7_stud, output8_stud, output9_stud
         return supervised_outputs, unsupervised_outputs
 
-        # todo
+    def copy_params(self):
+        model_utils.copy_params(self.conv5_stud, self.conv5_teach)
+        model_utils.copy_params(self.con6_stud, self.conv6_teach)
+        model_utils.copy_params(self.conv7_stud, self.conv7_teach)
+        model_utils.copy_params(self.conv8_stud, self.conv8_teach)
+        model_utils.copy_params(self.conv9_stud, self.conv9_teach)
+        model_utils.copy_params(self.cls5_stud, self.cls5_teach)
+        model_utils.copy_params(self.cls6_stud, self.cls6_teach)
+        model_utils.copy_params(self.cls7_stud, self.cls7_teach)
+        model_utils.copy_params(self.cls8_stud, self.cls8_teach)
+        model_utils.copy_params(self.cls9_stud, self.cls9_teach)
 
-    def update_params(self, global_step):
+    def update_params(self, global_step, max_step):
         model_utils.ema_update(self.conv5_stud, self.conv5_teach,
-                               global_step)
+                               global_step, max_step)
         model_utils.ema_update(self.cls5_stud, self.cls5_teach,
-                               global_step)
+                               global_step, max_step)
         model_utils.ema_update(self.conv6_stud, self.conv6_teach,
-                               global_step)
+                               global_step, max_step)
         model_utils.ema_update(self.cls6_stud, self.cls6_teach,
-                               global_step)
+                               global_step, max_step)
         model_utils.ema_update(self.conv7_stud, self.conv7_teach,
-                               global_step)
+                               global_step, max_step)
         model_utils.ema_update(self.cls7_stud, self.cls7_teach,
-                               global_step)
+                               global_step, max_step)
         model_utils.ema_update(self.conv8_stud, self.conv8_teach,
-                               global_step)
+                               global_step, max_step)
         model_utils.ema_update(self.cls8_stud, self.cls8_teach,
-                               global_step)
+                               global_step, max_step)
         model_utils.ema_update(self.conv9_stud, self.conv9_teach,
-                               global_step)
+                               global_step, max_step)
         model_utils.ema_update(self.cls9_stud, self.cls9_teach,
-                               global_step)
+                               global_step, max_step)
 
     def __fw_supervised_stud(self, X):
 

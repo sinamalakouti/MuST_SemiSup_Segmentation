@@ -134,7 +134,7 @@ def trainPgs_semi(train_sup_loader, train_unsup_loader, model, optimizer, device
         if global_step % 100 == 0 and global_step < 1000:
             print("glboal step is: ", global_step)
 
-        model.update_params(global_step)
+        model.module.update_params(global_step, max_step= 6 * len(train_unsup_loader)) #6 num of epochs
 
         with torch.no_grad():
             sf = torch.nn.Softmax2d()
