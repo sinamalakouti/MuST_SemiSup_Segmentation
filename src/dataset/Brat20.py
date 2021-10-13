@@ -71,21 +71,19 @@ def semi_sup_split(all_train_csv, sup_dir_path, unsup_dir_path, ratio=0.5, seed=
     sup_ids = np.random.choice(all_train, sup_size, replace=False)
     unsup_ids = np.setdiff1d(all_train, sup_ids)
     if seed is None:
-        np.savetxt(sup_dir_path + "/train18_sup_ids{}.csv".format(int(ratio * 100)), sup_ids.astype(np.str),
-                   delimiter=',',
+        np.savetxt(sup_dir_path + "/train18_sup_ids{}.csv".format(int(ratio * 100)), sup_ids.astype(np.str), delimiter=',',
                    fmt='%s')
     else:
-        np.savetxt(sup_dir_path + "/train18_sup_ids{}_seed{}.csv".format(int(ratio * 100), seed),
-                   sup_ids.astype(np.str),
+        np.savetxt(sup_dir_path + "/train18_sup_ids{}_seed{}.csv".format(int(ratio * 100), seed), sup_ids.astype(np.str),
                    delimiter=',',
                    fmt='%s')
     if seed is None:
         np.savetxt(unsup_dir_path + "/train18_unsup_ids{}.csv".format(int(ratio * 100)), unsup_ids.astype(np.str),
                    delimiter=',', fmt='%s')
     else:
-        np.savetxt(unsup_dir_path + "/train18_unsup_ids{}_seed{}.csv".format(int(ratio * 100), seed),
-                   unsup_ids.astype(np.str),
+        np.savetxt(unsup_dir_path + "/train18_unsup_ids{}_seed{}.csv".format(int(ratio * 100), seed), unsup_ids.astype(np.str),
                    delimiter=',', fmt='%s')
+
 
 
 class Brat20Test(torch.utils.data.Dataset):
@@ -362,7 +360,7 @@ class Brat20(torch.utils.data.Dataset):
 
         x, x_t1, x_t2, x_t1ce, y = tensorize(x, x_t1, x_t2, x_t1ce, y)
         # if self.center_cropping:
-        # x, x_t1, x_t2, x_t1ce, y = center_crop(x, x_t1, x_t2, x_t1ce, y)
+            # x, x_t1, x_t2, x_t1ce, y = center_crop(x, x_t1, x_t2, x_t1ce, y)
 
         # only Whole Tumor (WT) segmentation
         # y[y >= 1] = 1

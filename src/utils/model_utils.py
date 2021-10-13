@@ -10,18 +10,18 @@ def copy_params(src_model, dest_model):
     dest_model.load_state_dict(src_model.state_dict())
 
 
-def ema_update(student, teacher, cur_step, alpha=0.999, max_step = 600):
+def ema_update(student, teacher, cur_step, alpha=0.999, max_step=600):
     # if cur_step < L:
     #     alpha = 0.99
     # else:
     #     alpha = 0.999
-    alpha = min(np.exp(-5 * (1 - cur_step / max_step) ** 2), alpha)
+    if cur_step < max_step:
+        alpha = min(np.exp(-5 * (1 - cur_step / max_step) ** 2), alpha)
     for stud_p, teach_p in zip(student.parameters(), teacher.parameters()):
         teach_p.data = __ema(teach_p.data, stud_p.data, alpha)
 
     for teach_p, stud_p in zip(teacher.buffers(), student.buffers()):
         teach_p.data = __ema(teach_p.data, stud_p.data, alpha)
-
 
 
 def update_adaptiveRate(cur_step, L):
