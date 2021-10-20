@@ -255,16 +255,16 @@ class PGS_MT(nn.Module):
 
     def update_params(self, global_step, epoch, max_step, max_epoch):
         model_utils.ema_update(self.conv5_stud, self.conv5_teach,
-                               global_step,epoch,  max_step=max_step, max_epoch=max_epoch)
+                               global_step, epoch,  max_step=max_step, max_epoch=max_epoch)
         model_utils.ema_update(self.cls5_stud, self.cls5_teach,
-                               global_step,epoch,  max_step=max_step, max_epoch=max_epoch)
+                               global_step, epoch,  max_step=max_step, max_epoch=max_epoch)
         model_utils.ema_update(self.conv6_stud, self.conv6_teach,
-                               global_step,epoch,  max_step=max_step, max_epoch=max_epoch)
-        model_utils.ema_update(self.cls6_stud,epoch,  self.cls6_teach,
-                               global_step,epoch,  max_step=max_step, max_epoch=max_epoch)
+                               global_step, epoch,  max_step=max_step, max_epoch=max_epoch)
+        model_utils.ema_update(self.cls6_stud,  self.cls6_teach,
+                               global_step, epoch,  max_step=max_step, max_epoch=max_epoch)
         model_utils.ema_update(self.conv7_stud, self.conv7_teach,
                                global_step, epoch, max_step=max_step, max_epoch=max_epoch)
-        model_utils.ema_update(self.cls7_stud,epoch,  self.cls7_teach,
+        model_utils.ema_update(self.cls7_stud, self.cls7_teach,
                                global_step, epoch, max_step=max_step, max_epoch=max_epoch)
         model_utils.ema_update(self.conv8_stud, self.conv8_teach,
                                global_step, epoch, max_step=max_step, max_epoch=max_epoch)
