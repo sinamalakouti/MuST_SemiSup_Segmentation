@@ -183,8 +183,8 @@ class PGS_MT(nn.Module):
         c1, d1, c2, d2, c3, d3, c4, d4 = self.__fw_contracting_path(X)
 
         # bottleneck
+        c5_teach = self.__fw_bottleneck(self.conv5_teach, d4)
         with torch.no_grad():
-            c5_teach = self.__fw_bottleneck(self.conv5_teach, d4).detach()
             output5_teach = self.cls5_teach(c5_teach).detach()
 
         d4_stud, aug_output5_teach = transformer(d4, output5_teach, cascade=cascade)
@@ -194,8 +194,8 @@ class PGS_MT(nn.Module):
         # expanding path
         up1 = self.__fw_up(c5_teach, c4, self.up1) if self.config.information_passing_strategy == 'teacher' \
             else self.__fw_up(c5_stud, c4, self.up1)
+        c6_teach = self.__fw_expand_layer(self.conv6_teach, up1)
         with torch.no_grad():
-            c6_teach = self.__fw_expand_layer(self.conv6_teach, up1).detach()
             output6_teach = self.cls6_teach(c6_teach).detach()
 
         aug_up1, aug_output6_teach = transformer(up1, output6_teach, cascade=cascade)
@@ -205,8 +205,8 @@ class PGS_MT(nn.Module):
         up2 = self.__fw_up(c6_teach, c3, self.up2) if self.config.information_passing_strategy == 'teacher' \
             else self.__fw_up(c6_stud, c3, self.up2)
 
+        c7_teach = self.__fw_expand_layer(self.conv7_teach, up2)
         with torch.no_grad():
-            c7_teach = self.__fw_expand_layer(self.conv7_teach, up2).detach()
             output7_teach = self.cls7_teach(c7_teach).detach()
 
         aug_up2, aug_output7_teach = transformer(up2, output7_teach, cascade=cascade)
@@ -217,8 +217,8 @@ class PGS_MT(nn.Module):
         up3 = self.__fw_up(c7_teach, c2, self.up3) if self.config.information_passing_strategy == 'teacher' \
             else self.__fw_up(c7_stud, c2, self.up3)
 
+        c8_teach = self.__fw_expand_layer(self.conv8_teach, up3)
         with torch.no_grad():
-            c8_teach = self.__fw_expand_layer(self.conv8_teach, up3).detach()
             output8_teach = self.cls8_teach(c8_teach).detach()
 
         aug_up3, aug_output8_teach = transformer(up3, output8_teach, cascade=cascade)
@@ -229,9 +229,8 @@ class PGS_MT(nn.Module):
         up4 = self.__fw_up(c8_teach, c1, self.up4) if self.config.information_passing_strategy == 'teacher' \
             else self.__fw_up(c8_stud, c1, self.up4)
 
+        c9_teach = self.__fw_expand_layer(self.conv9_teach, up4)  # output9 is the main output of the network
         with torch.no_grad():
-            c9_teach = self.__fw_expand_layer(self.conv9_teach,
-                                              up4).detach()  # output9 is the main output of the network
             output9_teach = self.cls9_teach(c9_teach).detach()
 
         aug_up4, aug_output9_teach = transformer(up4, output9_teach, cascade=True)
@@ -254,27 +253,27 @@ class PGS_MT(nn.Module):
         model_utils.copy_params(self.cls8_stud, self.cls8_teach)
         model_utils.copy_params(self.cls9_stud, self.cls9_teach)
 
-    def update_params(self, global_step, max_step):
+    def update_params(self, global_step, epoch, max_step, max_epoch):
         model_utils.ema_update(self.conv5_stud, self.conv5_teach,
-                               global_step, max_step=max_step)
+                               global_step,epoch,  max_step=max_step, max_epoch=max_epoch)
         model_utils.ema_update(self.cls5_stud, self.cls5_teach,
-                               global_step, max_step=max_step)
+                               global_step, max_step=max_step, max_epoch=max_epoch)
         model_utils.ema_update(self.conv6_stud, self.conv6_teach,
-                               global_step, max_step=max_step)
+                               global_step, max_step=max_step, max_epoch=max_epoch)
         model_utils.ema_update(self.cls6_stud, self.cls6_teach,
-                               global_step, max_step=max_step)
+                               global_step, max_step=max_step, max_epoch=max_epoch)
         model_utils.ema_update(self.conv7_stud, self.conv7_teach,
-                               global_step, max_step=max_step)
+                               global_step, max_step=max_step, max_epoch=max_epoch)
         model_utils.ema_update(self.cls7_stud, self.cls7_teach,
-                               global_step, max_step=max_step)
+                               global_step, max_step=max_step, max_epoch=max_epoch)
         model_utils.ema_update(self.conv8_stud, self.conv8_teach,
-                               global_step, max_step=max_step)
+                               global_step, max_step=max_step, max_epoch=max_epoch)
         model_utils.ema_update(self.cls8_stud, self.cls8_teach,
-                               global_step, max_step=max_step)
+                               global_step, max_step=max_step, max_epoch=max_epoch)
         model_utils.ema_update(self.conv9_stud, self.conv9_teach,
-                               global_step, max_step=max_step)
+                               global_step, max_step=max_step, max_epoch=max_epoch)
         model_utils.ema_update(self.cls9_stud, self.cls9_teach,
-                               global_step, max_step=max_step)
+                               global_step, max_step=max_step, max_epoch=max_epoch)
 
     def __fw_supervised_stud(self, X):
 

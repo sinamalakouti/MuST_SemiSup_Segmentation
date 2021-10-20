@@ -10,12 +10,12 @@ def copy_params(src_model, dest_model):
     dest_model.load_state_dict(src_model.state_dict())
 
 
-def ema_update(student, teacher, cur_step, alpha=0.999, max_step=600):
+def ema_update(student, teacher, cur_step, epoch, alpha=0.999, max_step=600, max_epoch=5):
     # if cur_step < L:
     #     alpha = 0.99
     # else:
     #     alpha = 0.999
-    if cur_step < max_step:
+    if cur_step < max_step and epoch < max_epoch:
         alpha = min(np.exp(-5 * (1 - cur_step / max_step) ** 2), alpha)
     for stud_p, teach_p in zip(student.parameters(), teacher.parameters()):
         teach_p.data = __ema(teach_p.data, stud_p.data, alpha)
