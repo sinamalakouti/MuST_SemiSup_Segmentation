@@ -52,7 +52,7 @@ class consistency_weight(object):
     ramp_types = ['sigmoid_rampup', 'linear_rampup', 'cosine_rampup', 'log_rampup', 'exp_rampup']
     """
 
-    def __init__(self, final_w, iters_per_epoch, rampup_starts=0, rampup_ends=7, ramp_type='exp_rampup'):
+    def __init__(self, final_w, iters_per_epoch, rampup_starts=0, rampup_ends=7, ramp_type='linear_rampup'):
         self.final_w = final_w
         self.iters_per_epoch = iters_per_epoch
         self.rampup_starts = rampup_starts * iters_per_epoch

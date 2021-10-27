@@ -373,6 +373,11 @@ class Brat20(torch.utils.data.Dataset):
                 x=x, y=y, t1=x_t1, t2=x_t2, t1ce=x_t1ce, intensity_aug=self.intensity_aug)
         else:
             x, x_t1, x_t2, x_t1ce, y = tensorize(x, x_t1, x_t2, x_t1ce, y)
+            x = x.reshape(x.shape[1:])
+            x_t1 = x_t1.reshape(x_t1.shape[1:])
+            x_t2 = x_t2.reshape(x_t2.shape[1:])
+            x_t1ce = x_t1ce.reshape(x_t1ce.shape[1:])
+            y = y.reshape(y.shape[1:])
 
         x = rescale_intensity(x)
         x_t1 = rescale_intensity(x_t1) if x_t1 is not None else None

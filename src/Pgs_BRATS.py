@@ -6,6 +6,7 @@ from torch.optim import lr_scheduler
 
 from utils import utils, eval_utils
 from utils import model_utils
+from losses.loss import  consistency_weight
 
 from evaluation_metrics import dice_coef, get_dice_coef_per_subject, get_confusionMatrix_metrics, do_eval
 from dataset.Brat20 import Brat20Test, seg2WT, seg2TC, seg2ET, semi_sup_split
@@ -18,6 +19,8 @@ import random
 import argparse
 import yaml
 from easydict import EasyDict as edict
+
+
 
 import wandb
 
@@ -93,7 +96,7 @@ def compute_loss(y_preds, y_true, loss_functions, is_supervised):
     return total_loss
 
 
-def trainPgs_semi(train_sup_loader, train_unsup_loader, model, optimizer, device, loss_functions, epochid, cfg):
+def trainPgs_semi(train_sup_loader, train_unsup_loader, model, optimizer, device, loss_functions,cons_w_unsup,  epochid, cfg):
     total_loss = 0
     model.train()
 
@@ -113,9 +116,7 @@ def trainPgs_semi(train_sup_loader, train_unsup_loader, model, optimizer, device
 
         b_sup = batch_sup['data'].to(device)
         target_sup = batch_sup['label'].to(device)
-        del batch_sup
-        del batch_unsup
-        torch.cuda.empty_cache()
+
         sup_outputs, _ = model(b_sup, is_supervised=True)
         sLoss = compute_loss(sup_outputs, target_sup, loss_functions, is_supervised=True)
 
@@ -124,8 +125,8 @@ def trainPgs_semi(train_sup_loader, train_unsup_loader, model, optimizer, device
 
         print("**************** UNSUP LOSSS  : {} ****************".format(uLoss))
         print("**************** SUP LOSSS  : {} ****************".format(sLoss))
-
-        total_loss = uLoss + sLoss
+        weight_unsup = cons_w_unsup(epochid, unsup_step)
+        total_loss = sLoss + uLoss
         total_loss.backward()
         optimizer.step()
 
@@ -565,14 +566,14 @@ def Pgs_train_val(dataset, n_epochs, wmh_threshold, output_dir, learning_rate, a
 
     # semi_sup_split(all_train_csv=all_train_csv, sup_dir_path=supdir_path, unsup_dir_path=supdir_path,
     #                ratio=cfg.train_sup_rate / 100, seed=cfg.seed)
-    print("learning_rate is    ", learning_rate)
+
+
+
     step_size = cfg.scheduler_step_size
-    print("scheduler step size is :   ", step_size)
+
     best_score = 0
     start_epoch = 0
 
-    print("******* TRAINING PGS ***********")
-    print("output_dir is    ", output_dir)
 
     if not os.path.isdir(output_dir):
         try:
@@ -632,7 +633,16 @@ def Pgs_train_val(dataset, n_epochs, wmh_threshold, output_dir, learning_rate, a
         except OSError:
             print("Creation of the directory %s failed" % output_image_dir)
 
-    pgsnet = Pgs.PGS(inputs_dim, outputs_dim, kernels, strides)
+    # log_file_path = os.path.join(output_dir, "log_{}.log".format(args.training_mode))
+    # sys.stdout = open(log_file_path, "w")
+    print("EXPERIMENT DESCRIPTION:   {}".format(cfg.information))
+
+    print("******* TRAINING PGS ***********")
+    print("learning_rate is    ", learning_rate)
+    # print("scheduler step size is :   ", step_size)
+    print("output_dir is    ", output_dir)
+
+    pgsnet = Pgs.PGS(inputs_dim, outputs_dim, kernels, strides, cfg)
 
 
     if torch.cuda.is_available():
@@ -657,6 +667,7 @@ def Pgs_train_val(dataset, n_epochs, wmh_threshold, output_dir, learning_rate, a
 
     print('size of labeled training set: number of subjects:    ', len(train_sup_loader.dataset.subjects_name))
     print("labeled subjects  ", train_sup_loader.dataset.subjects_name)
+
     if cfg.experiment_mode == 'semi':
         train_unsup_loader = utils.get_trainset(dataset, batch_size=32, intensity_rescale=cfg.intensity_rescale,
                                                 mixup_threshold=cfg.mixup_threshold,
@@ -675,8 +686,13 @@ def Pgs_train_val(dataset, n_epochs, wmh_threshold, output_dir, learning_rate, a
                                             (torch.nn.CrossEntropyLoss(), None),
                                             epoch, cfg)
             else:
+                rampup_ends = 3
+                cons_w_unsup = consistency_weight(final_w=5,
+                                                  iters_per_epoch=len(train_unsup_loader),
+                                                  rampup_ends=rampup_ends)
+
                 pgsnet, loss = trainPgs_semi(train_sup_loader, train_unsup_loader, pgsnet, optimizer, device,
-                                             (torch.nn.CrossEntropyLoss(), torch.nn.CrossEntropyLoss()), epoch, cfg)
+                                             (torch.nn.CrossEntropyLoss(), torch.nn.CrossEntropyLoss()), cons_w_unsup, epoch, cfg)
         # score, segmentations = evaluatePGS(pgsnet, dataset, device, wmh_threshold, cfg, cfg.val_mode)
         elif cfg.experiment_mode == 'partially_sup':
             pgsnet, loss = trainPgs_sup(train_sup_loader, pgsnet, optimizer, device,
@@ -982,6 +998,8 @@ def main():
     elif cfg.experiment_mode == 'fully_sup':
         cfg.train_sup_mode = 'all_train2018_sup'
         cfg.train_unsup_mode = None
+
+
 
     config_params = dict(args=args, config=cfg)
     wandb.init(project="fully_sup_brats", config=config_params)
