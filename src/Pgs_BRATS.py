@@ -54,7 +54,7 @@ def __fw_outputwise_unsup_loss(y_stud, y_teach, loss_functions, cfg):
                 torch.sum(teach_pred.detach()
                           * torch.nn.functional.log_softmax(stud_pred, dim=1), dim=1)))
         elif cfg.consistency_loss == 'KL':
-            losses.append(softmax_kl_loss(y_stud, y_teach, conf_mask=False, threshold=None, use_softmax=False))
+            losses.append(softmax_kl_loss(stud_pred, teach_pred.detach(), conf_mask=False, threshold=None, use_softmax=False))
     total_loss = sum(losses)
     return total_loss
 
