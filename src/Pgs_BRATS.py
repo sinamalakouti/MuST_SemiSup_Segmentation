@@ -6,7 +6,7 @@ from torch.optim import lr_scheduler
 
 from utils import utils, eval_utils
 from utils import model_utils
-from losses.loss import  consistency_weight
+from losses.loss import  consistency_weight, softmax_ce_consistency_loss, softmax_kl_loss
 
 from evaluation_metrics import dice_coef, get_dice_coef_per_subject, get_confusionMatrix_metrics, do_eval
 from dataset.Brat20 import Brat20Test, seg2WT, seg2TC, seg2ET, semi_sup_split
@@ -36,7 +36,7 @@ utils.Constants.USE_CUDA = True
 parser = argparse.ArgumentParser()
 
 
-def __fw_outputwise_unsup_loss(y_stud, y_teach, loss_functions):
+def __fw_outputwise_unsup_loss(y_stud, y_teach, loss_functions, cfg):
     (_, unsup_loss) = loss_functions
     total_loss = 0
     assert len(y_teach) == len(y_stud), "Error! unsup_preds and sup_preds have to have same length"
@@ -48,12 +48,13 @@ def __fw_outputwise_unsup_loss(y_stud, y_teach, loss_functions):
         stud_pred = y_stud[i]
         assert teach_pred.shape == stud_pred.shape, "Error! for preds number {}, supervised and unsupervised" \
                                                     " prediction shape is not similar!".format(i)
-        mse_loss = torch.nn.MSELoss()
-        # total_loss +=  mse_loss(stud_pred, teach_pred)
 
-        losses.append(- torch.mean(
-            torch.sum(teach_pred.detach()
-                      * torch.nn.functional.log_softmax(stud_pred, dim=1), dim=1)))
+        if cfg.consistency_loss == 'CE':
+            losses.append(- torch.mean(
+                torch.sum(teach_pred.detach()
+                          * torch.nn.functional.log_softmax(stud_pred, dim=1), dim=1)))
+        elif cfg.consistency_loss == 'KL':
+            losses.append(softmax_kl_loss(y_stud, y_teach, conf_mask=False, threshold=None, use_softmax=False))
     total_loss = sum(losses)
     return total_loss
 
@@ -82,7 +83,7 @@ def __fw_sup_loss(y_preds, y_true, sup_loss):
     return total_loss
 
 
-def compute_loss(y_preds, y_true, loss_functions, is_supervised):
+def compute_loss(y_preds, y_true, loss_functions, is_supervised, cfg):
     if is_supervised:
         total_loss = __fw_sup_loss(y_preds, y_true, loss_functions[0])
 
@@ -91,7 +92,7 @@ def compute_loss(y_preds, y_true, loss_functions, is_supervised):
         '''
 
     else:
-        total_loss = __fw_outputwise_unsup_loss(y_preds, y_true, loss_functions)
+        total_loss = __fw_outputwise_unsup_loss(y_preds, y_true, loss_functions, cfg)
 
     return total_loss
 
@@ -118,10 +119,10 @@ def trainPgs_semi(train_sup_loader, train_unsup_loader, model, optimizer, device
         target_sup = batch_sup['label'].to(device)
 
         sup_outputs, _ = model(b_sup, is_supervised=True)
-        sLoss = compute_loss(sup_outputs, target_sup, loss_functions, is_supervised=True)
+        sLoss = compute_loss(sup_outputs, target_sup, loss_functions, is_supervised=True, cfg=cfg)
 
         teacher_outputs, student_outputs = model(b_unsup, is_supervised=False)
-        uLoss = compute_loss(student_outputs, teacher_outputs, loss_functions, is_supervised=False)
+        uLoss = compute_loss(student_outputs, teacher_outputs, loss_functions, is_supervised=False, cfg=cfg)
 
         print("**************** UNSUP LOSSS  : {} ****************".format(uLoss))
         print("**************** SUP LOSSS  : {} ****************".format(sLoss))
@@ -159,7 +160,7 @@ def trainPgs_sup(train_sup_loader, model, optimizer, device, loss_functions, epo
 
         print("subject is : ", batch_sup['subject'])
         sup_outputs, _ = model(b_sup, is_supervised=True)
-        total_loss = compute_loss(sup_outputs, target_sup, (sup_loss, None), is_supervised=True)
+        total_loss = compute_loss(sup_outputs, target_sup, (sup_loss, None), is_supervised=True, cfg=cfg)
 
         # wandb.log({"batch_id": step + epochid * len(train_sup_loader), "loss": total_loss})
         print("**************** LOSSS  : {} ****************".format(total_loss))

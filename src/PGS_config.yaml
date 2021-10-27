@@ -22,9 +22,10 @@ train_sup_mode: "train2018_semi_sup"
 train_sup_rate: 10
 cuda: "0,1"
 seed: 41
-loss: 'CE' # CE, DSC, FOCAL, CE_DSC, CE_FOCAL, DSC_FOCAL, CE_FOCAL_DSC
+sup_loss: 'CE' # CE, DSC, FOCAL, CE_DSC, CE_FOCAL, DSC_FOCAL, CE_FOCAL_DSC
+consistency_loss: 'CE' # CE, KL, DSC
 semi_mode: "shared"   # shared, MT
 gradient_stop_strategy: "stop_feature" #stop_feature, stop_output
 information_passing_strategy: "teacher" #student, teacher
-information: "semi supervised, pass teacher's features, MT, supervised: student, stop gradietn: teacher "  # description
+information: "no input augemtation for unsup_loader, semi supervised, pass teacher's features, shared, supervised: student, stop gradietn: teach feature, weight_unsup = linear_ramp(final_w = 2, step =4)"
 model: "PGS" #PGS,PGSMT, UNET

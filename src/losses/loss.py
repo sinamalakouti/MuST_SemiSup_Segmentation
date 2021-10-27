@@ -1,6 +1,30 @@
 import torch
 from utils import ramps
+import torch.nn.functional as F
 
+
+def softmax_ce_consistency_loss(x , y):
+    return - torch.mean(
+            torch.sum(y.detach()
+                      * F.log_softmax(x, dim=1), dim=1))
+
+
+def softmax_kl_loss(inputs, targets, conf_mask=False, threshold=None, use_softmax=False):
+    assert inputs.requires_grad == True and targets.requires_grad == False
+    assert inputs.size() == targets.size()
+    input_log_softmax = F.log_softmax(inputs, dim=1)
+    if use_softmax:
+
+        targets = F.softmax(targets, dim=1)
+
+    if conf_mask:
+        loss_mat = F.kl_div(input_log_softmax, targets, reduction='none')
+        mask = (targets.max(1)[0] > threshold)
+        loss_mat = loss_mat[mask.unsqueeze(1).expand_as(loss_mat)]
+        if loss_mat.shape.numel() == 0: loss_mat = torch.tensor([0.]).to(inputs.device)
+        return loss_mat.sum() / mask.shape.numel()
+    else:
+        return F.kl_div(input_log_softmax, targets, reduction='mean')
 
 def mse_power(x, y, power=3):
     temp = (x ** power - y ** power) ** 2
