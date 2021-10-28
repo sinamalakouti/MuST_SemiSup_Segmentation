@@ -687,10 +687,11 @@ def Pgs_train_val(dataset, n_epochs, wmh_threshold, output_dir, learning_rate, a
                                             (torch.nn.CrossEntropyLoss(), None),
                                             epoch, cfg)
             else:
-                rampup_ends = 3
-                cons_w_unsup = consistency_weight(final_w=5,
+
+                cons_w_unsup = consistency_weight(final_w=cfg['consist_w_unsup']['final_w'],
                                                   iters_per_epoch=len(train_unsup_loader),
-                                                  rampup_ends=rampup_ends)
+                                                  rampup_ends=cfg['consist_w_unsup']['rampup_ends'],
+                                                  ramp_type=cfg['consist_w_unsup']['rampup'])
 
                 pgsnet, loss = trainPgs_semi(train_sup_loader, train_unsup_loader, pgsnet, optimizer, device,
                                              (torch.nn.CrossEntropyLoss(), torch.nn.CrossEntropyLoss()), cons_w_unsup, epoch, cfg)
