@@ -127,7 +127,7 @@ def trainPgs_semi(train_sup_loader, train_unsup_loader, model, optimizer, device
         print("**************** UNSUP LOSSS  : {} ****************".format(uLoss))
         print("**************** SUP LOSSS  : {} ****************".format(sLoss))
         weight_unsup = cons_w_unsup(epochid, unsup_step)
-        total_loss = sLoss + uLoss
+        total_loss = sLoss + weight_unsup * uLoss
         total_loss.backward()
         optimizer.step()
 
