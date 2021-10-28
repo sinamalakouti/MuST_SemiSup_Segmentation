@@ -264,7 +264,7 @@ def eval_per_subjectPgs(model, device, threshold, cfg, data_mode):
                 sf = torch.nn.Softmax2d()
                 outputs = sf(outputs[-1])
 
-            loss_val = compute_loss(outputs, target, (sup_loss, None), is_supervised=True)
+            loss_val = compute_loss(outputs, target, (sup_loss, None), is_supervised=True, cfg=cfg)
             print("############# LOSS for subject {} is {} ##############".format(subjects[0], loss_val.item()))
             if cfg.oneHot:
                 target[target >= 1] = 1
@@ -450,7 +450,7 @@ def eval_per_subjectPgs2(model, device, threshold, cfg, data_mode):
                 sf = torch.nn.Softmax2d()
                 outputs = sf(outputs[-1])
 
-            loss_val = compute_loss(outputs, target, (sup_loss, None), is_supervised=True)
+            loss_val = compute_loss(outputs, target, (sup_loss, None), is_supervised=True, cfg=cfg)
             print("############# LOSS for subject {} is {} ##############".format(subjects[0], loss_val.item()))
             if cfg.oneHot:
                 target[target >= 1] = 1
