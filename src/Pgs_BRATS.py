@@ -1004,7 +1004,7 @@ def main():
 
 
     config_params = dict(args=args, config=cfg)
-    wandb.init(project="fully_sup_brats", config=config_params)
+    wandb.init(project="CVPR2022_BRATS", config=config_params)
     Pgs_train_val(dataset, cfg.n_epochs, cfg.wmh_threshold, args.output_dir, cfg.lr, args, cfg, cfg.seed)
 
 
