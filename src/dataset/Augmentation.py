@@ -30,6 +30,7 @@ class DropOutDecoder(nn.Module):
         self.dropout = nn.Dropout2d(p=drop_rate) if spatial_dropout else nn.Dropout(drop_rate)
 
     def forward(self, x):
+        x = torch.nn.functional.dropout(x,0.3, training=True)
         x = self.dropout(x)
         return x
 
@@ -81,6 +82,7 @@ def _l2_normalize(d):
 
 def augment(x, y, cascade=False):
     y = torch.nn.functional.softmax(y, dim=1)
+
     angle = np.random.uniform(-180, 180)
     scale = np.random.uniform(.8, 1.2)
     # shear = np.random.uniform(-30, 30)
@@ -107,14 +109,15 @@ def augment(x, y, cascade=False):
     else:
         # perform scaling
         if random_selector == 0:
-            x_transform = DropOutDecoder(x)
-            y_trainsform = y
+            module = FeatureDropDecoder()
+            x_transform = module(x)
+            y_transform = y
             # x_transform = F.affine(x,
             #                        angle=0, translate=(0, 0), shear=0, scale=scale)
             # y_transform = F.affine(y,
             #                        angle=0, translate=(0, 0), shear=0, scale=scale)
         elif random_selector == 1:
-            x_transform = FeatureDropDecoder(x,4)
+            x_transfrom = torch.nn.functional.dropout(x, 0.3, training=True)
             y_transform = y
             # x_transform = F.affine(x,
             #                        angle=angle, translate=(0, 0), shear=0, scale=1)
