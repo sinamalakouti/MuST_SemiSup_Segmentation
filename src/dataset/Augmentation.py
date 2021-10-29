@@ -35,7 +35,7 @@ class DropOutDecoder(nn.Module):
         return x
 
 
-def get_r_adv(x, decoder, it=1, xi=1e-1, eps=10.0):
+def get_r_adv(x, y_tr, it=1, xi=1e-1, eps=10.0):
     """
     Virtual Adversarial Training
     https://arxiv.org/abs/1704.03976
@@ -61,15 +61,14 @@ def get_r_adv(x, decoder, it=1, xi=1e-1, eps=10.0):
 
 
 class VATDecoder(nn.Module):
-    def __init__(self, upscale, conv_in_ch, num_classes, xi=1e-1, eps=10.0, iterations=1):
+    def __init__(self, xi=1e-1, eps=10.0, iterations=1):
         super(VATDecoder, self).__init__()
         self.xi = xi
         self.eps = eps
         self.it = iterations
 
-    def forward(self, x, _):
-        r_adv = get_r_adv(x, self.upsample, self.it, self.xi, self.eps)
-        x = self.upsample(x + r_adv)
+    def forward(self, x):
+        r_adv = get_r_adv(x, self.it, self.xi, self.eps)
         return x + r_adv
 
 
@@ -89,7 +88,7 @@ def augment(x, y, cascade=False):
     rand_thresh = random.uniform(0, 1)
     uni_dist = Uniform(-1 * rand_thresh, rand_thresh)
 
-    random_selector = np.random.randint(3)
+    random_selector = np.random.randint(5)
     # print("random selector is ", random_selector)
     if cascade:
 
@@ -117,7 +116,7 @@ def augment(x, y, cascade=False):
             # y_transform = F.affine(y,
             #                        angle=0, translate=(0, 0), shear=0, scale=scale)
         elif random_selector == 1:
-            x_transfrom = torch.nn.functional.dropout(x, 0.3, training=True)
+            x_transform = torch.nn.functional.dropout(x, 0.3, training=True)
             y_transform = y
             # x_transform = F.affine(x,
             #                        angle=angle, translate=(0, 0), shear=0, scale=1)
@@ -128,4 +127,15 @@ def augment(x, y, cascade=False):
             noise = uni_dist.sample(x.shape[1:]).to(x.device)
             x_transform = x.mul(noise) + x
             y_transform = y
+        elif random_selector == 3:
+            x_transform = F.affine(x,
+                                   angle=angle, translate=(0, 0), shear=0, scale=1)
+            y_transform = F.affine(y,
+                                   angle=angle, translate=(0, 0), shear=0, scale=1)
+
+        elif random_selector == 4:
+                x_transform = F.affine(x,
+                                       angle=0, translate=(0, 0), shear=0, scale=scale)
+                y_transform = F.affine(y,
+                                       angle=0, translate=(0, 0), shear=0, scale=scale)
         return x_transform, y_transform

@@ -1,12 +1,13 @@
 import torch
 from utils import ramps
 import torch.nn.functional as F
+import torch.nn as nn
 
 
-def softmax_ce_consistency_loss(x , y):
+def softmax_ce_consistency_loss(x, y):
     return - torch.mean(
-            torch.sum(y.detach()
-                      * F.log_softmax(x, dim=1), dim=1))
+        torch.sum(y.detach()
+                  * F.log_softmax(x, dim=1), dim=1))
 
 
 def softmax_kl_loss(inputs, targets, conf_mask=False, threshold=None, use_softmax=False):
@@ -14,7 +15,6 @@ def softmax_kl_loss(inputs, targets, conf_mask=False, threshold=None, use_softma
     assert inputs.size() == targets.size()
     input_log_softmax = F.log_softmax(inputs, dim=1)
     if use_softmax:
-
         targets = F.softmax(targets, dim=1)
 
     if conf_mask:
@@ -25,6 +25,7 @@ def softmax_kl_loss(inputs, targets, conf_mask=False, threshold=None, use_softma
         return loss_mat.sum() / mask.shape.numel()
     else:
         return F.kl_div(input_log_softmax, targets, reduction='mean')
+
 
 def mse_power(x, y, power=3):
     temp = (x ** power - y ** power) ** 2
@@ -122,3 +123,60 @@ class soft_dice_loss(torch.nn.Module):
         denominator = torch.sum(y_pred ** 2 + y_true ** 2, axes)
 
         return 1 - torch.mean((numerator + epsilon) / (denominator + epsilon))  # average over classes and batch
+
+
+class abCE_loss (nn.Module):
+    """
+    Annealed-Bootstrapped cross-entropy loss
+    """
+
+    def __init__(self, iters_per_epoch, epochs, num_classes, weight=None,
+                 reduction='mean', thresh=0.7, min_kept=1, ramp_type='log_rampup'):
+        super(abCE_loss, self).__init__()
+        self.weight = torch.FloatTensor(weight) if weight is not None else weight
+        self.reduction = reduction
+        self.thresh = thresh
+        self.min_kept = min_kept
+        self.ramp_type = ramp_type
+
+        if ramp_type is not None:
+            self.rampup_func = getattr(ramps, ramp_type)
+            self.iters_per_epoch = iters_per_epoch
+            self.num_classes = num_classes
+            self.start = 1 / num_classes
+            self.end = 0.9
+            self.total_num_iters = (epochs - (0.6 * epochs)) * iters_per_epoch
+
+    def threshold(self, curr_iter, epoch):
+        cur_total_iter = self.iters_per_epoch * epoch + curr_iter
+        current_rampup = self.rampup_func(cur_total_iter, self.total_num_iters)
+        return current_rampup * (self.end - self.start) + self.start
+
+    def forward(self, predict, target, ignore_index, curr_iter, epoch):
+        batch_kept = self.min_kept * target.size(0)
+        prob_out = F.softmax(predict, dim=1)
+        tmp_target = target.clone()
+        tmp_target[tmp_target == ignore_index] = 0
+        prob = prob_out.gather(1, tmp_target.unsqueeze(1))
+        mask = target.contiguous().view(-1, ) != ignore_index
+        sort_prob, sort_indices = prob.contiguous().view(-1, )[mask].contiguous().sort()
+
+        if self.ramp_type is not None:
+            thresh = self.threshold(curr_iter=curr_iter, epoch=epoch)
+        else:
+            thresh = self.thresh
+
+        min_threshold = sort_prob[min(batch_kept, sort_prob.numel() - 1)] if sort_prob.numel() > 0 else 0.0
+        threshold = max(min_threshold, thresh)
+        loss_matrix = F.cross_entropy(predict, target,
+                                      weight=self.weight.to(predict.device) if self.weight is not None else None,
+                                      ignore_index=ignore_index, reduction='none')
+        loss_matirx = loss_matrix.contiguous().view(-1, )
+        sort_loss_matirx = loss_matirx[mask][sort_indices]
+        select_loss_matrix = sort_loss_matirx[sort_prob < threshold]
+        if self.reduction == 'sum' or select_loss_matrix.numel() == 0:
+            return select_loss_matrix.sum()
+        elif self.reduction == 'mean':
+            return select_loss_matrix.mean()
+        else:
+            raise NotImplementedError('Reduction Error!')
