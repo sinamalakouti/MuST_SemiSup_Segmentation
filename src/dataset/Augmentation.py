@@ -7,7 +7,7 @@ import torch.nn as nn
 
 
 class FeatureDropDecoder(nn.Module):
-    def __init__(self, upscale, conv_in_ch, num_classes):
+    def __init__(self):
         super(FeatureDropDecoder, self).__init__()
 
     def feature_dropout(self, x):
@@ -25,7 +25,7 @@ class FeatureDropDecoder(nn.Module):
 
 
 class DropOutDecoder(nn.Module):
-    def __init__(self, upscale, conv_in_ch, num_classes, drop_rate=0.3, spatial_dropout=True):
+    def __init__(self, drop_rate=0.3, spatial_dropout=True):
         super(DropOutDecoder, self).__init__()
         self.dropout = nn.Dropout2d(p=drop_rate) if spatial_dropout else nn.Dropout(drop_rate)
 
@@ -113,7 +113,7 @@ def augment(x, y, cascade=False):
             # y_transform = F.affine(y,
             #                        angle=0, translate=(0, 0), shear=0, scale=scale)
         elif random_selector == 1:
-            x_transform = FeatureDropDecoder(x)
+            x_transform = FeatureDropDecoder(x,4)
             y_transform = y
             # x_transform = F.affine(x,
             #                        angle=angle, translate=(0, 0), shear=0, scale=1)
