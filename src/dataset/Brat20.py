@@ -272,6 +272,10 @@ class Brat20(torch.utils.data.Dataset):
             ids_path = os.path.join(dataroot_dir, 'trainset/train18_sup_ids5_seed{}.csv'.format(self.seed))
         elif mode == "train2018_semi_unsup5":
             ids_path = os.path.join(dataroot_dir, 'trainset/train18_unsup_ids5_seed{}.csv'.format(self.seed))
+        elif mode == "train2018_semi_sup50":
+            ids_path = os.path.join(dataroot_dir, 'trainset/train18_sup_ids50_seed{}.csv'.format(self.seed))
+        elif mode == "train2018_semi_unsup50":
+            ids_path = os.path.join(dataroot_dir, 'trainset/train18_unsup_ids50_seed{}.csv'.format(self.seed))
 
         elif mode == "test2019_new":
             ids_path = os.path.join(dataroot_dir, 'valset/brats2019_new.csv')
