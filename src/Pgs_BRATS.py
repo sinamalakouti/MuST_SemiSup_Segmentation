@@ -96,7 +96,6 @@ def compute_loss(y_preds, y_true, loss_functions, is_supervised, cfg):
 
     return total_loss
 
-
 def trainPgs_semi(train_sup_loader, train_unsup_loader, model, optimizer, device, loss_functions,cons_w_unsup,  epochid, cfg):
     total_loss = 0
     model.train()
@@ -143,7 +142,61 @@ def trainPgs_semi(train_sup_loader, train_unsup_loader, model, optimizer, device
                  "sup loss": sLoss,
                  "unsup_batch_id": unsup_step + epochid * len(train_unsup_loader),
                  "unsup loss": uLoss,
-                 "batch_score_WT": dice_score})
+                 "batch_score_WT": dice_score,
+                 'weight unsup': weight_unsup
+                 })
+        sup_step += 1
+    return model, total_loss
+
+def trainPgs_semi2(train_sup_loader, train_unsup_loader, model, optimizer, device, loss_functions,cons_w_unsup,  epochid, cfg):
+    total_loss = 0
+    model.train()
+
+    train_sup_iterator = iter(train_sup_loader)
+    sup_step = 0
+    for unsup_step, batch_unsup in enumerate(train_unsup_loader):
+        optimizer.zero_grad()
+        b_unsup = batch_unsup['data']
+        b_unsup = b_unsup.to(device)
+
+        try:
+            batch_sup = next(train_sup_iterator)
+
+        except StopIteration:
+            train_sup_iterator = iter(train_sup_loader)
+            batch_sup = next(train_sup_iterator)
+
+        b_sup = batch_sup['data'].to(device)
+        target_sup = batch_sup['label'].to(device)
+
+        sup_outputs, _ = model(b_sup, is_supervised=True)
+        sLoss = compute_loss(sup_outputs, target_sup, loss_functions, is_supervised=True, cfg=cfg)
+
+        teacher_outputs, student_outputs = model(b_unsup, is_supervised=False)
+        uLoss = compute_loss(student_outputs, teacher_outputs, loss_functions, is_supervised=False, cfg=cfg)
+
+        print("**************** UNSUP LOSSS  : {} ****************".format(uLoss))
+        print("**************** SUP LOSSS  : {} ****************".format(sLoss))
+        weight_unsup = cons_w_unsup(epochid, unsup_step)
+        total_loss = sLoss + weight_unsup * uLoss
+        total_loss.backward()
+        optimizer.step()
+
+        with torch.no_grad():
+            sf = torch.nn.Softmax2d()
+            target_sup[target_sup >= 1] = 1
+            target_sup = target_sup
+            y_pred = sf(sup_outputs[-1])
+            y_WT = seg2WT(y_pred, 0.5, cfg.oneHot)
+            dice_score = dice_coef(target_sup.reshape(y_WT.shape), y_WT)
+            wandb.log(
+                {"sup_batch_id": sup_step + epochid * len(train_unsup_loader),
+                 "sup loss": sLoss,
+                 "unsup_batch_id": unsup_step + epochid * len(train_unsup_loader),
+                 "unsup loss": uLoss,
+                 "batch_score_WT": dice_score,
+                 'weight unsup': weight_unsup
+                 })
         sup_step += 1
     return model, total_loss
 
