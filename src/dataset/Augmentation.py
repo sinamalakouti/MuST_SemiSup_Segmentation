@@ -18,7 +18,7 @@ class FeatureDropDecoder(nn.Module):
         drop_mask = (attention < threshold).float()
         return x.mul(drop_mask)
 
-    def forward(self, x, _):
+    def forward(self, x):
         x = self.feature_dropout(x)
 
         return x
@@ -29,7 +29,7 @@ class DropOutDecoder(nn.Module):
         super(DropOutDecoder, self).__init__()
         self.dropout = nn.Dropout2d(p=drop_rate) if spatial_dropout else nn.Dropout(drop_rate)
 
-    def forward(self, x, _):
+    def forward(self, x):
         x = self.dropout(x)
         return x
 
@@ -108,6 +108,7 @@ def augment(x, y, cascade=False):
         # perform scaling
         if random_selector == 0:
             x_transform = DropOutDecoder(x)
+            y_trainsform = y
             # x_transform = F.affine(x,
             #                        angle=0, translate=(0, 0), shear=0, scale=scale)
             # y_transform = F.affine(y,
