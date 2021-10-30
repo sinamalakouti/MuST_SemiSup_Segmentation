@@ -99,8 +99,8 @@ def mixup_featureSpace(X, Y):
     p = np.random.permutation(X.shape[0])  # permutation
     X_permute = X[p]
     Y_permute = Y[p]
-    X_transform = mixup(X, X_permute)
-    Y_transform = mixup(Y, Y_permute)
+    X_transform, Y_transform = mixup(X, X_permute, Y, Y_permute)
+
 
     return X_transform, Y_transform
 
