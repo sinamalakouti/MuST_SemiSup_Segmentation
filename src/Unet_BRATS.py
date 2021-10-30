@@ -18,6 +18,7 @@ import random
 import argparse
 import yaml
 from easydict import EasyDict as edict
+from losses.loss import  consistency_weight, softmax_ce_consistency_loss, softmax_kl_loss
 
 import wandb
 
@@ -72,7 +73,7 @@ def compute_loss(y_preds, y_true, loss_functions, is_supervised):
     return total_loss
 
 
-def trainUnet_semi(train_sup_loader, train_unsup_loader, model, optimizer, device, loss_functions, epochid, cfg):
+def trainUnet_semi(train_sup_loader, train_unsup_loader, model, optimizer, device, loss_functions, epochid, cfg, cons_w_unsup):
     total_loss = 0
     model.train()
 
@@ -103,7 +104,8 @@ def trainUnet_semi(train_sup_loader, train_unsup_loader, model, optimizer, devic
 
         print("**************** UNSUP LOSSS  : {} ****************".format(uLoss))
         print("**************** SUP LOSSS  : {} ****************".format(sLoss))
-        total_loss = uLoss + sLoss
+        weight_unsup = cons_w_unsup(epochid, sup_step)
+        total_loss = weight_unsup * uLoss + sLoss
         total_loss.backward()
         optimizer.step()
 
@@ -615,8 +617,12 @@ def Unet_train_val(dataset, n_epochs, wmh_threshold, output_dir, learning_rate, 
 
         # pgsnet, loss = trainPGS(train_loader, pgsnet, optimizer, device, epoch)
         if cfg.experiment_mode == 'semi':
+            cons_w_unsup = consistency_weight(final_w=10,
+                                              iters_per_epoch=len(train_sup_loader),
+                                              rampup_ends=20,
+                                              ramp_type='linear_rampup')
             unet, loss = trainUnet_semi(train_sup_loader, train_unsup_loader, unet, optimizer, device,
-                                        (torch.nn.CrossEntropyLoss(), torch.nn.CrossEntropyLoss()), epoch, cfg)
+                                        (torch.nn.CrossEntropyLoss(), torch.nn.CrossEntropyLoss()), epoch, cfg, cons_w_unsup)
         # score, segmentations = evaluatePGS(pgsnet, dataset, device, wmh_threshold, cfg, cfg.val_mode)
         elif cfg.experiment_mode == 'partially_sup':
             unet, loss = trainUnet_sup(train_sup_loader, unet, optimizer, device,
