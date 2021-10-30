@@ -76,21 +76,21 @@ def trainUnet_semi(train_sup_loader, train_unsup_loader, model, optimizer, devic
     total_loss = 0
     model.train()
 
-    train_sup_iterator = iter(train_sup_loader)
-    sup_step = 0
-    for unsup_step, batch_unsup in enumerate(train_unsup_loader):
+    train_unsup_iterator = iter(train_unsup_loader)
+    unsup_step = 0
+    for sup_step, batch_sup in enumerate(train_sup_loader):
         optimizer.zero_grad()
-        b_unsup = batch_unsup['data']
-        b_unsup = b_unsup.to(device)
+        b_sup = batch_sup['data']
+        b_sup = b_sup.to(device)
 
         try:
-            batch_sup = next(train_sup_iterator)
+            batch_unsup = next(train_unsup_iterator)
 
         except StopIteration:
-            train_sup_iterator = iter(train_sup_loader)
-            batch_sup = next(train_sup_iterator)
+            train_unsup_iterator = iter(train_sup_loader)
+            batch_unsup = next(train_unsup_iterator)
 
-        b_sup = batch_sup['data'].to(device)
+        b_unsup = batch_unsup['data'].to(device)
         target_sup = batch_sup['label'].to(device)
         del batch_sup
         del batch_unsup
@@ -115,12 +115,12 @@ def trainUnet_semi(train_sup_loader, train_unsup_loader, model, optimizer, devic
             y_WT = seg2WT(y_pred, 0.5, cfg.oneHot)
             dice_score = dice_coef(target_sup.reshape(y_WT.shape), y_WT)
             wandb.log(
-                {"sup_batch_id": sup_step + epochid * len(train_unsup_loader),
+                {"sup_batch_id": sup_step + epochid * len(train_sup_loader),
                  "sup loss": sLoss,
-                 "unsup_batch_id": unsup_step + epochid * len(train_unsup_loader),
+                 "unsup_batch_id": unsup_step + epochid * len(train_sup_loader),
                  "unsup loss": uLoss,
                  "batch_score_WT": dice_score})
-        sup_step += 1
+        unsup_step += 1
     return model, total_loss
 
 
