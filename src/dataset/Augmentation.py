@@ -86,21 +86,6 @@ def gaussian(ins, is_training, stddev=0.2):
     return ins
 
 
-def mixup_data(x, y, d, alpha=1.0, device='cpu'):
-    """Returns mixed inputs, pairs of targets, and lambda"""
-    if alpha > 0:
-        lam = np.random.beta(alpha, alpha)
-    else:
-        lam = 1
-
-    batch_size = x.size()[0]
-    index = torch.randperm(batch_size).cuda()
-
-    mixed_x = lam * x + (1 - lam) * x[index, :]
-    y_a, y_b = y, y[index]
-    d_a, d_b = d, d[index]
-    return mixed_x, y_a, y_b, d_a, d_b, lam
-
 
 def mixup(x_a, x_b, y_a, y_b):
     alpha = 0.4
@@ -148,38 +133,36 @@ def augment(x, y, cascade=False):
         return x_transform, y_transform
     else:
         # perform scaling
-        if random_selector == 0:
+        if random_selector == 0: #feature drop out
             module = FeatureDropDecoder()
             x_transform = module(x)
             y_transform = y
-            # x_transform = F.affine(x,
-            #                        angle=0, translate=(0, 0), shear=0, scale=scale)
-            # y_transform = F.affine(y,
-            #                        angle=0, translate=(0, 0), shear=0, scale=scale)
-        elif random_selector == 1:
+
+        elif random_selector == 1: #spatial dropout
             x_transform = torch.nn.functional.dropout(x, 0.3, training=True)
             y_transform = y
             # x_transform = F.affine(x,
             #                        angle=angle, translate=(0, 0), shear=0, scale=1)
             # y_transform = F.affine(y,
             #                        angle=angle, translate=(0, 0), shear=0, scale=1)
-        elif random_selector == 2:
+        elif random_selector == 2: #uniform noise
 
             noise = uni_dist.sample(x.shape[1:]).to(x.device)
             x_transform = x.mul(noise) + x
             y_transform = y
-        elif random_selector == 3:
+
+        elif random_selector == 3: #rotate
             x_transform = F.affine(x,
                                    angle=angle, translate=(0, 0), shear=0, scale=1)
             y_transform = F.affine(y,
                                    angle=angle, translate=(0, 0), shear=0, scale=1)
 
-        elif random_selector == 4:
+        elif random_selector == 4: #scale
             x_transform = F.affine(x,
                                    angle=0, translate=(0, 0), shear=0, scale=scale)
             y_transform = F.affine(y,
                                    angle=0, translate=(0, 0), shear=0, scale=scale)
-        elif random_selector == 5:
+        elif random_selector == 5: #scale + feature dropout
 
             x_transform = F.affine(x,
                                    angle=0, translate=(0, 0), shear=0, scale=scale)
@@ -189,7 +172,7 @@ def augment(x, y, cascade=False):
             x_transform = module(x_transform)
             y_transform = y_transform
 
-        elif random_selector == 6:
+        elif random_selector == 6: #rotate + feature dropout
             x_transform = F.affine(x,
                                    angle=angle, translate=(0, 0), shear=0, scale=1)
             y_transform = F.affine(y,
@@ -197,12 +180,14 @@ def augment(x, y, cascade=False):
             module = FeatureDropDecoder()
             x_transform = module(x_transform)
             y_transform = y_transform
-        elif random_selector == 7:
+        elif random_selector == 7: # vertical flip
             x_transform = F.vflip(x)
             y_transform = F.vflip(y)
-        elif random_selector == 8:
+        elif random_selector == 8: #horizontal flip
             x_transform = F.hflip(x)
             y_transform = F.hflip(y)
-        elif random_selector == 9:
+        elif random_selector == 9: #feature_mixup
             x_transform, y_transform = mixup_featureSpace(x,y)
+        elif random_selector == 10:  # feature_mixup
+            x_transform, y_transform = mixup_featureSpace(x, y)
         return x_transform, y_transform
