@@ -132,8 +132,8 @@ def augment(x, y, cascade=False):
 
         return x_transform, y_transform
     else:
-        # perform scaling
-        if random_selector == 0: #feature drop out
+
+        if random_selector == 0:  # feature drop out
             module = FeatureDropDecoder()
             x_transform = module(x)
             y_transform = y
@@ -162,32 +162,71 @@ def augment(x, y, cascade=False):
                                    angle=0, translate=(0, 0), shear=0, scale=scale)
             y_transform = F.affine(y,
                                    angle=0, translate=(0, 0), shear=0, scale=scale)
-        elif random_selector == 5: #scale + feature dropout
-
-            x_transform = F.affine(x,
-                                   angle=0, translate=(0, 0), shear=0, scale=scale)
-            y_transform = F.affine(y,
-                                   angle=0, translate=(0, 0), shear=0, scale=scale)
-            module = FeatureDropDecoder()
-            x_transform = module(x_transform)
-            y_transform = y_transform
-
-        elif random_selector == 6: #rotate + feature dropout
-            x_transform = F.affine(x,
-                                   angle=angle, translate=(0, 0), shear=0, scale=1)
-            y_transform = F.affine(y,
-                                   angle=angle, translate=(0, 0), shear=0, scale=1)
-            module = FeatureDropDecoder()
-            x_transform = module(x_transform)
-            y_transform = y_transform
-        elif random_selector == 7: # vertical flip
-            x_transform = F.vflip(x)
-            y_transform = F.vflip(y)
-        elif random_selector == 8: #horizontal flip
-            x_transform = F.hflip(x)
-            y_transform = F.hflip(y)
-        elif random_selector == 9: #feature_mixup
-            x_transform, y_transform = mixup_featureSpace(x,y)
-        elif random_selector == 10:  # feature_mixup
-            x_transform, y_transform = mixup_featureSpace(x, y)
+        # elif random_selector == 5: #scale + feature dropout
+        #
+        #     x_transform = F.affine(x,
+        #                            angle=0, translate=(0, 0), shear=0, scale=scale)
+        #     y_transform = F.affine(y,
+        #                            angle=0, translate=(0, 0), shear=0, scale=scale)
+        #     module = FeatureDropDecoder()
+        #     x_transform = module(x_transform)
+        #     y_transform = y_transform
+        # perform scaling
+        # if random_selector == 0: #feature drop out
+        #     module = FeatureDropDecoder()
+        #     x_transform = module(x)
+        #     y_transform = y
+        #
+        # elif random_selector == 1: #spatial dropout
+        #     x_transform = torch.nn.functional.dropout(x, 0.3, training=True)
+        #     y_transform = y
+        #     # x_transform = F.affine(x,
+        #     #                        angle=angle, translate=(0, 0), shear=0, scale=1)
+        #     # y_transform = F.affine(y,
+        #     #                        angle=angle, translate=(0, 0), shear=0, scale=1)
+        # elif random_selector == 2: #uniform noise
+        #
+        #     noise = uni_dist.sample(x.shape[1:]).to(x.device)
+        #     x_transform = x.mul(noise) + x
+        #     y_transform = y
+        #
+        # elif random_selector == 3: #rotate
+        #     x_transform = F.affine(x,
+        #                            angle=angle, translate=(0, 0), shear=0, scale=1)
+        #     y_transform = F.affine(y,
+        #                            angle=angle, translate=(0, 0), shear=0, scale=1)
+        #
+        # elif random_selector == 4: #scale
+        #     x_transform = F.affine(x,
+        #                            angle=0, translate=(0, 0), shear=0, scale=scale)
+        #     y_transform = F.affine(y,
+        #                            angle=0, translate=(0, 0), shear=0, scale=scale)
+        # elif random_selector == 5: #scale + feature dropout
+        #
+        #     x_transform = F.affine(x,
+        #                            angle=0, translate=(0, 0), shear=0, scale=scale)
+        #     y_transform = F.affine(y,
+        #                            angle=0, translate=(0, 0), shear=0, scale=scale)
+        #     module = FeatureDropDecoder()
+        #     x_transform = module(x_transform)
+        #     y_transform = y_transform
+        #
+        # elif random_selector == 6: #rotate + feature dropout
+        #     x_transform = F.affine(x,
+        #                            angle=angle, translate=(0, 0), shear=0, scale=1)
+        #     y_transform = F.affine(y,
+        #                            angle=angle, translate=(0, 0), shear=0, scale=1)
+        #     module = FeatureDropDecoder()
+        #     x_transform = module(x_transform)
+        #     y_transform = y_transform
+        # elif random_selector == 7: # vertical flip
+        #     x_transform = F.vflip(x)
+        #     y_transform = F.vflip(y)
+        # elif random_selector == 8: #horizontal flip
+        #     x_transform = F.hflip(x)
+        #     y_transform = F.hflip(y)
+        # elif random_selector == 9: #feature_mixup
+        #     x_transform, y_transform = mixup_featureSpace(x,y)
+        # elif random_selector == 10:  # feature_mixup
+        #     x_transform, y_transform = mixup_featureSpace(x, y)
         return x_transform, y_transform
