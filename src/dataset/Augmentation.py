@@ -203,7 +203,7 @@ class Perturbator(nn.Module):
     def forward(self, x, y, cascade=False):
         y = torch.nn.functional.softmax(y, dim=1)
 
-        random_selector = np.random.randint(5)
+        random_selector = np.random.randint(3)
 
         # print("random selector is ", random_selector)
         if cascade:
@@ -223,28 +223,28 @@ class Perturbator(nn.Module):
             return None, None
         else:
 
-            if random_selector == 0:  # feature drop out
-                x_transform, y_transform = self.feature_dropout(x,y)
-
-            elif random_selector == 1:  # spatial dropout
-                x_transform, y_transform = self.spatial_dropout(x, y)
-
-            elif random_selector == 2:  # uniform noise
+            if random_selector == 0:  # rotate
 
                 x_transform, y_transform = self.rotation_decoder(x, y)
                 # noise = uni_dist.sample(x.shape[1:]).to(x.device)
                 # x_transform = x.mul(noise) + x
                 # y_transform = y
 
-            elif random_selector == 3:  # rotate
+            elif random_selector == 1:  # scale
                 x_transform, y_transform = self.scale_decoder(x, y)
 
-            elif random_selector == 4:  # scale
+            elif random_selector == 2:  # flip
                 rand = random.randint(0, 2)
                 if rand == 0:
                     x_transform, y_transform = self.hflip_decoder(x, y)
                 else:
                     x_transform, y_transform = self.vflip_decoder(x, y)
+
+            elif random_selector == 3:  # feature drop out
+                x_transform, y_transform = self.feature_dropout(x, y)
+
+            elif random_selector == 4:  # spatial dropout
+                x_transform, y_transform = self.spatial_dropout(x, y)
 
             if random_selector % 2 == 0:
                 x_transform, y_transform = self.uni_decoder(x_transform, y_transform)

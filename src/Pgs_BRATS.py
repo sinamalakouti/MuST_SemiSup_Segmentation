@@ -794,7 +794,7 @@ def Pgs_train_val(dataset, n_epochs, wmh_threshold, output_dir, learning_rate, a
                                              epoch, cfg)
         elif cfg.experiment_mode == 'semi_downSample':
             cons_w_unsup = consistency_weight(final_w=cfg['consist_w_unsup']['final_w'],
-                                              iters_per_epoch=len(train_unsup_loader),
+                                              iters_per_epoch=len(train_sup_loader),
                                               rampup_ends=cfg['consist_w_unsup']['rampup_ends'],
                                               ramp_type=cfg['consist_w_unsup']['rampup'])
 
