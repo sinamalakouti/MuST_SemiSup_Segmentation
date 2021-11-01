@@ -195,9 +195,9 @@ class Unet(nn.Module):
         c1, d1, c2, d2, c3, d3, c4, d4 = self.__fw_contracting_path(X)
 
         # bottleneck
-
-        c5_sup = self.__fw_bottleneck(d4)
-        output5_sup = self.cls5(c5_sup)
+        with torch.no_grad():
+            c5_sup = self.__fw_bottleneck(d4).detach()
+            output5_sup = self.cls5(c5_sup).detach()
 
         d4_unsup, aug_output5_sup = transformer(d4, output5_sup, cascade=cascade)
         c5_unsup = self.__fw_bottleneck(d4_unsup)
@@ -205,26 +205,30 @@ class Unet(nn.Module):
 
         # expanding path
 
-        up1 = self.__fw_up(c5_unsup, c4, self.up1)
-        c6 = self.__fw_expand_4layer(up1)
-        output6_sup = self.cls6(c6)
+
+        up1 = self.__fw_up(c5_sup, c4, self.up1)
+        with torch.no_grad():
+            c6 = self.__fw_expand_4layer(up1).detach()
+            output6_sup = self.cls6(c6).detach()
 
         aug_up1, aug_output6_sup = transformer(up1, output6_sup, cascade=cascade)
         c6_unsup = self.__fw_expand_4layer(aug_up1)
         output6_unsup = self.cls6(c6_unsup)
         ######
-        up2 = self.__fw_up(c6_unsup, c3, self.up2)
-        c7 = self.__fw_expand_3layer(up2)
-        output7_sup = self.cls7(c7)
+        up2 = self.__fw_up(c6, c3, self.up2)
+        with torch.no_grad():
+            c7 = self.__fw_expand_3layer(up2).detach()
+            output7_sup = self.cls7(c7).detach()
 
         aug_up2, aug_output7_sup = transformer(up2, output7_sup, cascade=cascade)
         c7_unsup = self.__fw_expand_3layer(aug_up2)
         output7_unsup = self.cls7(c7_unsup)
 
         #####
-        up3 = self.__fw_up(c7_unsup, c2, self.up3)
-        c8 = self.__fw_expand_2layer(up3)
-        output8_sup = self.cls8(c8)
+        up3 = self.__fw_up(c7, c2, self.up3)
+        with torch.no_grad():
+            c8 = self.__fw_expand_2layer(up3).detach()
+            output8_sup = self.cls8(c8).detach()
 
         aug_up3, aug_output8_sup = transformer(up3, output8_sup, cascade=cascade)
         c8_unsup = self.__fw_expand_2layer(aug_up3)
@@ -232,9 +236,10 @@ class Unet(nn.Module):
 
         ####
 
-        up4 = self.__fw_up(c8_unsup, c1, self.up4)
-        c9 = self.__fw_expand_1layer(up4)  # output9 is the main output of the network
-        output9_sup = self.cls9(c9)
+        up4 = self.__fw_up(c8, c1, self.up4)
+        with torch.no_grad():
+            c9 = self.__fw_expand_1layer(up4).detach()  # output9 is the main output of the network
+            output9_sup = self.cls9(c9).detach()
 
         aug_up4, aug_output9_sup = transformer(up4, output9_sup, cascade=True)
         c9_unsup = self.__fw_expand_1layer(aug_up4)
