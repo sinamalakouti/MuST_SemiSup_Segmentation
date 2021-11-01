@@ -32,13 +32,13 @@ consist_w_unsup:
   final_w: 5
   rampup_ends: 4
 #hyper parameters
-experiment_mode: "semi"
+experiment_mode: "partially_sup_upSample"
 n_epochs: 50
 batch_size: 32
 parallel: True
 cuda: "0,1"
 seed: 41
-information: "no input augemtation for unsup_loader, semi supervised, pass teacher's features,
+information: " trainPgs_sup_upSample, no input augemtation for unsup_loader, semi supervised, pass teacher's features,
 shared, supervised: student, stop gradietn: teach feature, weight_unsup = linear_ramp(final_w = 5, step =4)"
 
 

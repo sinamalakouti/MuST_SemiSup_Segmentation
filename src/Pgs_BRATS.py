@@ -6,7 +6,7 @@ from torch.optim import lr_scheduler
 
 from utils import utils, eval_utils
 from utils import model_utils
-from losses.loss import  consistency_weight, softmax_ce_consistency_loss, softmax_kl_loss
+from losses.loss import consistency_weight, softmax_ce_consistency_loss, softmax_kl_loss
 
 from evaluation_metrics import dice_coef, get_dice_coef_per_subject, get_confusionMatrix_metrics, do_eval
 from dataset.Brat20 import Brat20Test, seg2WT, seg2TC, seg2ET, semi_sup_split
@@ -19,8 +19,6 @@ import random
 import argparse
 import yaml
 from easydict import EasyDict as edict
-
-
 
 import wandb
 
@@ -54,7 +52,8 @@ def __fw_outputwise_unsup_loss(y_stud, y_teach, loss_functions, cfg):
                 torch.sum(teach_pred.detach()
                           * torch.nn.functional.log_softmax(stud_pred, dim=1), dim=1)))
         elif cfg.consistency_loss == 'KL':
-            losses.append(softmax_kl_loss(stud_pred, teach_pred.detach(), conf_mask=False, threshold=None, use_softmax=False))
+            losses.append(
+                softmax_kl_loss(stud_pred, teach_pred.detach(), conf_mask=False, threshold=None, use_softmax=False))
     total_loss = sum(losses)
     return total_loss
 
@@ -96,7 +95,9 @@ def compute_loss(y_preds, y_true, loss_functions, is_supervised, cfg):
 
     return total_loss
 
-def trainPgs_semi(train_sup_loader, train_unsup_loader, model, optimizer, device, loss_functions,cons_w_unsup,  epochid, cfg):
+
+def trainPgs_semi(train_sup_loader, train_unsup_loader, model, optimizer, device, loss_functions, cons_w_unsup, epochid,
+                  cfg):
     total_loss = 0
     model.train()
 
@@ -148,7 +149,9 @@ def trainPgs_semi(train_sup_loader, train_unsup_loader, model, optimizer, device
         sup_step += 1
     return model, total_loss
 
-def trainPgs_semi2(train_sup_loader, train_unsup_loader, model, optimizer, device, loss_functions,cons_w_unsup,  epochid, cfg):
+
+def trainPgs_sup_upSample(train_sup_loader, train_unsup_loader, model, optimizer, device, loss_functions, cons_w_unsup,
+                          epochid, cfg):
     total_loss = 0
     model.train()
 
@@ -156,8 +159,6 @@ def trainPgs_semi2(train_sup_loader, train_unsup_loader, model, optimizer, devic
     sup_step = 0
     for unsup_step, batch_unsup in enumerate(train_unsup_loader):
         optimizer.zero_grad()
-        b_unsup = batch_unsup['data']
-        b_unsup = b_unsup.to(device)
 
         try:
             batch_sup = next(train_sup_iterator)
@@ -172,13 +173,9 @@ def trainPgs_semi2(train_sup_loader, train_unsup_loader, model, optimizer, devic
         sup_outputs, _ = model(b_sup, is_supervised=True)
         sLoss = compute_loss(sup_outputs, target_sup, loss_functions, is_supervised=True, cfg=cfg)
 
-        teacher_outputs, student_outputs = model(b_unsup, is_supervised=False)
-        uLoss = compute_loss(student_outputs, teacher_outputs, loss_functions, is_supervised=False, cfg=cfg)
-
-        print("**************** UNSUP LOSSS  : {} ****************".format(uLoss))
         print("**************** SUP LOSSS  : {} ****************".format(sLoss))
-        weight_unsup = cons_w_unsup(epochid, unsup_step)
-        total_loss = sLoss + weight_unsup * uLoss
+
+        total_loss = sLoss
         total_loss.backward()
         optimizer.step()
 
@@ -193,9 +190,7 @@ def trainPgs_semi2(train_sup_loader, train_unsup_loader, model, optimizer, devic
                 {"sup_batch_id": sup_step + epochid * len(train_unsup_loader),
                  "sup loss": sLoss,
                  "unsup_batch_id": unsup_step + epochid * len(train_unsup_loader),
-                 "unsup loss": uLoss,
                  "batch_score_WT": dice_score,
-                 'weight unsup': weight_unsup
                  })
         sup_step += 1
     return model, total_loss
@@ -234,7 +229,8 @@ def trainPgs_sup(train_sup_loader, model, optimizer, device, loss_functions, epo
             y_WT = seg2WT(y_pred, 0.5, cfg.oneHot)
             dice_score = dice_coef(target_sup.reshape(y_WT.shape), y_WT)
             wandb.log(
-                {"sup_batch_id": step + epochid * len(train_sup_loader), "sup_loss": total_loss, "batch_score": dice_score})
+                {"sup_batch_id": step + epochid * len(train_sup_loader), "sup_loss": total_loss,
+                 "batch_score": dice_score})
 
     return model, total_loss
 
@@ -621,20 +617,17 @@ def Pgs_train_val(dataset, n_epochs, wmh_threshold, output_dir, learning_rate, a
     # semi_sup_split(all_train_csv=all_train_csv, sup_dir_path=supdir_path, unsup_dir_path=supdir_path,
     #                ratio=cfg.train_sup_rate / 100, seed=cfg.seed)
 
-
-
     step_size = cfg.scheduler_step_size
 
     best_score = 0
     start_epoch = 0
-
 
     if not os.path.isdir(output_dir):
         try:
             os.mkdir(output_dir, 0o777)
         except OSError:
             print("Creation of the directory %s failed" % output_dir)
-    if cfg.experiment_mode == 'semi':
+    if cfg.experiment_mode == 'semi' or cfg.experiment_mode == 'partially_sup_upSample':
         output_dir = os.path.join(output_dir, "sup_ratio_{}".format(cfg.train_sup_rate))
         if not os.path.isdir(output_dir):
             try:
@@ -698,7 +691,6 @@ def Pgs_train_val(dataset, n_epochs, wmh_threshold, output_dir, learning_rate, a
 
     pgsnet = Pgs.PGS(inputs_dim, outputs_dim, kernels, strides, cfg)
 
-
     if torch.cuda.is_available():
         if type(pgsnet) is not torch.nn.DataParallel and cfg.parallel and cfg.parallel:
             pgsnet = torch.nn.DataParallel(pgsnet)
@@ -734,7 +726,7 @@ def Pgs_train_val(dataset, n_epochs, wmh_threshold, output_dir, learning_rate, a
 
         # pgsnet, loss = trainPGS(train_loader, pgsnet, optimizer, device, epoch)
         if cfg.experiment_mode == 'semi':
-            if epoch < 3 and False:     # todo if epoch < a -> train supervised
+            if epoch < 3 and False:  # todo if epoch < a -> train supervised
                 print("training supervised because epoch < 3")
                 pgsnet, loss = trainPgs_sup(train_sup_loader, pgsnet, optimizer, device,
                                             (torch.nn.CrossEntropyLoss(), None),
@@ -747,7 +739,8 @@ def Pgs_train_val(dataset, n_epochs, wmh_threshold, output_dir, learning_rate, a
                                                   ramp_type=cfg['consist_w_unsup']['rampup'])
 
                 pgsnet, loss = trainPgs_semi(train_sup_loader, train_unsup_loader, pgsnet, optimizer, device,
-                                             (torch.nn.CrossEntropyLoss(), torch.nn.CrossEntropyLoss()), cons_w_unsup, epoch, cfg)
+                                             (torch.nn.CrossEntropyLoss(), torch.nn.CrossEntropyLoss()), cons_w_unsup,
+                                             epoch, cfg)
         # score, segmentations = evaluatePGS(pgsnet, dataset, device, wmh_threshold, cfg, cfg.val_mode)
         elif cfg.experiment_mode == 'partially_sup':
             pgsnet, loss = trainPgs_sup(train_sup_loader, pgsnet, optimizer, device,
@@ -757,6 +750,10 @@ def Pgs_train_val(dataset, n_epochs, wmh_threshold, output_dir, learning_rate, a
             pgsnet, loss = trainPgs_sup(train_sup_loader, pgsnet, optimizer, device,
                                         (torch.nn.CrossEntropyLoss(), None),
                                         epoch, cfg)
+        elif cfg.experiment_mode == 'partially_sup_upSample':
+            pgsnet, loss = trainPgs_sup_upSample(train_sup_loader, train_unsup_loader, pgsnet, optimizer, device,
+                                         (torch.nn.CrossEntropyLoss(), torch.nn.CrossEntropyLoss()), cons_w_unsup,
+                                         epoch, cfg)
 
         if epoch % 2 == 0:
             final_dice, final_PPV, final_sensitivity, final_specificity, final_hd = eval_per_subjectPgs(pgsnet, device,
@@ -1044,7 +1041,7 @@ def main():
     random.seed(cfg.seed)
     os.environ['CUDA_VISIBLE_DEVICES'] = cfg.cuda
 
-    if cfg.experiment_mode == 'semi':
+    if cfg.experiment_mode == 'semi' or cfg.experiment_mode == 'partially_sup_upSample':
         cfg.train_sup_mode = 'train2018_semi_sup' + str(cfg.train_sup_rate)
         cfg.train_unsup_mode = 'train2018_semi_unsup' + str(cfg.train_sup_rate)
     elif cfg.experiment_mode == 'partially_sup':
@@ -1053,8 +1050,6 @@ def main():
     elif cfg.experiment_mode == 'fully_sup':
         cfg.train_sup_mode = 'all_train2018_sup'
         cfg.train_unsup_mode = None
-
-
 
     config_params = dict(args=args, config=cfg)
     wandb.init(project="CVPR2022_BRATS", config=config_params)
