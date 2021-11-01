@@ -253,7 +253,7 @@ class PGS(nn.Module):
             c9_teach = self.__fw_expand_1layer(up4).detach()  # output9 is the main output of the network
             output9_teach = self.cls9(c9_teach).detach()
 
-        aug_up4, aug_output9_teach = self.transformer(up4, output9_teach, cascade=True)
+        aug_up4, aug_output9_teach = self.transformer(up4, output9_teach, cascade=cascade)
         c9_stud = self.__fw_expand_1layer(aug_up4)
         output9_stud = self.cls9(c9_stud)
 
