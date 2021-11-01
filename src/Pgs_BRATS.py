@@ -189,9 +189,9 @@ def trainPgs_semi_downSample(train_sup_loader, train_unsup_loader, model, optimi
             y_WT = seg2WT(y_pred, 0.5, cfg.oneHot)
             dice_score = dice_coef(target_sup.reshape(y_WT.shape), y_WT)
             wandb.log(
-                {"sup_batch_id": batch_idx + epochid * len(semi_dataLoader),
+                {"sup_batch_id": batch_idx + epochid * min(len(train_unsup_loader), len(train_sup_loader)),
                  "sup loss": sLoss,
-                 "unsup_batch_id": batch_idx + epochid * len(semi_dataLoader),
+                 "unsup_batch_id": batch_idx + epochid * min(len(train_unsup_loader), len(train_sup_loader)),
                  "unsup loss": uLoss,
                  "batch_score_WT": dice_score,
                  'weight unsup': weight_unsup
