@@ -203,7 +203,7 @@ class Perturbator(nn.Module):
     def forward(self, x, y, cascade=False):
         y = torch.nn.functional.softmax(y, dim=1)
 
-        random_selector = np.random.randint(10)
+        random_selector = np.random.randint(5)
 
         # print("random selector is ", random_selector)
         if cascade:

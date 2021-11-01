@@ -158,22 +158,12 @@ def trainPgs_semi_downSample(train_sup_loader, train_unsup_loader, model, optimi
 
     train_sup_iterator = iter(train_sup_loader)
 
-    semi_dataLoader = iter(zip(train_sup_loader, train_unsup_loader))
+    semi_dataLoader = zip(train_sup_loader, train_unsup_loader)
 
-    for batch_idx in semi_dataLoader:
+    for batch_idx, (batch_sup, batch_unsup)  in enumerate(semi_dataLoader):
         optimizer.zero_grad()
-        batch_sup, batch_unsup = next(semi_dataLoader)
-
-        try:
-            batch_sup = next(train_sup_iterator)
-
-        except StopIteration:
-            train_sup_iterator = iter(train_sup_loader)
-            batch_sup = next(train_sup_iterator)
-
         b_sup = batch_sup['data'].to(device)
         target_sup = batch_sup['label'].to(device)
-
         sup_outputs, _ = model(b_sup, is_supervised=True)
         sLoss = compute_loss(sup_outputs, target_sup, loss_functions, is_supervised=True, cfg=cfg)
 
