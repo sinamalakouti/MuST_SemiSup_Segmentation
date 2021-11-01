@@ -753,7 +753,7 @@ def Pgs_train_val(dataset, n_epochs, wmh_threshold, output_dir, learning_rate, a
                                         epoch, cfg)
         elif cfg.experiment_mode == 'partially_sup_upSample':
             pgsnet, loss = trainPgs_sup_upSample(train_sup_loader, train_unsup_loader, pgsnet, optimizer, device,
-                                         (torch.nn.CrossEntropyLoss(), torch.nn.CrossEntropyLoss()), cons_w_unsup,
+                                         (torch.nn.CrossEntropyLoss(), torch.nn.CrossEntropyLoss()), None,
                                          epoch, cfg)
 
         if epoch % 2 == 0:
