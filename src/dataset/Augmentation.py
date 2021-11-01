@@ -11,7 +11,7 @@ class FeatureDropDecoder(nn.Module):
     def __init__(self):
         super(FeatureDropDecoder, self).__init__()
 
-    def feature_dropout(self, x):
+    def f_dropout(self, x):
         attention = torch.mean(x, dim=1, keepdim=True)
         max_val, _ = torch.max(attention.view(x.size(0), -1), dim=1, keepdim=True)
         threshold = max_val * np.random.uniform(0.7, 0.9)
@@ -20,7 +20,7 @@ class FeatureDropDecoder(nn.Module):
         return x.mul(drop_mask)
 
     def forward(self, x, y):
-        x = self.feature_dropout(x)
+        x = self.f_dropout(x)
 
         return x, y
 
@@ -38,6 +38,8 @@ class DropOutDecoder(nn.Module):
 
 class RotationDecoder(nn.Module):
     def __init__(self, angle_min=-180, angle_max=180):
+        super(RotationDecoder, self).__init__()
+
         self.angle_min = angle_min
         self.angle_max = angle_max
 
@@ -53,6 +55,7 @@ class RotationDecoder(nn.Module):
 
 class ScaleDecoder(nn.Module):
     def __init__(self, scale_min=0.8, scale_max=1.2):
+        super(ScaleDecoder, self).__init__()
         self.angle_min = scale_min
         self.angle_max = scale_max
 
@@ -69,6 +72,7 @@ class ScaleDecoder(nn.Module):
 class UniformNoiseDecoder(nn.Module):
 
     def __init__(self, noise_min=-0.3, noise_max=0.3):
+        super(UniformNoiseDecoder, self).__init__()
         self.noise_min = noise_min
         self.noise_max = noise_max
         self.uni_dist = Uniform(self.noise_min, self.noise_max)
@@ -81,6 +85,7 @@ class UniformNoiseDecoder(nn.Module):
 
 class GaussianNoiseDecoder(nn.Module):
     def __init__(self, mean=0, std=1):
+        super(GaussianNoiseDecoder, self).__init__()
         self.mu = mean
         self.sigma = std
 
@@ -92,6 +97,7 @@ class GaussianNoiseDecoder(nn.Module):
 class HFlipDecoder(nn.Module):
 
     def forward(self, x, y):
+        super(HFlipDecoder, self).__init__()
         x_transform = F.hflip(x)
         y_transform = F.hflip(y)
         return x_transform, y_transform
@@ -100,6 +106,7 @@ class HFlipDecoder(nn.Module):
 class VFlipDecoder(nn.Module):
 
     def forward(self, x, y):
+        super(VFlipDecoder, self).__init__()
         x_transform = F.vflip(x)
         y_transform = F.vflip(y)
         return x_transform, y_transform
@@ -183,6 +190,7 @@ def mixup_featureSpace(X, Y):
 class Perturbator(nn.Module):
 
     def __init__(self):
+        super(Perturbator, self).__init__()
         self.feature_dropout = FeatureDropDecoder()
         self.spatial_dropout = DropOutDecoder()
         self.rotation_decoder = RotationDecoder()
