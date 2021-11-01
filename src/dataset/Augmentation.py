@@ -90,7 +90,7 @@ class GaussianNoiseDecoder(nn.Module):
         self.sigma = std
 
     def forward(self, x, y):
-        x_transform = x + torch.randn(x.size()) * self.sigma + self.mu
+        x_transform = x + torch.randn(x.size()).to(x.device) * self.sigma + self.mu
         return x_transform, y
 
 
