@@ -187,7 +187,8 @@ def trainPgs_sup_upSample(train_sup_loader, train_unsup_loader, model, optimizer
             y_WT = seg2WT(y_pred, 0.5, cfg.oneHot)
             dice_score = dice_coef(target_sup.reshape(y_WT.shape), y_WT)
             wandb.log(
-                {"sup_batch_id": sup_step + epochid * len(train_unsup_loader),
+                {
+                 "sup_batch_id": sup_step + epochid * len(train_unsup_loader),
                  "sup loss": sLoss,
                  "unsup_batch_id": unsup_step + epochid * len(train_unsup_loader),
                  "batch_score_WT": dice_score,
@@ -714,7 +715,7 @@ def Pgs_train_val(dataset, n_epochs, wmh_threshold, output_dir, learning_rate, a
     print('size of labeled training set: number of subjects:    ', len(train_sup_loader.dataset.subjects_name))
     print("labeled subjects  ", train_sup_loader.dataset.subjects_name)
 
-    if cfg.experiment_mode == 'semi':
+    if cfg.experiment_mode == 'semi' or cfg.experiment_mode == 'partially_sup_upSample':
         train_unsup_loader = utils.get_trainset(dataset, batch_size=32, intensity_rescale=cfg.intensity_rescale,
                                                 mixup_threshold=cfg.mixup_threshold,
                                                 mode=cfg.train_unsup_mode, t1=cfg.t1, t2=cfg.t2, t1ce=cfg.t1ce,
