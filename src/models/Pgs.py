@@ -4,7 +4,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from torch.distributions.uniform import Uniform
-from dataset.Augmentation import augment as transformer
+from dataset.Augmentation import Perturbator
 import random
 
 
@@ -90,430 +90,6 @@ class Down(nn.Module):
     def forward(self, X):
         return self.net(X)
 
-#
-# class AttentionBlock(nn.Module):
-#     def __init__(self, in_channels_x, in_channels_g, int_channels):
-#         super(AttentionBlock, self).__init__()
-#         self.Wx = nn.Sequential(nn.Conv2d(in_channels_x, int_channels, kernel_size=1),
-#                                 nn.BatchNorm2d(int_channels))
-#         self.Wg = nn.Sequential(nn.Conv2d(in_channels_g, int_channels, kernel_size=1),
-#                                 nn.BatchNorm2d(int_channels))
-#         self.psi = nn.Sequential(nn.Conv2d(int_channels, 1, kernel_size=1),
-#                                  nn.BatchNorm2d(1),
-#                                  nn.Sigmoid())  # todo? What iare these sigmoids for
-#
-#     def forward(self, x, g):
-#         # apply the Wx to the skip connection
-#         x1 = self.Wx(x)
-#         # after applying Wg to the input, upsample to the size of the skip connection
-#         g1 = nn.functional.interpolate(self.Wg(g), x1.shape[2:], mode='bilinear', align_corners=False)
-#         out = self.psi(nn.ReLU()(x1 + g1))
-#         out = nn.Sigmoid()(out)
-#         return out * x
-#
-#
-# class PGS_attention(nn.Module):
-#     def __init__(self, dim_inputs, dim_outputs, kernel_sizes, strides, num_labels):
-#         super(PGS_attention, self).__init__()
-#         self.dim_inputs = dim_inputs
-#         self.dim_outputs = dim_outputs
-#         self.kernel_sizes = kernel_sizes
-#         self.strides = strides
-#         self.num_labels = num_labels
-#         self.__build_net()
-#
-#     def __build_net(self):
-#
-#         # contracting path
-#         self.conv1 = ConvBlock(self.dim_inputs[0], self.dim_outputs[0], self.strides[0], self.kernel_sizes[0])
-#         self.down1 = Down()
-#         self.conv2 = ConvBlock(self.dim_inputs[1], self.dim_outputs[1], self.strides[1], self.kernel_sizes[1])
-#         self.down2 = Down()
-#         self.conv3 = ConvBlock(self.dim_inputs[2], self.dim_outputs[2], self.strides[2], self.kernel_sizes[2])
-#         self.down3 = Down()
-#         self.conv4 = ConvBlock(self.dim_inputs[3], self.dim_outputs[3], self.strides[3], self.kernel_sizes[3])
-#         self.down4 = Down()
-#
-#         # bottleneck
-#
-#         self.conv5 = ConvBlock(self.dim_inputs[4], self.dim_outputs[4], self.strides[4], self.kernel_sizes[4])
-#
-#         # Expanding path
-#
-#         self.up1 = Up(self.dim_outputs[4], self.dim_outputs[4], False)
-#         self.conv6 = ConvBlock(self.dim_inputs[5], self.dim_outputs[5], self.strides[5], self.kernel_sizes[5])
-#         self.up2 = Up(self.dim_outputs[5], self.dim_outputs[5], False)
-#         self.conv7 = ConvBlock(self.dim_inputs[6], self.dim_outputs[6], self.strides[6], self.kernel_sizes[6])
-#         self.up3 = Up(self.dim_outputs[6], self.dim_outputs[6], False)
-#         self.conv8 = ConvBlock(self.dim_inputs[7], self.dim_outputs[7], self.strides[7], self.kernel_sizes[7])
-#         self.up4 = Up(self.dim_outputs[7], self.dim_outputs[7], False)
-#         self.conv9 = ConvBlock(self.dim_inputs[8], self.dim_outputs[8], self.strides[8], self.kernel_sizes[8])
-#
-#         # classifiers
-#         print(self.dim_outputs[4])
-#         self.cls5 = CLS(self.dim_outputs[4], self.num_labels)
-#         self.cls6 = CLS(self.dim_outputs[5], self.num_labels)
-#         self.cls7 = CLS(self.dim_outputs[6], self.num_labels)
-#         self.cls8 = CLS(self.dim_outputs[7], self.num_labels)
-#         self.cls9 = CLS(self.dim_outputs[8], self.num_labels)  # main classifier
-#
-#         # attention layers
-#         self.attention1 = AttentionBlock()
-#         self.attention2 = AttentionBlock()
-#         self.attention3 = AttentionBlock()
-#         self.attention4 = AttentionBlock()
-#
-#     def forward(self, X, is_supervised):
-#         type_unsup = 'layerwise'
-#         if is_supervised:
-#             sup_outputs = self.__fw_supervised(X)
-#             return sup_outputs, None
-#
-#         elif type_unsup == 'layerwise':
-#             return self.__fw_unsupervised_layerwise(X)
-#
-#         else:
-#
-#             # get supervised outputs
-#
-#             self.training = False
-#             # with torch.no_grad():
-#             sup_outputs = self.__fw_supervised(X)
-#
-#             # get unsupervised outputs
-#
-#             self.training = True
-#             unsup_outputs = self.__fw_unsupervised(X)
-#
-#             return sup_outputs, unsup_outputs
-#
-#     def __fw_unsupervised_layerwise(self, X):
-#         cascade = False
-#         # contracting path
-#         c1, d1, c2, d2, c3, d3, c4, d4 = self.__fw_contracting_path(X)
-#
-#         # bottleneck
-#
-#         c5_sup = self.__fw_bottleneck(d4)
-#         output5_sup = self.cls5(c5_sup)
-#
-#         d4_unsup, output5_sup = transformer(d4, output5_sup, cascade=cascade)
-#         c5_unsup = self.__fw_bottleneck(d4_unsup)
-#         output5_unsup = self.cls5(c5_unsup)
-#
-#         # expanding path
-#
-#         up1 = self.__fw_up(c5_sup, c4, self.up1)
-#         c6 = self.__fw_expand_4layer(up1)
-#         output6_sup = self.cls6(c6)
-#
-#         up1, output6_sup = transformer(up1, output6_sup, cascade=cascade)
-#         c6_unsup = self.__fw_expand_4layer(up1)
-#         output6_unsup = self.cls6(c6_unsup)
-#         ######
-#         up2 = self.__fw_up(c6, c3, self.up2)
-#         c7 = self.__fw_expand_3layer(up2)
-#         output7_sup = self.cls7(c7)
-#
-#         up2, output7_sup = transformer(up2, output7_sup, cascade=cascade)
-#         c7_unsup = self.__fw_expand_3layer(up2)
-#         output7_unsup = self.cls7(c7_unsup)
-#
-#         #####
-#         up3 = self.__fw_up(c7, c2, self.up3)
-#         c8 = self.__fw_expand_2layer(up3)
-#         output8_sup = self.cls8(c8)
-#
-#         up3, output8_sup = transformer(up3, output8_sup, cascade=cascade)
-#         c8_unsup = self.__fw_expand_2layer(up3)
-#         output8_unsup = self.cls8(c8_unsup)
-#
-#         ####
-#
-#         up4 = self.__fw_up(c8, c1, self.up4)
-#         c9 = self.__fw_expand_1layer(up4)  # output9 is the main output of the network
-#         output9_sup = self.cls9(c9)
-#
-#         up4, output9_sup = transformer(up4, output9_sup, cascade=True)
-#         c9_unsup = self.__fw_expand_1layer(up4)
-#         output9_unsup = self.cls9(c9_unsup)
-#
-#         supervised_outputs = output5_sup, output6_sup, output7_sup, output8_sup, output9_sup
-#         unsupervised_outputs = output5_unsup, output6_unsup, output7_unsup, output8_unsup, output9_unsup
-#         return supervised_outputs, unsupervised_outputs
-#
-#     def __fw_supervised(self, X):
-#
-#         # contracting path
-#
-#         # c1 = self.conv1(X)
-#         # d1 = self.down1(c1)
-#         # c2 = self.conv2(d1)
-#         # d2 = self.down2(c2)
-#         # c3 = self.conv3(d2)
-#         # d3 = self.down3(c3)
-#         # c4 = self.conv4(d3)
-#         # d4 = self.down4(c4)
-#
-#         c1, d1, c2, d2, c3, d3, c4, d4 = self.__fw_contracting_path(X)
-#
-#         # bottleneck
-#
-#         # if it is unsupervised loss add some noise
-#
-#         # if not is_supervised:
-#         #     uni_dist = Uniform(-0.3, 0.3)
-#         #     noise_vector = uni_dist.sample(d4.shape[1:]).to(d4.device).unsqueeze(0)
-#         #     d4 = d4.mul(noise_vector) + d4
-#
-#         # c5 = self.conv5(d4)
-#         # output5 = self.cls5(c5)
-#
-#         c5 = self.__fw_bottleneck(d4)
-#         output5 = self.cls5(c5)
-#         # expanding path
-#
-#         # u1 = self.up1((c5, c4))
-#         # c6 = self.conv6(u1)
-#         # output6 = self.cls6(c6)
-#         # 4th expanding layer
-#
-#         up1 = self.__fw_up(c5, c4, self.up1)
-#         c6 = self.__fw_expand_4layer(up1)
-#         output6 = self.cls6(c6)
-#         # 3rd expanding layer
-#
-#         # u2 = self.up2((c6, c3))
-#         # c7 = self.conv7(u2)
-#         # output7 = self.cls7(c7)
-#         up2 = self.__fw_up(c6, c3, self.up2)
-#         c7 = self.__fw_expand_3layer(up2)
-#         output7 = self.cls7(c7)
-#         # 2nd expanding layer
-#
-#         # u3 = self.up3((c7, c2))
-#         # c8 = self.conv8(u3)
-#         # output8 = self.cls8(c8)
-#         up3 = self.__fw_up(c7, c2, self.up3)
-#         c8 = self.__fw_expand_2layer(up3)
-#         output8 = self.cls8(c8)
-#
-#         # 1st expanding layer
-#         # output9 is the main output of the netowrk
-#         up4 = self.__fw_up(c8, c1, self.up4)
-#         c9 = self.__fw_expand_1layer(up4)
-#         output9 = self.cls9(c9)
-#
-#         # u4 = self.up4((c8, c1))
-#         # c9 = self.conv9(u4)
-#         # output9 = self.cls9(c9)
-#
-#         return output5, output6, output7, output8, output9
-#
-#     def __fw_unsupervised(self, X):
-#
-#         # contracting path
-#         c1, d1, c2, d2, c3, d3, c4, d4 = self.__fw_contracting_path(X)
-#
-#         # bottleneck
-#         #  add some noise
-#
-#         rand_thresh = random.uniform(0, 1)
-#         rand_thresh = 0.3
-#         uni_dist = Uniform(-1 * rand_thresh, rand_thresh)
-#         noise_vector = uni_dist.sample(d4.shape[1:]).to(d4.device)  # .unsqueeze(0)
-#         noise_vector = noise_vector.reshape(d4.shape[1:])
-#         d4 = d4.mul(noise_vector) + d4
-#
-#         c5, output5 = self.__fw_bottleneck(d4)
-#         output5 = self.cls5(c5)
-#
-#         # expanding path
-#         rand_thresh = random.uniform(0, 1)
-#         rand_thresh = 0.3
-#         uni_dist = Uniform(-1 * rand_thresh, rand_thresh)
-#         up1 = self.__fw_up(c5, c4, self.up1, uni_dist, False)
-#         c6 = self.__fw_expand_4layer(up1)
-#         output6 = self.cls6(c6)
-#
-#         # noise_vector = uni_dist.sample(c6.shape[1:]).to(c6.device)  # .unsqueeze(0)
-#         # noise_vector = noise_vector.reshape(c6.shape[1:])
-#         # c6 = c6.mul(noise_vector) + c6
-#
-#         rand_thresh = random.uniform(0, 1)
-#         rand_thresh = 0.3
-#         uni_dist = Uniform(-1 * rand_thresh, rand_thresh)
-#         up2 = self.__fw_up(c6, c3, self.up2, uni_dist, False)
-#         c7 = self.__fw_expand_3layer(up2)
-#         output7 = self.cls7(c7)
-#
-#         # noise_vector = uni_dist.sample(c7.shape[1:]).to(c7.device)  # .unsqueeze(0)
-#         # noise_vector = noise_vector.reshape(c7.shape[1:])
-#         # c7 = c7.mul(noise_vector) + c7
-#
-#         rand_thresh = random.uniform(0, 1)
-#         rand_thresh = 0.3
-#         uni_dist = Uniform(-1 * rand_thresh, rand_thresh)
-#         up3 = self.__fw_up(c7, c2, self.up3, uni_dist, False)
-#
-#         c8 = self.__fw_expand_2layer(up3)
-#         output8 = self.cls8(c8)
-#
-#         # noise_vector = uni_dist.sample(c8.shape[1:]).to(c8.device)  # .unsqueeze(0)
-#         # noise_vector = noise_vector.reshape(c8.shape[1:])
-#         # c8 = c8.mul(noise_vector) + c8
-#
-#         rand_thresh = random.uniform(0, 1)
-#         rand_thresh = 0.3
-#         uni_dist = Uniform(-1 * rand_thresh, rand_thresh)
-#         up4 = self.__fw_up(c8, c1, self.up4, uni_dist, False)
-#
-#         c9 = self.__fw_expand_1layer(up4)  # output9 is the main output of the network
-#         output9 = self.cls9(c9)
-#
-#         return output5, output6, output7, output8, output9
-#
-#     def __fw_contracting_path(self, X):
-#         c1 = self.conv1(X)
-#         d1 = self.down1(c1)
-#         c2 = self.conv2(d1)
-#         d2 = self.down2(c2)
-#         c3 = self.conv3(d2)
-#         d3 = self.down3(c3)
-#         c4 = self.conv4(d3)
-#         d4 = self.down4(c4)
-#
-#         return c1, d1, c2, d2, c3, d3, c4, d4
-#
-#     def __fw_bottleneck(self, X):
-#         c5 = self.conv5(X)
-#         # out = self.cls5(c5)
-#         return c5
-#
-#     def __fw_up(self, X_expand, X_contract, up_module, noise_dist=None, is_supervised=True):
-#         if is_supervised:
-#             return up_module((X_expand, X_contract))
-#         else:
-#             # 1st augmentation
-#             noise_vector = noise_dist.sample(X_expand.shape[1:]).to(X_expand.device)  # .unsqueeze(0)
-#             noise_vector = noise_vector.reshape(X_expand.shape[1:])
-#             X_expand = X_expand.mul(noise_vector) + X_expand
-#
-#             # 2nd augmentation
-#
-#             noise_vector = noise_dist.sample(X_contract.shape[1:]).to(X_contract.device)  # .unsqueeze(0)
-#             noise_vector = noise_vector.reshape(X_contract.shape[1:])
-#             X_contract = X_contract.mul(noise_vector) + X_contract
-#
-#             up = up_module((X_expand, X_contract))
-#             # noise_vector = noise_dist.sample(up.shape[1:]).to(up.device)  # .unsqueeze(0)
-#             # noise_vector = noise_vector.reshape(up.shape[1:])
-#             # up = up.mul(noise_vector) + up
-#             return up
-#
-#     def __fw_expand_4layer(self, X):
-#         # u1 = self.up1((X_expand, X_contract))
-#         c6 = self.conv6(X)
-#         # output6 = self.cls6(c6)
-#         return c6
-#
-#     def __fw_expand_3layer(self, X):
-#
-#         # u2 = self.up2((X_expand, X_contract))
-#         c7 = self.conv7(X)
-#         # output7 = self.cls7(c7)
-#         return c7
-#
-#     def __fw_expand_2layer(self, X):
-#         # u3 = self.up3((X_expand, X_contract))
-#         c8 = self.conv8(X)
-#         # output8 = self.cls8(c8)
-#         return c8
-#
-#     def __fw_expand_1layer(self, X):
-#         # u4 = self.up4((X_expand, X_contract))
-#         c9 = self.conv9(X)
-#         # output9 = self.cls9(c9)
-#         return c9
-#
-#     def __fw_sup_loss(self, y_preds, y_true, loss_functions):
-#         (sup_loss, unsup_loss) = loss_functions
-#         total_loss = 0
-#
-#         for output in y_preds:
-#             ratio = int(np.round(y_true.shape[2] / output.shape[2]))
-#             maxpool = nn.MaxPool2d(kernel_size=2, stride=ratio, padding=0)
-#             #
-#             target = maxpool(y_true)
-#             if target.shape != output.shape:
-#                 h_diff = output.size()[2] - target.size()[2]
-#                 w_diff = output.size()[3] - target.size()[3]
-#                 #
-#                 target = F.pad(target, (w_diff // 2, w_diff - w_diff // 2,
-#                                         h_diff // 2, h_diff - h_diff // 2))
-#             #
-#             # print("SUPERVISED : padded target!!!")
-#             #
-#             #
-#             assert output.shape == target.shape, "output and target shape is not similar!!"
-#             total_loss = total_loss + sup_loss(output, target)
-#         return total_loss
-#
-#     def __fw_self_unsup_loss(self, y_preds, loss_functions):
-#         main_output = y_preds[-1].detach()
-#         (_, unsup_loss) = loss_functions
-#         total_loss = 0
-#
-#         for i in range(len(y_preds) - 1):
-#             # if out
-#             assert not (main_output.shape == y_preds[i].shape), "Wrong output: comparing main output with itself"
-#             with torch.no_grad():
-#                 ratio = int(np.round(main_output.shape[2] / y_preds[i].shape[2]))
-#
-#                 maxpool = nn.MaxPool2d(kernel_size=2, stride=ratio, padding=0)
-#
-#                 pooled_main_output = maxpool(main_output)
-#                 if pooled_main_output.shape != y_preds[i].shape:
-#                     h_diff = y_preds[i].size()[2] - pooled_main_output.size()[2]
-#                     w_diff = y_preds[i].size()[3] - pooled_main_output.size()[3]
-#
-#                     pooled_main_output = F.pad(pooled_main_output, (w_diff // 2, w_diff - w_diff // 2,
-#                                                                     h_diff // 2, h_diff - h_diff // 2))
-#                     # print(pooled_main_output)
-#                     # print("Unsupervised: Padded OUTPUT!!!")
-#
-#                 assert pooled_main_output.shape == y_preds[i].shape, \
-#                     "Error! shapes has to be equal but got {} and {}".format(pooled_main_output.shape,
-#                                                                              y_preds[i].shape)
-#             total_loss =total_loss +  unsup_loss(y_preds[i], pooled_main_output)
-#         return total_loss
-#
-#     def __fw_outputwise_unsup_loss(self, y_noisy, y_orig, loss_functions):
-#         (_, unsup_loss) = loss_functions
-#         total_loss = 0
-#         assert len(y_orig) == len(y_noisy), "Error! unsup_preds and sup_preds have to have same length"
-#         num_preds = len(y_orig)
-#
-#         for i in range(num_preds):
-#             orig_pred = y_orig[i]
-#             noisy_pred = y_noisy[i]
-#             assert orig_pred.shape == noisy_pred.shape, "Error! for preds number {}, supervised and unsupervised" \
-#                                                         " prediction shape is not similar!".format(i)
-#             total_loss = total_loss +  unsup_loss(noisy_pred, orig_pred.detach())
-#         return total_loss
-#
-#     def compute_loss(self, y_preds, y_true, loss_functions, is_supervised):
-#
-#         if is_supervised:
-#             total_loss = self.__fw_sup_loss(y_preds, y_true, loss_functions)
-#         else:
-#             # for comparing outputs together!
-#             # total_loss = self.__fw_self_unsup_lossf(y_preds, loss_functions)
-#
-#             # consistency of original output and noisy output
-#             total_loss = self.__fw_outputwise_unsup_loss(y_preds, y_true, loss_functions)
-#
-#         return total_loss
 
 
 class PGS(nn.Module):
@@ -524,6 +100,7 @@ class PGS(nn.Module):
         self.kernel_sizes = kernel_sizes
         self.strides = strides
         self.config = cfg
+        self.transformer = Perturbator()
         self.__build_net()
 
     def __build_net(self):
@@ -626,7 +203,7 @@ class PGS(nn.Module):
             c5_teach = self.__fw_bottleneck(d4).detach()
             output5_teach = self.cls5(c5_teach).detach()
 
-        d4_stud, aug_output5_teach = transformer(d4, output5_teach, cascade=cascade)
+        d4_stud, aug_output5_teach = self.transformer(d4, output5_teach, cascade=cascade)
         c5_stud = self.__fw_bottleneck(d4_stud)
         output5_stud = self.cls5(c5_stud)
 
@@ -638,7 +215,7 @@ class PGS(nn.Module):
             c6_teach = self.__fw_expand_4layer(up1).detach()
             output6_teach = self.cls6(c6_teach).detach()
 
-        aug_up1, aug_output6_teach = transformer(up1, output6_teach, cascade=cascade)
+        aug_up1, aug_output6_teach = self.transformer(up1, output6_teach, cascade=cascade)
         c6_stud = self.__fw_expand_4layer(aug_up1)
         output6_stud = self.cls6(c6_stud)
         ######
@@ -650,7 +227,7 @@ class PGS(nn.Module):
             c7_teach = self.__fw_expand_3layer(up2).detach()
             output7_teach = self.cls7(c7_teach).detach()
 
-        aug_up2, aug_output7_teach = transformer(up2, output7_teach, cascade=cascade)
+        aug_up2, aug_output7_teach = self.transformer(up2, output7_teach, cascade=cascade)
         c7_stud = self.__fw_expand_3layer(aug_up2)
         output7_stud = self.cls7(c7_stud)
 
@@ -663,7 +240,7 @@ class PGS(nn.Module):
             c8_teach = self.__fw_expand_2layer(up3).detach()
             output8_teach = self.cls8(c8_teach).detach()
 
-        aug_up3, aug_output8_teach = transformer(up3, output8_teach, cascade=cascade)
+        aug_up3, aug_output8_teach = self.transformer(up3, output8_teach, cascade=cascade)
         c8_stud = self.__fw_expand_2layer(aug_up3)
         output8_stud = self.cls8(c8_stud)
 
@@ -676,7 +253,7 @@ class PGS(nn.Module):
             c9_teach = self.__fw_expand_1layer(up4).detach()  # output9 is the main output of the network
             output9_teach = self.cls9(c9_teach).detach()
 
-        aug_up4, aug_output9_teach = transformer(up4, output9_teach, cascade=True)
+        aug_up4, aug_output9_teach = self.transformer(up4, output9_teach, cascade=True)
         c9_stud = self.__fw_expand_1layer(aug_up4)
         output9_stud = self.cls9(c9_stud)
 
