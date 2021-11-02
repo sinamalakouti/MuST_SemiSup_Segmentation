@@ -63,6 +63,8 @@ class CLS(nn.Module):
                 output = torch.nn.functional.softmax((logits - self.center)/0.5, dim=1)
                 self.update_center(logits)
 
+            else:
+                output = logits
         else:
             output = logits
         return output
