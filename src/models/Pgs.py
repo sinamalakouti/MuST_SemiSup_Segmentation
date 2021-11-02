@@ -59,7 +59,7 @@ class CLS(nn.Module):
         if self.training:
             if isTeacher:
                 if self.center is None:
-                    self.center = torch.zeros((1, logits.shape[1:]))
+                    self.center = torch.zeros((1, logits.shape[1], logits.shpae[2], logits.shape[3]))
                 output = torch.nn.functional.softmax((logits - self.center)/0.5, dim=1)
                 self.update_center(logits)
 
