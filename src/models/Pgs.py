@@ -41,7 +41,7 @@ class CLS(nn.Module):
         self.dim_in = dim_in
         self.dim_out = dim_out
         self.center_momentum = 0.9
-        self.center = torch.zeros((1, dim_out))
+        self.center = None
         self.net = self.__build_module()
 
     def __build_module(self):
@@ -50,16 +50,21 @@ class CLS(nn.Module):
         )
 
     def update_center(self, teacher_output):
-        batch_center = torch.sum(teacher_output, dim=0, keepdim=True)
-        batch_center = batch_center / (len(teacher_output))
+        batch_center = torch.mean(teacher_output, dim=(0,2,3), keepdim=True)
+        # batch_center = batch_center / (len(teacher_output))
         self.center = self.center * self.center_momentum + batch_center * (1 - self.center_momentum)
 
     def forward(self, X, isTeacher=False):
+        logits = self.net(X)
         if self.training:
-            output = self.net(X) if not isTeacher else torch.nn.functional.softmax((y - self.center)/0.5, dim=1)
-            self.update_center(output)
+            if isTeacher:
+                if self.center is None:
+                    self.center = torch.zeros((1, logits.shape[1:]))
+                output = torch.nn.functional.softmax((logits - self.center)/0.5, dim=1)
+                self.update_center(logits)
+
         else:
-            output = self.net(X)
+            output = logits
         return output
 
 
