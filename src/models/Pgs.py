@@ -199,7 +199,7 @@ class PGS(nn.Module):
         # expanding path
         up1 = self.__fw_up(c5_teach, c4, self.up1) if self.config.information_passing_strategy == 'teacher' \
             else self.__fw_up(c5_stud, c4, self.up1)
-        c6_teach = self.__fw_expand_4layer(up1)
+        c6_teach = self.__fw_expand_4layer(up1).detach()
         with torch.no_grad():
 
             output6_teach = self.cls6(c6_teach, isTeacher=True).detach()
@@ -211,7 +211,7 @@ class PGS(nn.Module):
         up2 = self.__fw_up(c6_teach, c3, self.up2) if self.config.information_passing_strategy == 'teacher' \
             else self.__fw_up(c6_stud, c3, self.up2)
 
-        c7_teach = self.__fw_expand_3layer(up2)
+        c7_teach = self.__fw_expand_3layer(up2).detach()
         with torch.no_grad():
 
             output7_teach = self.cls7(c7_teach, isTeacher=True).detach()
@@ -224,7 +224,7 @@ class PGS(nn.Module):
         up3 = self.__fw_up(c7_teach, c2, self.up3) if self.config.information_passing_strategy == 'teacher' \
             else self.__fw_up(c7_stud, c2, self.up3)
 
-        c8_teach = self.__fw_expand_2layer(up3)
+        c8_teach = self.__fw_expand_2layer(up3).detach()
         with torch.no_grad():
             output8_teach = self.cls8(c8_teach, isTeacher=True).detach()
 
@@ -235,7 +235,7 @@ class PGS(nn.Module):
         ####
         up4 = self.__fw_up(c8_teach, c1, self.up4) if self.config.information_passing_strategy == 'teacher' \
             else self.__fw_up(c8_stud, c1, self.up4)
-        c9_teach = self.__fw_expand_1layer(up4)
+        c9_teach = self.__fw_expand_1layer(up4).detach()
         with torch.no_grad():
               # output9 is the main output of the network
             output9_teach = self.cls9(c9_teach, isTeacher=True).detach()
@@ -277,94 +277,6 @@ class PGS(nn.Module):
 
         up4 = self.__fw_up(c8, c1, self.up4)
         c9 = self.__fw_expand_1layer(up4)
-        output9 = self.cls9(c9)
-
-        return output5, output6, output7, output8, output9
-
-    def __fw_unsupervised(self, X):
-
-        # contracting path
-        c1, d1, c2, d2, c3, d3, c4, d4 = self.__fw_contracting_path(X)
-
-        # bottleneck
-        #  add some noise
-
-        # uni_dist = Uniform(-0.3, 0.3)
-        # uni_dist = Normal(torch.tensor([0.0]), torch.tensor([1.0]))
-
-        # noise_vector = uni_dist.sample(d4.shape[1:]).to(d4.device)#.unsqueeze(0)
-        # noise_vector = noise_vector.reshape(d4.shape[1:])
-        # d4 = d4.mul(noise_vector) + d4
-
-        # noise_vector = uni_dist.sample(c1.shape[1:]).to(c1.device)#.unsqueeze(0)
-        # noise_vector = noise_vector.reshape(c1.shape[1:])
-        # c1 = c1.mul(noise_vector) + c1
-
-        # noise_vector = uni_dist.sample(c2.shape[1:]).to(c2.device)#.unsqueeze(0)
-        # noise_vector = noise_vector.reshape(c2.shape[1:])
-        # c2 = c2.mul(noise_vector) + c2
-
-        # noise_vector = uni_dist.sample(c3.shape[1:]).to(c3.device)#.unsqueeze(0)
-        # noise_vector = noise_vector.reshape(c3.shape[1:])
-        # c3 = c3.mul(noise_vector) + c3
-
-        # noise_vector = uni_dist.sample(c4.shape[1:]).to(c4.device)# .unsqueeze(0)
-        # noise_vector = noise_vector.reshape(c4.shape[1:])
-        # c4 = c4.mul(noise_vector) + c4
-        rand_thresh = random.uniform(0, 1)
-        rand_thresh = 0.3
-        uni_dist = Uniform(-1 * rand_thresh, rand_thresh)
-        noise_vector = uni_dist.sample(d4.shape[1:]).to(d4.device)  # .unsqueeze(0)
-        noise_vector = noise_vector.reshape(d4.shape[1:])
-        d4 = d4.mul(noise_vector) + d4
-
-        c5, output5 = self.__fw_bottleneck(d4)
-        output5 = self.cls5(c5)
-        # noise_vector = uni_dist.sample(c5.shape[1:]).to(c5.device)  # .unsqueeze(0)
-        # noise_vector = noise_vector.reshape(c5.shape[1:])
-        # c5 = c5.mul(noise_vector) + c5
-
-        # expanding path
-        rand_thresh = random.uniform(0, 1)
-        rand_thresh = 0.3
-        uni_dist = Uniform(-1 * rand_thresh, rand_thresh)
-        up1 = self.__fw_up(c5, c4, self.up1, uni_dist, False)
-        c6 = self.__fw_expand_4layer(up1)
-        output6 = self.cls6(c6)
-
-        # noise_vector = uni_dist.sample(c6.shape[1:]).to(c6.device)  # .unsqueeze(0)
-        # noise_vector = noise_vector.reshape(c6.shape[1:])
-        # c6 = c6.mul(noise_vector) + c6
-
-        rand_thresh = random.uniform(0, 1)
-        rand_thresh = 0.3
-        uni_dist = Uniform(-1 * rand_thresh, rand_thresh)
-        up2 = self.__fw_up(c6, c3, self.up2, uni_dist, False)
-        c7 = self.__fw_expand_3layer(up2)
-        output7 = self.cls7(c7)
-
-        # noise_vector = uni_dist.sample(c7.shape[1:]).to(c7.device)  # .unsqueeze(0)
-        # noise_vector = noise_vector.reshape(c7.shape[1:])
-        # c7 = c7.mul(noise_vector) + c7
-
-        rand_thresh = random.uniform(0, 1)
-        rand_thresh = 0.3
-        uni_dist = Uniform(-1 * rand_thresh, rand_thresh)
-        up3 = self.__fw_up(c7, c2, self.up3, uni_dist, False)
-
-        c8 = self.__fw_expand_2layer(up3)
-        output8 = self.cls8(c8)
-
-        # noise_vector = uni_dist.sample(c8.shape[1:]).to(c8.device)  # .unsqueeze(0)
-        # noise_vector = noise_vector.reshape(c8.shape[1:])
-        # c8 = c8.mul(noise_vector) + c8
-
-        rand_thresh = random.uniform(0, 1)
-        rand_thresh = 0.3
-        uni_dist = Uniform(-1 * rand_thresh, rand_thresh)
-        up4 = self.__fw_up(c8, c1, self.up4, uni_dist, False)
-
-        c9 = self.__fw_expand_1layer(up4)  # output9 is the main output of the network
         output9 = self.cls9(c9)
 
         return output5, output6, output7, output8, output9
