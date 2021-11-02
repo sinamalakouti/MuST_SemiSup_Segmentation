@@ -10,6 +10,7 @@ def copy_params(src_model, dest_model):
     dest_model.load_state_dict(src_model.state_dict())
 
 
+@torch.no_grad()
 def ema_update(student, teacher, cur_step, epoch, alpha=0.999, max_step=600, max_epoch=5):
     # if cur_step < L:
     #     alpha = 0.99

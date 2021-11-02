@@ -48,7 +48,7 @@ class CLS(nn.Module):
         return nn.Sequential(
             nn.Conv2d(self.dim_in, self.dim_out, 1),
         )
-
+    @torch.no_grad()
     def update_center(self, teacher_output):
         batch_center = torch.mean(teacher_output, dim=(0,2,3), keepdim=True)
         # batch_center = batch_center / (len(teacher_output))

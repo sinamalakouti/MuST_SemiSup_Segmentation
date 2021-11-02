@@ -199,7 +199,7 @@ class Perturbator(nn.Module):
         self.vflip_decoder = VFlipDecoder()
         self.uni_decoder = UniformNoiseDecoder()
         self.gaussian_decoder = GaussianNoiseDecoder()
-        self.cfg = cfg.num_perturbators
+        self.cfg = cfg
     def forward(self, x, y, cascade=False ):
 
 
