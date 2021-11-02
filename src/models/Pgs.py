@@ -117,7 +117,7 @@ class PGS(nn.Module):
         self.kernel_sizes = kernel_sizes
         self.strides = strides
         self.config = cfg
-        self.transformer = Perturbator()
+        self.transformer = Perturbator(cfg)
         self.__build_net()
 
     def __build_net(self):

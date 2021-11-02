@@ -189,7 +189,7 @@ def mixup_featureSpace(X, Y):
 
 class Perturbator(nn.Module):
 
-    def __init__(self):
+    def __init__(self, cfg):
         super(Perturbator, self).__init__()
         self.feature_dropout = FeatureDropDecoder()
         self.spatial_dropout = DropOutDecoder()
@@ -199,11 +199,11 @@ class Perturbator(nn.Module):
         self.vflip_decoder = VFlipDecoder()
         self.uni_decoder = UniformNoiseDecoder()
         self.gaussian_decoder = GaussianNoiseDecoder()
+        self.cfg = cfg.num_perturbators
+    def forward(self, x, y, cascade=False ):
 
-    def forward(self, x, y, cascade=False):
 
-
-        random_selector = np.random.randint(4)
+        random_selector = np.random.randint(self.cfg.num_perturbators)
 
         # print("random selector is ", random_selector)
         if cascade:
