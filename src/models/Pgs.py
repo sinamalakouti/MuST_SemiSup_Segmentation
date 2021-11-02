@@ -55,7 +55,7 @@ class CLS(nn.Module):
         self.center = self.center * self.center_momentum + batch_center * (1 - self.center_momentum)
 
     def forward(self, X, isTeacher=False):
-        if self.isTraining:
+        if self.training:
             output = self.net(X) if not isTeacher else torch.nn.functional.softmax((y - self.center)/0.5, dim=1)
             self.update_center(output)
         else:
