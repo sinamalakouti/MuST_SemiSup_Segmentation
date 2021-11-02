@@ -201,9 +201,9 @@ class Perturbator(nn.Module):
         self.gaussian_decoder = GaussianNoiseDecoder()
 
     def forward(self, x, y, cascade=False):
-        y = torch.nn.functional.softmax(y, dim=1)
 
-        random_selector = np.random.randint(3)
+
+        random_selector = np.random.randint(4)
 
         # print("random selector is ", random_selector)
         if cascade:
@@ -233,17 +233,10 @@ class Perturbator(nn.Module):
             elif random_selector == 1:  # scale
                 x_transform, y_transform = self.scale_decoder(x, y)
 
-            elif random_selector == 2:  # flip
-                rand = random.randint(0, 2)
-                if rand == 0:
-                    x_transform, y_transform = self.hflip_decoder(x, y)
-                else:
-                    x_transform, y_transform = self.vflip_decoder(x, y)
-
-            elif random_selector == 3:  # feature drop out
+            elif random_selector == 2:  # feature drop out
                 x_transform, y_transform = self.feature_dropout(x, y)
 
-            elif random_selector == 4:  # spatial dropout
+            elif random_selector == 3:  # spatial dropout
                 x_transform, y_transform = self.spatial_dropout(x, y)
 
             if random_selector % 2 == 0:

@@ -50,7 +50,7 @@ def __fw_outputwise_unsup_loss(y_stud, y_teach, loss_functions, cfg):
         if cfg.consistency_loss == 'CE':
             losses.append(- torch.mean(
                 torch.sum(teach_pred.detach()
-                          * torch.nn.functional.log_softmax(stud_pred, dim=1), dim=1)))
+                          * torch.nn.functional.log_softmax(stud_pred/0.5, dim=1), dim=1)))
         elif cfg.consistency_loss == 'KL':
             losses.append(
                 softmax_kl_loss(stud_pred, teach_pred.detach(), conf_mask=False, threshold=None, use_softmax=False))
