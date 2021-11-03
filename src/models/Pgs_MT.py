@@ -43,6 +43,7 @@ class CLS(nn.Module):
         self.dim_in = dim_in
         self.dim_out = dim_out
         self.center = None
+        self.center_momentum =0.9
         self.isTeacher = isTeacher
         self.net = self.__build_module()
 
