@@ -68,3 +68,7 @@ src/dasfdsfsaf/runs/events.out.tfevents.1621295785.sina.38283.0
 src/data/dana/preprocess/0064KW/.DS_Store
 src/__pycache__
 *.pyc
+src/runners/dasfdsfsaf/.DS_Store
+src/runners/.DS_Store
+src/utils/.DS_Store
+src/utils/.DS_Store

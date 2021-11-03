@@ -4,7 +4,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from torch.distributions.uniform import Uniform
-from dataset.Augmentation import augment as transformer
+from dataset.Augmentation import Perturbator
 from utils import model_utils
 
 import random
@@ -38,20 +38,39 @@ class ConvBlock(nn.Module):
 
 
 class CLS(nn.Module):
-    def __init__(self, dim_in, dim_out):
+    def __init__(self, dim_in, dim_out, isTeacher=False):
         super(CLS, self).__init__()
         self.dim_in = dim_in
         self.dim_out = dim_out
-
+        self.center = None
+        self.isTeacher = isTeacher
         self.net = self.__build_module()
+
+    @torch.no_grad()
+    def update_center(self, teacher_output):
+        batch_center = torch.mean(teacher_output, dim=(0, 2, 3), keepdim=True)
+        # batch_center = batch_center / (len(teacher_output))
+        self.center = self.center * self.center_momentum + batch_center * (1 - self.center_momentum)
 
     def __build_module(self):
         return nn.Sequential(
             nn.Conv2d(self.dim_in, self.dim_out, 1),
         )
 
-    def forward(self, X):
-        return self.net(X)
+    def forward(self, X, use_softmax=False):
+        logits = self.net(X)
+        if self.isTeacher:
+            if self.center is None:
+                self.center = torch.zeros((1, logits.shape[1], logits.shape[2], logits.shape[3])).to(X.device)
+            if use_softmax:
+                output = torch.nn.functional.softmax((logits - self.center), dim=1)
+            else:
+                output = logits
+            if self.training:
+                self.update_center(logits)
+        else:
+            output = logits
+        return output
 
 
 class Up(torch.nn.Module):
@@ -101,6 +120,7 @@ class PGS_MT(nn.Module):
         self.kernel_sizes = kernel_sizes
         self.strides = strides
         self.config = cfg
+        self.transformer = Perturbator(cfg)
         self.__build_net()
 
     def __build_net(self):
@@ -137,11 +157,11 @@ class PGS_MT(nn.Module):
 
         # classifiers
         print(self.dim_outputs[4])
-        self.cls5_teach = CLS(self.dim_outputs[4], self.dim_outputs[-1])
-        self.cls6_teach = CLS(self.dim_outputs[5], self.dim_outputs[-1])
-        self.cls7_teach = CLS(self.dim_outputs[6], self.dim_outputs[-1])
-        self.cls8_teach = CLS(self.dim_outputs[7], self.dim_outputs[-1])
-        self.cls9_teach = CLS(self.dim_outputs[8], self.dim_outputs[-1])  # main classifier
+        self.cls5_teach = CLS(self.dim_outputs[4], self.dim_outputs[-1], isTeacher=True)
+        self.cls6_teach = CLS(self.dim_outputs[5], self.dim_outputs[-1], isTeacher=True)
+        self.cls7_teach = CLS(self.dim_outputs[6], self.dim_outputs[-1], isTeacher=True)
+        self.cls8_teach = CLS(self.dim_outputs[7], self.dim_outputs[-1], isTeacher=True)
+        self.cls9_teach = CLS(self.dim_outputs[8], self.dim_outputs[-1], isTeacher=True)  # main classifier
 
         self.cls5_stud = CLS(self.dim_outputs[4], self.dim_outputs[-1])
         self.cls6_stud = CLS(self.dim_outputs[5], self.dim_outputs[-1])
@@ -185,9 +205,9 @@ class PGS_MT(nn.Module):
         # bottleneck
         c5_teach = self.__fw_bottleneck(self.conv5_teach, d4)
         with torch.no_grad():
-            output5_teach = self.cls5_teach(c5_teach).detach()
+            output5_teach = self.cls5_teach(c5_teach, use_softmax=True).detach()
 
-        d4_stud, aug_output5_teach = transformer(d4, output5_teach, cascade=cascade)
+        d4_stud, aug_output5_teach = self.transformer(d4, output5_teach, cascade=cascade)
         c5_stud = self.__fw_bottleneck(self.conv5_stud, d4_stud)
         output5_stud = self.cls5_stud(c5_stud)
 
@@ -196,9 +216,9 @@ class PGS_MT(nn.Module):
             else self.__fw_up(c5_stud, c4, self.up1)
         c6_teach = self.__fw_expand_layer(self.conv6_teach, up1)
         with torch.no_grad():
-            output6_teach = self.cls6_teach(c6_teach).detach()
+            output6_teach = self.cls6_teach(c6_teach, use_softmax=True).detach()
 
-        aug_up1, aug_output6_teach = transformer(up1, output6_teach, cascade=cascade)
+        aug_up1, aug_output6_teach = self.transformer(up1, output6_teach, cascade=cascade)
         c6_stud = self.__fw_expand_layer(self.conv6_stud, aug_up1)
         output6_stud = self.cls6_stud(c6_stud)
         ######
@@ -207,9 +227,9 @@ class PGS_MT(nn.Module):
 
         c7_teach = self.__fw_expand_layer(self.conv7_teach, up2)
         with torch.no_grad():
-            output7_teach = self.cls7_teach(c7_teach).detach()
+            output7_teach = self.cls7_teach(c7_teach, use_softmax=True).detach()
 
-        aug_up2, aug_output7_teach = transformer(up2, output7_teach, cascade=cascade)
+        aug_up2, aug_output7_teach = self.transformer(up2, output7_teach, cascade=cascade)
         c7_stud = self.__fw_expand_layer(self.conv7_stud, aug_up2)
         output7_stud = self.cls7_stud(c7_stud)
 
@@ -219,9 +239,9 @@ class PGS_MT(nn.Module):
 
         c8_teach = self.__fw_expand_layer(self.conv8_teach, up3)
         with torch.no_grad():
-            output8_teach = self.cls8_teach(c8_teach).detach()
+            output8_teach = self.cls8_teach(c8_teach, use_softmax=True).detach()
 
-        aug_up3, aug_output8_teach = transformer(up3, output8_teach, cascade=cascade)
+        aug_up3, aug_output8_teach = self.transformer(up3, output8_teach, cascade=cascade)
         c8_stud = self.__fw_expand_layer(self.conv8_stud, aug_up3)
         output8_stud = self.cls8_stud(c8_stud)
 
@@ -231,9 +251,9 @@ class PGS_MT(nn.Module):
 
         c9_teach = self.__fw_expand_layer(self.conv9_teach, up4)  # output9 is the main output of the network
         with torch.no_grad():
-            output9_teach = self.cls9_teach(c9_teach).detach()
+            output9_teach = self.cls9_teach(c9_teach, use_softmax=True).detach()
 
-        aug_up4, aug_output9_teach = transformer(up4, output9_teach, cascade=True)
+        aug_up4, aug_output9_teach = self.transformer(up4, output9_teach, cascade=cascade)
         c9_stud = self.__fw_expand_layer(self.conv9_stud, aug_up4)
         output9_stud = self.cls9_stud(c9_stud)
 
@@ -252,28 +272,29 @@ class PGS_MT(nn.Module):
         model_utils.copy_params(self.cls7_stud, self.cls7_teach)
         model_utils.copy_params(self.cls8_stud, self.cls8_teach)
         model_utils.copy_params(self.cls9_stud, self.cls9_teach)
-
+    @torch.no_grad
     def update_params(self, global_step, epoch, max_step, max_epoch):
         model_utils.ema_update(self.conv5_stud, self.conv5_teach,
-                               global_step, epoch,  max_step=max_step, max_epoch=max_epoch)
+                               global_step, epoch, alpha=0.999, max_step=max_step, max_epoch=max_epoch)
+
         model_utils.ema_update(self.cls5_stud, self.cls5_teach,
-                               global_step, epoch,  max_step=max_step, max_epoch=max_epoch)
+                               global_step, epoch,  alpha=0.999, max_step=max_step, max_epoch=max_epoch)
         model_utils.ema_update(self.conv6_stud, self.conv6_teach,
-                               global_step, epoch,  max_step=max_step, max_epoch=max_epoch)
+                               global_step, epoch,  alpha=0.999, max_step=max_step, max_epoch=max_epoch)
         model_utils.ema_update(self.cls6_stud,  self.cls6_teach,
-                               global_step, epoch,  max_step=max_step, max_epoch=max_epoch)
+                               global_step, epoch,  alpha=0.999, max_step=max_step, max_epoch=max_epoch)
         model_utils.ema_update(self.conv7_stud, self.conv7_teach,
-                               global_step, epoch, max_step=max_step, max_epoch=max_epoch)
+                               global_step, epoch, alpha=0.999, max_step=max_step, max_epoch=max_epoch)
         model_utils.ema_update(self.cls7_stud, self.cls7_teach,
-                               global_step, epoch, max_step=max_step, max_epoch=max_epoch)
+                               global_step, epoch, alpha=0.999, max_step=max_step, max_epoch=max_epoch)
         model_utils.ema_update(self.conv8_stud, self.conv8_teach,
-                               global_step, epoch, max_step=max_step, max_epoch=max_epoch)
+                               global_step, epoch, alpha=0.999, max_step=max_step, max_epoch=max_epoch)
         model_utils.ema_update(self.cls8_stud, self.cls8_teach,
-                               global_step, epoch, max_step=max_step, max_epoch=max_epoch)
+                               global_step, epoch,  alpha=0.999, max_step=max_step, max_epoch=max_epoch)
         model_utils.ema_update(self.conv9_stud, self.conv9_teach,
-                               global_step, epoch, max_step=max_step, max_epoch=max_epoch)
+                               global_step, epoch,  alpha=0.999, max_step=max_step, max_epoch=max_epoch)
         model_utils.ema_update(self.cls9_stud, self.cls9_teach,
-                               global_step, epoch, max_step=max_step, max_epoch=max_epoch)
+                               global_step, epoch, alpha=0.999, max_step=max_step, max_epoch=max_epoch)
 
     def __fw_supervised_stud(self, X):
 
