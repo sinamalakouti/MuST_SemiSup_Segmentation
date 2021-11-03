@@ -239,13 +239,10 @@ class Perturbator(nn.Module):
             elif random_selector == 3:  # spatial dropout
                 x_transform, y_transform = self.spatial_dropout(x, y)
 
-            if random_selector == 4:
-                x_transform, y_transform = self.uni_decoder(x, y)
-            elif random_selector == 5:
-                x_transform, y_transform = self.gaussian_decoder(x, y)
-            #elif random_selector == 6:
-                # mixoup-feature space
-
+            if random_selector % 2 == 0:
+                x_transform, y_transform = self.uni_decoder(x_transform, y_transform)
+            else:
+                x_transform, y_transform = self.gaussian_decoder(x_transform, y_transform)
             # elif random_selector == 5: #scale + feature dropout
             #
             #     x_transform = F.affine(x,
