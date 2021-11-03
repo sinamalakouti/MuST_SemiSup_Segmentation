@@ -272,7 +272,7 @@ class PGS_MT(nn.Module):
         model_utils.copy_params(self.cls7_stud, self.cls7_teach)
         model_utils.copy_params(self.cls8_stud, self.cls8_teach)
         model_utils.copy_params(self.cls9_stud, self.cls9_teach)
-    @torch.no_grad
+    @torch.no_grad()
     def update_params(self, global_step, epoch, max_step, max_epoch):
         model_utils.ema_update(self.conv5_stud, self.conv5_teach,
                                global_step, epoch, alpha=0.999, max_step=max_step, max_epoch=max_epoch)
