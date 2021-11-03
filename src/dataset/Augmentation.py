@@ -240,9 +240,9 @@ class Perturbator(nn.Module):
                 x_transform, y_transform = self.spatial_dropout(x, y)
 
             if random_selector == 4:
-                x_transform, y_transform = self.uni_decoder(x_transform, y_transform)
+                x_transform, y_transform = self.uni_decoder(x, y)
             elif random_selector == 5:
-                x_transform, y_transform = self.gaussian_decoder(x_transform, y_transform)
+                x_transform, y_transform = self.gaussian_decoder(x, y)
             #elif random_selector == 6:
                 # mixoup-feature space
 
