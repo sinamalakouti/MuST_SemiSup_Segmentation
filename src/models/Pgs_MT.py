@@ -49,8 +49,8 @@ class CLS(nn.Module):
 
     @torch.no_grad()
     def update_center(self, teacher_output):
-        batch_center = torch.mean(teacher_output, dim=(0, 2, 3), keepdim=True)
-        # batch_center = batch_center / (len(teacher_output))
+        batch_center = torch.sum(teacher_output, dim=0, keepdim=True)
+        batch_center = batch_center / (len(teacher_output))
         self.center = self.center * self.center_momentum + batch_center * (1 - self.center_momentum)
 
     def __build_module(self):
