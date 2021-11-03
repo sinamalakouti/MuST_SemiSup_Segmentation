@@ -26,7 +26,7 @@ class FeatureDropDecoder(nn.Module):
 
 
 class DropOutDecoder(nn.Module):
-    def __init__(self, drop_rate=0.3, spatial_dropout=True):
+    def __init__(self, drop_rate=0.1, spatial_dropout=True):
         super(DropOutDecoder, self).__init__()
         self.dropout = nn.Dropout2d(p=drop_rate) if spatial_dropout else nn.Dropout(drop_rate)
 
@@ -264,7 +264,8 @@ class Perturbator(nn.Module):
             #     # x_transform = F.affine(x,
             #     #                        angle=angle, translate=(0, 0), shear=0, scale=1)
             #     # y_transform = F.affine(y,
-            #     #                        angle=angle, translate=(0, 0), shear=0, scale=1)
+            #     #                        angle=an
+            #     gle, translate=(0, 0), shear=0, scale=1)
             # elif random_selector == 2: #uniform noise
             #
             #     noise = uni_dist.sample(x.shape[1:]).to(x.device)
