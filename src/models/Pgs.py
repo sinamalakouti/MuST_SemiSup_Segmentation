@@ -46,7 +46,7 @@ class CLS(nn.Module):
 
     def __build_module(self):
         return nn.Sequential(
-            nn.Conv2d(self.dim_in, self.dim_out, 1),
+            nn.Conv2d(self.dim_in, self.dim_out, 1)
         )
 
     @torch.no_grad()
