@@ -69,7 +69,7 @@ class Up(torch.nn.Module):
             self.up = torch.nn.ConvTranspose2d(ic, oc,
                                                kernel_size=3, stride=2, padding=1, output_padding=1)
 
-    def forward(self, X, transformer=None):
+    def forward(self, X, transformer):
         x1, x2 = X
         if transformer is None:
             x1 = self.up(x1)
@@ -248,12 +248,12 @@ class PGS(nn.Module):
 
         # expanding path
         teach_up1 = self.__fw_up(c5_teach, c4, self.up1,
-                                 None) if self.config.information_passing_strategy == 'teacher' \
-            else self.__fw_up(c5_stud, c4, self.up1, None)
+                                 transformer=None) if self.config.information_passing_strategy == 'teacher' \
+            else self.__fw_up(c5_stud, c4, self.up1, transformer=None)
 
         stud_up1 = self.__fw_up(c5_teach, c4, self.up1,
-                                self.transformer) if self.config.information_passing_strategy == 'teacher' \
-            else self.__fw_up(c5_stud, c4, self.up1, self.transformer)
+                                transformer=self.transformer) if self.config.information_passing_strategy == 'teacher' \
+            else self.__fw_up(c5_stud, c4, self.up1, transformer=self.transformer)
 
         with torch.no_grad():
             c6_teach = self.__fw_expand_4layer(teach_up1).detach()
@@ -263,12 +263,12 @@ class PGS(nn.Module):
         output6_stud = self.cls6(c6_stud)
         ######
         teach_up2 = self.__fw_up(c6_teach, c3, self.up2,
-                                 None) if self.config.information_passing_strategy == 'teacher' \
-            else self.__fw_up(c6_stud, c3, self.up2, None)
+                                 transformer=None) if self.config.information_passing_strategy == 'teacher' \
+            else self.__fw_up(c6_stud, c3, self.up2,transformer=None)
 
         stud_up2 = self.__fw_up(c6_teach, c3, self.up2,
-                                self.transformer) if self.config.information_passing_strategy == 'teacher' \
-            else self.__fw_up(c6_stud, c3, self.up2, self.transformer)
+                                transformer=self.transformer) if self.config.information_passing_strategy == 'teacher' \
+            else self.__fw_up(c6_stud, c3, self.up2, transformer=self.transformer)
 
         with torch.no_grad():
             c7_teach = self.__fw_expand_3layer(teach_up2).detach()
@@ -278,12 +278,12 @@ class PGS(nn.Module):
         output7_stud = self.cls7(c7_stud)
 
         #####
-        teach_up3 = self.__fw_up(c7_teach, c2, self.up3, None) if self.config.information_passing_strategy == 'teacher' \
-            else self.__fw_up(c7_stud, c2, self.up3, None)
+        teach_up3 = self.__fw_up(c7_teach, c2, self.up3,transformer=None) if self.config.information_passing_strategy == 'teacher' \
+            else self.__fw_up(c7_stud, c2, self.up3, transformer=None)
 
         stud_up3 = self.__fw_up(c7_teach, c2, self.up3,
-                                self.transformer) if self.config.information_passing_strategy == 'teacher' \
-            else self.__fw_up(c7_stud, c2, self.up3, self.transformer)
+                                transformer=self.transformer) if self.config.information_passing_strategy == 'teacher' \
+            else self.__fw_up(c7_stud, c2, self.up3, transformer=self.transformer)
 
         with torch.no_grad():
             c8_teach = self.__fw_expand_2layer(teach_up3).detach()
@@ -293,12 +293,12 @@ class PGS(nn.Module):
         output8_stud = self.cls8(c8_stud)
 
         ####
-        teach_up4 = self.__fw_up(c8_teach, c1, self.up4, None) if self.config.information_passing_strategy == 'teacher' \
-            else self.__fw_up(c8_stud, c1, self.up4, None)
+        teach_up4 = self.__fw_up(c8_teach, c1, self.up4, transformer=None) if self.config.information_passing_strategy == 'teacher' \
+            else self.__fw_up(c8_stud, c1, self.up4, transformer=None)
 
         stud_up4 = self.__fw_up(c8_teach, c1, self.up4,
-                                self.transformer) if self.config.information_passing_strategy == 'teacher' \
-            else self.__fw_up(c8_stud, c1, self.up4, self.transformer)
+                                transformer=self.transformer) if self.config.information_passing_strategy == 'teacher' \
+            else self.__fw_up(c8_stud, c1, self.up4, transformer=self.transformer)
 
         with torch.no_grad():
             # output9 is the main output of the network
@@ -362,7 +362,7 @@ class PGS(nn.Module):
         # out = self.cls5(c5)
         return c5
 
-    def __fw_up(self, X_expand, X_contract, up_module, noise_dist=None, is_supervised=True, transformer=None):
+    def __fw_up(self, X_expand, X_contract, up_module, transformer=None, noise_dist=None, is_supervised=True):
         if is_supervised:
             return up_module((X_expand, X_contract), transformer)
         else:

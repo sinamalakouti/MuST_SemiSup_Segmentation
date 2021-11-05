@@ -71,9 +71,13 @@ class Up(torch.nn.Module):
             self.up = torch.nn.ConvTranspose2d(ic, oc,
                                                kernel_size=3, stride=2, padding=1, output_padding=1)
 
-    def forward(self, X):
+    def forward(self, X, transformer):
         x1, x2 = X
-        x1 = self.up(x1)
+        if transformer is None:
+            x1 = self.up(x1)
+        else:
+            x1 = self.up(transformer(x1)[0])
+
         # bxcxhxw
         h_diff = x2.size()[2] - x1.size()[2]
         w_diff = x2.size()[3] - x1.size()[3]
@@ -438,9 +442,9 @@ class PGS_MT(nn.Module):
         # out = self.cls5(c5)
         return c5
 
-    def __fw_up(self, X_expand, X_contract, up_module, noise_dist=None, is_supervised=True):
+    def __fw_up(self, X_expand, X_contract, up_module, transformer = None, noise_dist=None, is_supervised=True):
         if is_supervised:
-            return up_module((X_expand, X_contract))
+            return up_module((X_expand, X_contract), transformer)
         else:
             # 1st augmentation
             noise_vector = noise_dist.sample(X_expand.shape[1:]).to(X_expand.device)  # .unsqueeze(0)
