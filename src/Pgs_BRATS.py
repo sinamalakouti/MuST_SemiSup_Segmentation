@@ -55,7 +55,7 @@ def __fw_outputwise_unsup_loss(y_stud, y_teach, loss_functions, cfg):
         elif cfg.consistency_loss == 'KL':
             losses.append(
                 softmax_kl_loss(stud_pred, teach_pred.detach(), conf_mask=False, threshold=None, use_softmax=False))
-        elif cfg.consistency_loss == 'balance_CE':
+        elif cfg.consistency_loss == 'balanced_CE':
             losses.append(
                 unsup_loss(stud_pred, teach_pred, i, use_softmax=True))
     total_loss = sum(losses)
@@ -545,7 +545,7 @@ def Pgs_train_val(dataset, n_epochs, wmh_threshold, output_dir, learning_rate, a
 
     sup_loss_fn = torch.nn.CrossEntropyLoss()
     if cfg.consistency_loss == 'balanced_CE':
-        cons_loss_fn = Consistency_CE()
+        cons_loss_fn = Consistency_CE(5)
     else:
         cons_loss_fn = None
 
