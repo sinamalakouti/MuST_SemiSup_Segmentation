@@ -6,7 +6,7 @@ from torch.optim import lr_scheduler
 
 from utils import utils, eval_utils
 from utils import model_utils
-from losses.loss import consistency_weight, softmax_kl_loss, softmax_ce_consistency_loss
+from losses.loss import consistency_weight, softmax_kl_loss, Consistency_CE
 
 from evaluation_metrics import dice_coef, get_dice_coef_per_subject, get_confusionMatrix_metrics, do_eval
 from dataset.Brat20 import Brat20Test, seg2WT, seg2TC, seg2ET, semi_sup_split
@@ -35,9 +35,10 @@ parser = argparse.ArgumentParser()
 
 global_step = 0
 
+
 def __fw_outputwise_unsup_loss(y_stud, y_teach, loss_functions, cfg):
     (_, unsup_loss) = loss_functions
-    total_loss = 0
+
     assert len(y_teach) == len(y_stud), "Error! unsup_preds and sup_preds have to have same length"
     num_preds = len(y_teach)
     losses = []
@@ -54,7 +55,10 @@ def __fw_outputwise_unsup_loss(y_stud, y_teach, loss_functions, cfg):
                           * torch.nn.functional.log_softmax(stud_pred / 0.5, dim=1), dim=1)))
         elif cfg.consistency_loss == 'KL':
             losses.append(
-                softmax_kl_loss(stud_pred, teach_pred.detach(), conf_mask=False, threshold=None, use_softmax=False))
+                softmax_kl_loss(stud_pred, teach_pred.detach(), conf_mask=False, threshold=None, use_softmax=True))
+
+        elif cfg.consistency_loss == 'balanced_CE':
+            losses.append(unsup_loss(stud_pred, teach_pred, i, use_softmax=True))
     total_loss = sum(losses)
     return total_loss
 
@@ -103,17 +107,14 @@ def trainPgs_semi_downSample(train_sup_loader, train_unsup_loader, model, optimi
     total_loss = 0
     model.train()
 
-
     semi_dataLoader = zip(train_sup_loader, train_unsup_loader)
 
-    for batch_idx, (batch_sup, batch_unsup)  in enumerate(semi_dataLoader):
+    for batch_idx, (batch_sup, batch_unsup) in enumerate(semi_dataLoader):
         optimizer.zero_grad()
         b_sup = batch_sup['data'].to(device)
         target_sup = batch_sup['label'].to(device)
         sup_outputs, _ = model(b_sup, is_supervised=True)
         sLoss = compute_loss(sup_outputs, target_sup, loss_functions, is_supervised=True, cfg=cfg)
-
-        del b_sup
 
         b_unsup = batch_unsup['data']
         b_unsup = b_unsup.to(device)
@@ -144,6 +145,7 @@ def trainPgs_semi_downSample(train_sup_loader, train_unsup_loader, model, optimi
                  })
 
     return model, total_loss
+
 
 def trainPgs_semi(train_sup_loader, train_unsup_loader, model, optimizer, device, loss_functions, cons_w_unsup, epochid,
                   cfg):
@@ -184,7 +186,8 @@ def trainPgs_semi(train_sup_loader, train_unsup_loader, model, optimizer, device
         if global_step % 100 == 0 and global_step < 1000:
             print("glboal step is: ", global_step)
 
-        model.module.update_params(global_step, epochid, max_step=5 * len(train_unsup_loader), max_epoch=5) #6 num of epochs
+        model.module.update_params(global_step, epochid, max_step=5 * len(train_unsup_loader),
+                                   max_epoch=5)  # 6 num of epochs
 
         with torch.no_grad():
             sf = torch.nn.Softmax2d()
@@ -371,11 +374,6 @@ def eval_per_subjectPgs(model, device, threshold, cfg, data_mode, model_for_sup)
     # return np.mean(np.array(dice_arrWT)), np.mean(np.array(dice_arrET)), np.mean(np.array(dice_arrTC))
 
 
-
-
-
-
-
 def evaluatePGS(model, dataset, device, threshold, cfg, training_mode):
     print("******************** EVALUATING  : {} ********************".format(training_mode))
 
@@ -549,6 +547,13 @@ def Pgs_train_val(dataset, n_epochs, wmh_threshold, output_dir, learning_rate, a
                                                 augment=cfg.augment, seed=cfg.seed)
         print('size of unlabeled training set: number of subjects:    ', len(train_unsup_loader.dataset.subjects_name))
         print("un labeled subjects  ", train_unsup_loader.dataset.subjects_name)
+
+    sup_loss_fn = torch.nn.CrossEntropyLoss()
+    if cfg.consistency_loss == 'balanced_CE':
+        cons_loss_fn = Consistency_CE(5)
+    else:
+        cons_loss_fn = None
+
     for epoch in range(start_epoch, n_epochs):
         print("iteration:  ", epoch)
 
@@ -568,14 +573,14 @@ def Pgs_train_val(dataset, n_epochs, wmh_threshold, output_dir, learning_rate, a
                 pgsnet, loss = trainPgs_semi(train_sup_loader, train_unsup_loader, pgsnet, optimizer, device,
                                              (torch.nn.CrossEntropyLoss(), torch.nn.CrossEntropyLoss()), cons_w_unsup,
                                              epoch, cfg)
-        elif cfg.experiment_mode =='semi_downSample':
+        elif cfg.experiment_mode == 'semi_downSample':
             cons_w_unsup = consistency_weight(final_w=cfg['consist_w_unsup']['final_w'],
                                               iters_per_epoch=len(train_sup_loader),
                                               rampup_ends=cfg['consist_w_unsup']['rampup_ends'],
                                               ramp_type=cfg['consist_w_unsup']['rampup'])
 
             pgsnet, loss = trainPgs_semi_downSample(train_sup_loader, train_unsup_loader, pgsnet, optimizer, device,
-                                                    (torch.nn.CrossEntropyLoss(), torch.nn.CrossEntropyLoss()),
+                                                    (torch.nn.CrossEntropyLoss(), cons_loss_fn),
                                                     cons_w_unsup,
                                                     epoch, cfg)
 

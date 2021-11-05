@@ -42,36 +42,16 @@ class CLS(nn.Module):
         super(CLS, self).__init__()
         self.dim_in = dim_in
         self.dim_out = dim_out
-        self.center = None
-        self.center_momentum =0.9
-        self.isTeacher = isTeacher
         self.net = self.__build_module()
-
-    @torch.no_grad()
-    def update_center(self, teacher_output):
-        batch_center = torch.sum(teacher_output, dim=0, keepdim=True)
-        batch_center = batch_center / (len(teacher_output))
-        self.center = self.center * self.center_momentum + batch_center * (1 - self.center_momentum)
 
     def __build_module(self):
         return nn.Sequential(
             nn.Conv2d(self.dim_in, self.dim_out, 1),
         )
 
-    def forward(self, X, use_softmax=False):
+    def forward(self, X):
         logits = self.net(X)
-        if self.isTeacher:
-            if self.center is None:
-                self.center = torch.zeros((1, logits.shape[1], logits.shape[2], logits.shape[3])).to(X.device)
-            if use_softmax:
-                output = torch.nn.functional.softmax((logits - self.center), dim=1)
-            else:
-                output = logits
-            if self.training:
-                self.update_center(logits)
-        else:
-            output = logits
-        return output
+        return logits
 
 
 class Up(torch.nn.Module):
@@ -158,11 +138,11 @@ class PGS_MT(nn.Module):
 
         # classifiers
         print(self.dim_outputs[4])
-        self.cls5_teach = CLS(self.dim_outputs[4], self.dim_outputs[-1], isTeacher=True)
-        self.cls6_teach = CLS(self.dim_outputs[5], self.dim_outputs[-1], isTeacher=True)
-        self.cls7_teach = CLS(self.dim_outputs[6], self.dim_outputs[-1], isTeacher=True)
-        self.cls8_teach = CLS(self.dim_outputs[7], self.dim_outputs[-1], isTeacher=True)
-        self.cls9_teach = CLS(self.dim_outputs[8], self.dim_outputs[-1], isTeacher=True)  # main classifier
+        self.cls5_teach = CLS(self.dim_outputs[4], self.dim_outputs[-1])
+        self.cls6_teach = CLS(self.dim_outputs[5], self.dim_outputs[-1])
+        self.cls7_teach = CLS(self.dim_outputs[6], self.dim_outputs[-1])
+        self.cls8_teach = CLS(self.dim_outputs[7], self.dim_outputs[-1])
+        self.cls9_teach = CLS(self.dim_outputs[8], self.dim_outputs[-1])  # main classifier
 
         self.cls5_stud = CLS(self.dim_outputs[4], self.dim_outputs[-1])
         self.cls6_stud = CLS(self.dim_outputs[5], self.dim_outputs[-1])
@@ -194,7 +174,7 @@ class PGS_MT(nn.Module):
             return sup_outputs, None
 
         elif type_unsup == 'layerwise':
-            return self.__fw_unsupervised_layerwise(X)
+            return self.__fw_unsupervised_layerwise2(X)
 
         return None
 
@@ -206,7 +186,7 @@ class PGS_MT(nn.Module):
         # bottleneck
         c5_teach = self.__fw_bottleneck(self.conv5_teach, d4)
         with torch.no_grad():
-            output5_teach = self.cls5_teach(c5_teach, use_softmax=True).detach()
+            output5_teach = self.cls5_teach(c5_teach).detach()
 
         d4_stud, aug_output5_teach = self.transformer(d4, output5_teach, cascade=cascade)
         c5_stud = self.__fw_bottleneck(self.conv5_stud, d4_stud)
@@ -218,7 +198,7 @@ class PGS_MT(nn.Module):
 
         with torch.no_grad():
             c6_teach = self.__fw_expand_layer(self.conv6_teach, up1).detach()
-            output6_teach = self.cls6_teach(c6_teach, use_softmax=True).detach()
+            output6_teach = self.cls6_teach(c6_teach).detach()
 
         aug_up1, aug_output6_teach = self.transformer(up1, output6_teach, cascade=cascade)
         c6_stud = self.__fw_expand_layer(self.conv6_stud, aug_up1)
@@ -227,10 +207,9 @@ class PGS_MT(nn.Module):
         up2 = self.__fw_up(c6_teach, c3, self.up2) if self.config.information_passing_strategy == 'teacher' \
             else self.__fw_up(c6_stud, c3, self.up2)
 
-
         with torch.no_grad():
             c7_teach = self.__fw_expand_layer(self.conv7_teach, up2).detach()
-            output7_teach = self.cls7_teach(c7_teach, use_softmax=True).detach()
+            output7_teach = self.cls7_teach(c7_teach).detach()
 
         aug_up2, aug_output7_teach = self.transformer(up2, output7_teach, cascade=cascade)
         c7_stud = self.__fw_expand_layer(self.conv7_stud, aug_up2)
@@ -242,7 +221,7 @@ class PGS_MT(nn.Module):
 
         with torch.no_grad():
             c8_teach = self.__fw_expand_layer(self.conv8_teach, up3).detach()
-            output8_teach = self.cls8_teach(c8_teach, use_softmax=True).detach()
+            output8_teach = self.cls8_teach(c8_teach).detach()
 
         aug_up3, aug_output8_teach = self.transformer(up3, output8_teach, cascade=cascade)
         c8_stud = self.__fw_expand_layer(self.conv8_stud, aug_up3)
@@ -254,10 +233,86 @@ class PGS_MT(nn.Module):
 
         with torch.no_grad():
             c9_teach = self.__fw_expand_layer(self.conv9_teach, up4).detach()  # output9 is the main output of the network
-            output9_teach = self.cls9_teach(c9_teach, use_softmax=True).detach()
+            output9_teach = self.cls9_teach(c9_teach).detach()
 
         aug_up4, aug_output9_teach = self.transformer(up4, output9_teach, cascade=cascade)
         c9_stud = self.__fw_expand_layer(self.conv9_stud, aug_up4)
+        output9_stud = self.cls9_stud(c9_stud)
+
+        supervised_outputs = aug_output5_teach, aug_output6_teach, aug_output7_teach, aug_output8_teach, aug_output9_teach
+        unsupervised_outputs = output5_stud, output6_stud, output7_stud, output8_stud, output9_stud
+        return supervised_outputs, unsupervised_outputs
+
+    def __fw_unsupervised_layerwise2(self, X):
+        cascade = False
+        # contracting path
+        c1, d1, c2, d2, c3, d3, c4, d4 = self.__fw_contracting_path(X)
+
+        # bottleneck
+
+        with torch.no_grad():
+            c5_teach = self.__fw_bottleneck(self.conv5_teach, d4).detach()
+            aug_output5_teach = self.cls5_teach(c5_teach).detach()
+
+        d4_stud, _ = self.transformer(d4, None, cascade=cascade)
+        c5_stud = self.__fw_bottleneck(self.conv5_stud, d4_stud)
+        output5_stud = self.cls5_stud(c5_stud)
+
+        # expanding path
+
+        teach_up1 = self.__fw_up(c5_teach, c4, self.up1,
+                                 None) if self.config.information_passing_strategy == 'teacher' \
+            else self.__fw_up(c5_stud, c4, self.up1, None)
+
+        stud_up1 = self.__fw_up(c5_teach, c4, self.up1,
+                                self.transformer) if self.config.information_passing_strategy == 'teacher' \
+            else self.__fw_up(c5_stud, c4, self.up1, self.transformer)
+
+        with torch.no_grad():
+            c6_teach = self.__fw_expand_layer(self.conv6_teach, teach_up1).detach()
+            aug_output6_teach = self.cls6_teach(c6_teach).detach()
+
+        c6_stud = self.__fw_expand_layer(self.conv6_stud, stud_up1)
+        output6_stud = self.cls6_stud(c6_stud)
+        ######
+        teach_up2 = self.__fw_up(c6_teach, c3, self.up2, None) if self.config.information_passing_strategy == 'teacher' \
+            else self.__fw_up(c6_stud, c3, self.up2, None)
+
+        stud_up2 = self.__fw_up(c6_teach, c3, self.up2, self.tranformer) if self.config.information_passing_strategy == 'teacher' \
+            else self.__fw_up(c6_stud, c3, self.up2, self.transformer)
+
+        with torch.no_grad():
+            c7_teach = self.__fw_expand_layer(self.conv7_teach, teach_up2).detach()
+            aug_output7_teach = self.cls7_teach(c7_teach).detach()
+
+        c7_stud = self.__fw_expand_layer(self.conv7_stud, stud_up2)
+        output7_stud = self.cls7_stud(c7_stud)
+
+        #####
+        teach_up3 = self.__fw_up(c7_teach, c2, self.up3, None) if self.config.information_passing_strategy == 'teacher' \
+            else self.__fw_up(c7_stud, c2, self.up3, None)
+
+        stud_up3 = self.__fw_up(c7_teach, c2, self.up3, self.transformer) if self.config.information_passing_strategy == 'teacher' \
+            else self.__fw_up(c7_stud, c2, self.up3, self.transformer)
+
+        with torch.no_grad():
+            c8_teach = self.__fw_expand_layer(self.conv8_teach, teach_up3).detach()
+            aug_output8_teach = self.cls8_teach(c8_teach).detach()
+        c8_stud = self.__fw_expand_layer(self.conv8_stud, stud_up3)
+        output8_stud = self.cls8_stud(c8_stud)
+
+        ####
+        teach_up4 = self.__fw_up(c8_teach, c1, self.up4, None) if self.config.information_passing_strategy == 'teacher' \
+            else self.__fw_up(c8_stud, c1, self.up4, None)
+        stud_up4 = self.__fw_up(c8_teach, c1, self.up4, self.transformer) if self.config.information_passing_strategy == 'teacher' \
+            else self.__fw_up(c8_stud, c1, self.up4, self.transformer)
+
+        with torch.no_grad():
+            c9_teach = self.__fw_expand_layer(self.conv9_teach,
+                                              teach_up4).detach()  # output9 is the main output of the network
+            aug_output9_teach = self.cls9_teach(c9_teach).detach()
+
+        c9_stud = self.__fw_expand_layer(self.conv9_stud, stud_up4)
         output9_stud = self.cls9_stud(c9_stud)
 
         supervised_outputs = aug_output5_teach, aug_output6_teach, aug_output7_teach, aug_output8_teach, aug_output9_teach
@@ -275,17 +330,18 @@ class PGS_MT(nn.Module):
         model_utils.copy_params(self.cls7_stud, self.cls7_teach)
         model_utils.copy_params(self.cls8_stud, self.cls8_teach)
         model_utils.copy_params(self.cls9_stud, self.cls9_teach)
+
     @torch.no_grad()
     def update_params(self, global_step, epoch, max_step, max_epoch):
         model_utils.ema_update(self.conv5_stud, self.conv5_teach,
                                global_step, epoch, alpha=0.999, max_step=max_step, max_epoch=max_epoch)
 
         model_utils.ema_update(self.cls5_stud, self.cls5_teach,
-                               global_step, epoch,  alpha=0.999, max_step=max_step, max_epoch=max_epoch)
+                               global_step, epoch, alpha=0.999, max_step=max_step, max_epoch=max_epoch)
         model_utils.ema_update(self.conv6_stud, self.conv6_teach,
-                               global_step, epoch,  alpha=0.999, max_step=max_step, max_epoch=max_epoch)
-        model_utils.ema_update(self.cls6_stud,  self.cls6_teach,
-                               global_step, epoch,  alpha=0.999, max_step=max_step, max_epoch=max_epoch)
+                               global_step, epoch, alpha=0.999, max_step=max_step, max_epoch=max_epoch)
+        model_utils.ema_update(self.cls6_stud, self.cls6_teach,
+                               global_step, epoch, alpha=0.999, max_step=max_step, max_epoch=max_epoch)
         model_utils.ema_update(self.conv7_stud, self.conv7_teach,
                                global_step, epoch, alpha=0.999, max_step=max_step, max_epoch=max_epoch)
         model_utils.ema_update(self.cls7_stud, self.cls7_teach,
@@ -293,9 +349,9 @@ class PGS_MT(nn.Module):
         model_utils.ema_update(self.conv8_stud, self.conv8_teach,
                                global_step, epoch, alpha=0.999, max_step=max_step, max_epoch=max_epoch)
         model_utils.ema_update(self.cls8_stud, self.cls8_teach,
-                               global_step, epoch,  alpha=0.999, max_step=max_step, max_epoch=max_epoch)
+                               global_step, epoch, alpha=0.999, max_step=max_step, max_epoch=max_epoch)
         model_utils.ema_update(self.conv9_stud, self.conv9_teach,
-                               global_step, epoch,  alpha=0.999, max_step=max_step, max_epoch=max_epoch)
+                               global_step, epoch, alpha=0.999, max_step=max_step, max_epoch=max_epoch)
         model_utils.ema_update(self.cls9_stud, self.cls9_teach,
                                global_step, epoch, alpha=0.999, max_step=max_step, max_epoch=max_epoch)
 
