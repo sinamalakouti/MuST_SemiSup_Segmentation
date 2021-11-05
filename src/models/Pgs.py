@@ -40,8 +40,6 @@ class CLS(nn.Module):
         super(CLS, self).__init__()
         self.dim_in = dim_in
         self.dim_out = dim_out
-        self.center_momentum = 0.9
-        self.center = None
         self.net = self.__build_module()
 
     def __build_module(self):
@@ -49,26 +47,9 @@ class CLS(nn.Module):
             nn.Conv2d(self.dim_in, self.dim_out, 1)
         )
 
-    @torch.no_grad()
-    def update_center(self, teacher_output):
-        batch_center = torch.sum(teacher_output, dim=0, keepdim=True)
-        batch_center = batch_center / (len(teacher_output))
-        self.center = self.center * self.center_momentum + batch_center * (1 - self.center_momentum)
-
-    def forward(self, X, isTeacher=False):
+    def forward(self, X):
         logits = self.net(X)
-        if self.training:
-            if isTeacher:
-                if self.center is None:
-                    self.center = torch.zeros((1, logits.shape[1], logits.shape[2], logits.shape[3])).to(X.device)
-                output = torch.nn.functional.softmax((logits - self.center), dim=1)
-                self.update_center(logits)
-
-            else:
-                output = logits
-        else:
-            output = logits
-        return output
+        return logits
 
 
 class Up(torch.nn.Module):
@@ -192,7 +173,7 @@ class PGS(nn.Module):
 
         with torch.no_grad():
             c5_teach = self.__fw_bottleneck(d4).detach()
-            output5_teach = self.cls5(c5_teach, isTeacher=True).detach()
+            output5_teach = self.cls5(c5_teach).detach()
 
         d4_stud, aug_output5_teach = self.transformer(d4, output5_teach, cascade=cascade)
         c5_stud = self.__fw_bottleneck(d4_stud)
@@ -204,7 +185,7 @@ class PGS(nn.Module):
 
         with torch.no_grad():
             c6_teach = self.__fw_expand_4layer(up1).detach()
-            output6_teach = self.cls6(c6_teach, isTeacher=True).detach()
+            output6_teach = self.cls6(c6_teach).detach()
 
         aug_up1, aug_output6_teach = self.transformer(up1, output6_teach, cascade=cascade)
         c6_stud = self.__fw_expand_4layer(aug_up1)
@@ -215,7 +196,7 @@ class PGS(nn.Module):
 
         with torch.no_grad():
             c7_teach = self.__fw_expand_3layer(up2).detach()
-            output7_teach = self.cls7(c7_teach, isTeacher=True).detach()
+            output7_teach = self.cls7(c7_teach).detach()
 
         aug_up2, aug_output7_teach = self.transformer(up2, output7_teach, cascade=cascade)
         c7_stud = self.__fw_expand_3layer(aug_up2)
@@ -227,7 +208,7 @@ class PGS(nn.Module):
 
         with torch.no_grad():
             c8_teach = self.__fw_expand_2layer(up3).detach()
-            output8_teach = self.cls8(c8_teach, isTeacher=True).detach()
+            output8_teach = self.cls8(c8_teach).detach()
 
         aug_up3, aug_output8_teach = self.transformer(up3, output8_teach, cascade=cascade)
         c8_stud = self.__fw_expand_2layer(aug_up3)
@@ -240,7 +221,7 @@ class PGS(nn.Module):
         with torch.no_grad():
             # output9 is the main output of the network
             c9_teach = self.__fw_expand_1layer(up4).detach()
-            output9_teach = self.cls9(c9_teach, isTeacher=True).detach()
+            output9_teach = self.cls9(c9_teach).detach()
 
         aug_up4, aug_output9_teach = self.transformer(up4, output9_teach, cascade=cascade)
         c9_stud = self.__fw_expand_1layer(aug_up4)
@@ -249,7 +230,6 @@ class PGS(nn.Module):
         supervised_outputs = aug_output5_teach, aug_output6_teach, aug_output7_teach, aug_output8_teach, aug_output9_teach
         unsupervised_outputs = output5_stud, output6_stud, output7_stud, output8_stud, output9_stud
         return supervised_outputs, unsupervised_outputs
-
 
     def __fw_unsupervised_layerwise2(self, X):
         cascade = False
@@ -260,7 +240,7 @@ class PGS(nn.Module):
 
         with torch.no_grad():
             c5_teach = self.__fw_bottleneck(d4).detach()
-            aug_output5_teach = self.cls5(c5_teach, isTeacher=True).detach()
+            aug_output5_teach = self.cls5(c5_teach).detach()
 
         d4_stud, _ = self.transformer(d4, None, cascade=cascade)
         c5_stud = self.__fw_bottleneck(d4_stud)
@@ -268,29 +248,31 @@ class PGS(nn.Module):
 
         # expanding path
         teach_up1 = self.__fw_up(c5_teach, c4, self.up1,
-                           None) if self.config.information_passing_strategy == 'teacher' \
+                                 None) if self.config.information_passing_strategy == 'teacher' \
             else self.__fw_up(c5_stud, c4, self.up1, None)
 
-        stud_up1 = self.__fw_up(c5_teach, c4, self.up1, self.transformer) if self.config.information_passing_strategy == 'teacher' \
+        stud_up1 = self.__fw_up(c5_teach, c4, self.up1,
+                                self.transformer) if self.config.information_passing_strategy == 'teacher' \
             else self.__fw_up(c5_stud, c4, self.up1, self.transformer)
 
         with torch.no_grad():
             c6_teach = self.__fw_expand_4layer(teach_up1).detach()
-            aug_output6_teach = self.cls6(c6_teach, isTeacher=True).detach()
+            aug_output6_teach = self.cls6(c6_teach).detach()
 
         c6_stud = self.__fw_expand_4layer(stud_up1)
         output6_stud = self.cls6(c6_stud)
         ######
         teach_up2 = self.__fw_up(c6_teach, c3, self.up2,
-                                None) if self.config.information_passing_strategy == 'teacher' \
+                                 None) if self.config.information_passing_strategy == 'teacher' \
             else self.__fw_up(c6_stud, c3, self.up2, None)
 
-        stud_up2 = self.__fw_up(c6_teach, c3, self.up2, self.transformer) if self.config.information_passing_strategy == 'teacher' \
+        stud_up2 = self.__fw_up(c6_teach, c3, self.up2,
+                                self.transformer) if self.config.information_passing_strategy == 'teacher' \
             else self.__fw_up(c6_stud, c3, self.up2, self.transformer)
 
         with torch.no_grad():
             c7_teach = self.__fw_expand_3layer(teach_up2).detach()
-            aug_output7_teach = self.cls7(c7_teach, isTeacher=True).detach()
+            aug_output7_teach = self.cls7(c7_teach).detach()
 
         c7_stud = self.__fw_expand_3layer(stud_up2)
         output7_stud = self.cls7(c7_stud)
@@ -300,12 +282,12 @@ class PGS(nn.Module):
             else self.__fw_up(c7_stud, c2, self.up3, None)
 
         stud_up3 = self.__fw_up(c7_teach, c2, self.up3,
-                           self.transformer) if self.config.information_passing_strategy == 'teacher' \
+                                self.transformer) if self.config.information_passing_strategy == 'teacher' \
             else self.__fw_up(c7_stud, c2, self.up3, self.transformer)
 
         with torch.no_grad():
             c8_teach = self.__fw_expand_2layer(teach_up3).detach()
-            aug_output8_teach = self.cls8(c8_teach, isTeacher=True).detach()
+            aug_output8_teach = self.cls8(c8_teach).detach()
 
         c8_stud = self.__fw_expand_2layer(stud_up3)
         output8_stud = self.cls8(c8_stud)
@@ -315,14 +297,13 @@ class PGS(nn.Module):
             else self.__fw_up(c8_stud, c1, self.up4, None)
 
         stud_up4 = self.__fw_up(c8_teach, c1, self.up4,
-                           self.transformer) if self.config.information_passing_strategy == 'teacher' \
+                                self.transformer) if self.config.information_passing_strategy == 'teacher' \
             else self.__fw_up(c8_stud, c1, self.up4, self.transformer)
 
         with torch.no_grad():
             # output9 is the main output of the network
             c9_teach = self.__fw_expand_1layer(teach_up4).detach()
-            aug_output9_teach = self.cls9(c9_teach, isTeacher=True).detach()
-
+            aug_output9_teach = self.cls9(c9_teach).detach()
 
         c9_stud = self.__fw_expand_1layer(stud_up4)
         output9_stud = self.cls9(c9_stud)
