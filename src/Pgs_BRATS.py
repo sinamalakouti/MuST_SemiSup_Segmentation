@@ -6,7 +6,7 @@ from torch.optim import lr_scheduler
 
 from utils import utils, eval_utils
 from utils import model_utils
-from losses.loss import consistency_weight, softmax_ce_consistency_loss, softmax_kl_loss
+from losses.loss import consistency_weight, Consistency_CE, softmax_kl_loss
 
 from evaluation_metrics import dice_coef, get_dice_coef_per_subject, get_confusionMatrix_metrics, do_eval
 from dataset.Brat20 import Brat20Test, seg2WT, seg2TC, seg2ET, semi_sup_split
@@ -36,10 +36,11 @@ parser = argparse.ArgumentParser()
 
 def __fw_outputwise_unsup_loss(y_stud, y_teach, loss_functions, cfg):
     (_, unsup_loss) = loss_functions
-    total_loss = 0
+
     assert len(y_teach) == len(y_stud), "Error! unsup_preds and sup_preds have to have same length"
     num_preds = len(y_teach)
     losses = []
+
     for i in range(num_preds):
         teach_pred = y_teach[i]
 
@@ -50,10 +51,13 @@ def __fw_outputwise_unsup_loss(y_stud, y_teach, loss_functions, cfg):
         if cfg.consistency_loss == 'CE':
             losses.append(- torch.mean(
                 torch.sum(teach_pred.detach()
-                          * torch.nn.functional.log_softmax(stud_pred/0.5, dim=1), dim=1)))
+                          * torch.nn.functional.log_softmax(stud_pred / 0.5, dim=1), dim=1)))
         elif cfg.consistency_loss == 'KL':
             losses.append(
                 softmax_kl_loss(stud_pred, teach_pred.detach(), conf_mask=False, threshold=None, use_softmax=False))
+        elif cfg.consistency_loss == 'balance_CE':
+            losses.append(
+                unsup_loss(stud_pred, teach_pred, i, use_softmax=True))
     total_loss = sum(losses)
     return total_loss
 
@@ -155,32 +159,38 @@ def trainPgs_semi_downSample(train_sup_loader, train_unsup_loader, model, optimi
                              cfg):
     total_loss = 0
     model.train()
-
-    train_sup_iterator = iter(train_sup_loader)
-
+    # dataloader
     semi_dataLoader = zip(train_sup_loader, train_unsup_loader)
 
-    for batch_idx, (batch_sup, batch_unsup)  in enumerate(semi_dataLoader):
+    for batch_idx, (batch_sup, batch_unsup) in enumerate(semi_dataLoader):
         optimizer.zero_grad()
+        # read labeled data
         b_sup = batch_sup['data'].to(device)
         target_sup = batch_sup['label'].to(device)
+        # forward-pass: supervised model
         sup_outputs, _ = model(b_sup, is_supervised=True)
+        # compute supervised loss
         sLoss = compute_loss(sup_outputs, target_sup, loss_functions, is_supervised=True, cfg=cfg)
-
+        # remove supervised batch
         del b_sup
-
+        # read unlabeled data
         b_unsup = batch_unsup['data']
         b_unsup = b_unsup.to(device)
+        # forward pass: consistency (unsupevised) model
         teacher_outputs, student_outputs = model(b_unsup, is_supervised=False)
+        # compute unsupervised loss
         uLoss = compute_loss(student_outputs, teacher_outputs, loss_functions, is_supervised=False, cfg=cfg)
 
         print("**************** UNSUP LOSSS  : {} ****************".format(uLoss))
         print("**************** SUP LOSSS  : {} ****************".format(sLoss))
+        # compute consistency weigth ( for unsupervised loss)
         weight_unsup = cons_w_unsup(epochid, batch_idx)
+        # compute total loss
         total_loss = sLoss + weight_unsup * uLoss
+        # backward pass & optimizer step
         total_loss.backward()
         optimizer.step()
-
+        # compute batch scores and log to Wandb
         with torch.no_grad():
             sf = torch.nn.Softmax2d()
             target_sup[target_sup >= 1] = 1
@@ -283,40 +293,6 @@ def trainPgs_sup(train_sup_loader, model, optimizer, device, loss_functions, epo
                 {"sup_batch_id": step + epochid * len(train_sup_loader), "sup_loss": total_loss,
                  "batch_score": dice_score})
 
-    return model, total_loss
-
-
-def trainPGS(train_loader, model, optimizer, device, epochid):
-    model.train()
-    total_loss = 0
-    for step, batch in enumerate(train_loader):
-        optimizer.zero_grad()
-        b = batch['data']
-        b = b.to(device)
-        target = batch['label'].to(device)
-
-        # unsup_loss = nn.MSELoss()
-        unsup_loss = nn.CrossEntropyLoss()
-        sup_loss = torch.nn.CrossEntropyLoss()
-        # sup_loss = reconstruction_loss.dice_coef_loss
-        # sup_loss = torch.nn.w
-        loss_functions = (sup_loss, unsup_loss)
-        is_supervised = True
-        print("subject is : ", batch['subject'])
-        sup_outputs, unsup_outputs = model(b, is_supervised)
-
-        if is_supervised:
-            total_loss = Pgs.compute_loss(sup_outputs, target, loss_functions, is_supervised)
-            wandb.log({"sup_loss": total_loss})
-        else:
-
-            # raise Exception("unsupervised is false")
-            total_loss = Pgs.compute_loss(unsup_outputs, sup_outputs, loss_functions, is_supervised)
-            wandb.log({"unsup_loss": total_loss})
-        print("****** LOSSS  : Is_supervised: {} *********   :".format(is_supervised), total_loss)
-
-        total_loss.backward()
-        optimizer.step()
     return model, total_loss
 
 
@@ -449,210 +425,6 @@ def eval_per_subjectPgs(model, device, threshold, cfg, data_mode):
     # return np.mean(np.array(dice_arrWT)), np.mean(np.array(dice_arrET)), np.mean(np.array(dice_arrTC))
 
 
-def eval_per_subjectPgs3(model, device, threshold, cfg, data_mode):
-    print("******************** EVALUATING {}********************".format(data_mode))
-
-    testset = Brat20Test(f'data/brats20', data_mode, 10, 155,
-                         augment=False, center_cropping=True, t1=cfg.t1, t2=cfg.t2, t1ce=cfg.t1ce, oneHot=cfg.oneHot)
-
-    model.eval()
-    dice_arrWT = []
-    dice_arrTC = []
-    dice_arrET = []
-
-    paths = testset.paths
-    sup_loss = torch.nn.CrossEntropyLoss()
-    with torch.no_grad():
-        for path in paths:
-            batch = testset.get_subject(path)
-            b = batch['data']
-            target = batch['label'].to(device)
-            subjects = batch['subjects']
-            assert len(np.unique(subjects)) == 1, print("More than one subject at a time")
-            b = b.to(device)
-            outputs, _ = model(b, True)
-
-            if cfg.oneHot:
-                sf = torch.nn.Softmax2d()
-                outputs = sf(outputs[-1])
-
-            loss_val = compute_loss(outputs, target, (sup_loss, None), is_supervised=True)
-            print("############# LOSS for subject {} is {} ##############".format(subjects[0], loss_val.item()))
-            if cfg.oneHot:
-                target[target >= 1] = 1
-                target_WT = seg2WT(target, 1, oneHot=cfg.oneHot)
-                y_pred = outputs
-            else:
-                sf = torch.nn.Softmax2d()
-                targetWT = target.clone()
-                targetET = target.clone()
-                targetTC = target.clone()
-                targetWT[targetWT >= 1] = 1
-                targetET[~ (targetET == 3)] = 0
-                targetET[(targetET == 3)] = 1
-                targetTC[~ ((targetTC == 3) | (targetTC == 1))] = 0
-                targetTC[(targetTC == 3) | (targetTC == 1)] = 1
-                y_pred = sf(outputs[-1])
-
-            y_WT = seg2WT(y_pred, threshold, oneHot=cfg.oneHot)
-            y_ET = seg2ET(y_pred, threshold)
-            y_TC = seg2TC(y_pred, threshold)
-
-            dice_scoreWT = dice_coef(targetWT.reshape(y_WT.shape), y_WT)
-            dice_scoreET = dice_coef(targetET, y_ET)
-            dice_scoreTC = dice_coef(targetTC.reshape(y_TC.shape), y_TC)
-
-            print("*** EVALUATION METRICS FOR SUBJECT {} IS: ".format(subjects[0]))
-            print("(WT) :  DICE SCORE   {}".format(dice_scoreWT))
-            print("(ET) :  DICE SCORE   {}".format(dice_scoreET))
-            print("(TC) :  DICE SCORE   {}".format(dice_scoreTC))
-
-            dice_arrWT.append(dice_scoreWT.detach().item())
-            dice_arrET.append(dice_scoreET.detach().item())
-            dice_arrTC.append(dice_scoreTC.detach().item())
-
-    final_dice = {'WT': np.mean(dice_arrWT), 'ET': np.mean(dice_arrET), 'TC': np.mean(dice_arrTC)}
-
-    return final_dice
-    # return np.mean(np.array(dice_arrWT)), np.mean(np.array(dice_arrET)), np.mean(np.array(dice_arrTC))
-
-
-def eval_per_subjectPgs2(model, device, threshold, cfg, data_mode):
-    print("******************** EVALUATING {}********************".format(data_mode))
-
-    testset = Brat20Test(f'data/brats20', data_mode, 10, 155,
-                         augment=False, center_cropping=True, t1=cfg.t1, t2=cfg.t2, t1ce=cfg.t1ce, oneHot=cfg.oneHot)
-
-    model.eval()
-    # dice_arrWT = []
-    # dice_arrTC = []
-    # dice_arrET = []
-    running_dice = {'WT': [], 'TC': [], 'ET': []}
-    running_hd = {'WT': [], 'TC': [], 'ET': []}
-    running_PPV = {'WT': [], 'TC': [], 'ET': []}
-    running_sensitivity = {'WT': [], 'TC': [], 'ET': []}
-
-    paths = testset.paths
-    sup_loss = torch.nn.CrossEntropyLoss()
-
-    with torch.no_grad():
-        for path in paths:
-            batch = testset.get_subject(path)
-            b = batch['data']
-            target = batch['label'].to(device)
-            subjects = batch['subjects']
-            assert len(np.unique(subjects)) == 1, print("More than one subject at a time")
-            b = b.to(device)
-
-            outputs, _ = model(b, True)
-
-            if cfg.oneHot:
-                sf = torch.nn.Softmax2d()
-                outputs = sf(outputs[-1])
-
-            loss_val = compute_loss(outputs, target, (sup_loss, None), is_supervised=True, cfg=cfg)
-            print("############# LOSS for subject {} is {} ##############".format(subjects[0], loss_val.item()))
-            if cfg.oneHot:
-                target[target >= 1] = 1
-                target_WT = seg2WT(target, 1, oneHot=cfg.oneHot)
-                y_pred = outputs
-            else:
-                sf = torch.nn.Softmax2d()
-                targetWT = target.clone()
-                targetET = target.clone()
-                targetTC = target.clone()
-                targetWT[targetWT >= 1] = 1
-                targetET[~ (targetET == 3)] = 0
-                targetET[(targetET == 3)] = 1
-                targetTC[~ ((targetTC == 3) | (targetTC == 1))] = 0
-                targetTC[(targetTC == 3) | (targetTC == 1)] = 1
-                y_pred = sf(outputs[-1])
-
-            y_WT = seg2WT(y_pred, threshold, oneHot=cfg.oneHot)
-            y_ET = seg2ET(y_pred, threshold)
-            y_TC = seg2TC(y_pred, threshold)
-
-            metrics_WT, _, _ = eval_utils.do_eval(targetWT.reshape(y_WT.shape).cpu(), y_WT.cpu())
-            metrics_ET, _, _ = eval_utils.do_eval(targetET.cpu(), y_ET.cpu())
-            metrics_TC, _, _ = eval_utils.do_eval(targetTC.reshape(y_TC.shape).cpu(), y_TC.cpu())
-
-            running_dice['WT'].append(metrics_WT['dsc'])
-            running_dice['ET'].append(metrics_ET['dsc'])
-            running_dice['TC'].append(metrics_TC['dsc'])
-
-            running_hd['WT'].append(metrics_WT['h95'])
-            running_hd['ET'].append(metrics_ET['h95'])
-            running_hd['TC'].append(metrics_TC['h95'])
-
-            running_PPV['WT'].append(metrics_WT['PPV'])
-            running_PPV['ET'].append(metrics_ET['PPV'])
-            running_PPV['TC'].append(metrics_TC['PPV'])
-
-            running_sensitivity['WT'].append(metrics_WT['sensitivity'])
-            running_sensitivity['ET'].append(metrics_ET['sensitivity'])
-            running_sensitivity['TC'].append(metrics_TC['sensitivity'])
-
-    final_dice = {'WT': np.mean(running_dice['WT']), 'ET': np.mean(running_dice['ET']),
-                  'TC': np.mean(running_dice['TC'])}
-    final_hd = {'WT': np.mean(running_hd['WT']), 'ET': np.mean(running_hd['ET']), 'TC': np.mean(running_hd['TC'])}
-    final_PPV = {'WT': np.mean(running_PPV['WT']), 'ET': np.mean(running_PPV['ET']), 'TC': np.mean(running_PPV['TC'])}
-    final_sensitivity = {'WT': np.mean(running_sensitivity['WT']), 'ET': np.mean(running_sensitivity['ET']),
-                         'TC': np.mean(running_sensitivity['TC'])}
-    return final_dice, final_hd, final_PPV, final_sensitivity
-
-
-def evaluatePGS(model, dataset, device, threshold, cfg, training_mode):
-    print("******************** EVALUATING  : {} ********************".format(training_mode))
-
-    testset = utils.get_testset(dataset, cfg.batch_size, intensity_rescale=cfg.intensity_rescale,
-                                mixup_threshold=cfg.mixup_threshold, mode=training_mode,
-                                t1=cfg.t1, t2=cfg.t2, t1ce=cfg.t1ce, augment=False)
-
-    model.eval()
-
-    dice_arr = []
-    segmentation_outputs = []
-    all_preds = None
-    all_targets = None
-    all_subjects = None
-
-    with torch.no_grad():
-        for batch_id, batch in enumerate(testset):
-            b = batch['data']
-            b = b.to(device)
-            target = batch['label'].to(device)
-            predictions, _ = model(b, True)
-            # apply softmax
-            sf = torch.nn.Softmax2d()
-            y_pred = sf(predictions[-1])
-
-            if batch_id == 0:
-                all_preds = y_pred
-                all_subjects = batch['subject']
-                all_targets = target
-            else:
-                all_preds = torch.cat((all_preds, y_pred), dim=0)
-                all_subjects = torch.cat((all_subjects, batch['subject']), dim=0)
-                all_targets = torch.cat((all_targets, target), dim=0)
-
-            y_WT = seg2WT(y_pred, threshold)
-            target[target >= 1] = 1
-            target_WT = target
-            dice_score = dice_coef(target_WT.reshape(y_WT.shape), y_WT)
-            dice_arr.append(dice_score.detach().item())
-            outputs = predictions[-1].reshape(predictions[-1].shape[0], predictions[-1].shape[1],
-                                              predictions[-1].shape[2],
-                                              predictions[-1].shape[3])
-            for output in outputs:
-                segmentation_outputs.append(output)
-
-    all_targets[all_targets >= 1] = 1
-    all_preds = seg2WT(all_preds, threshold)
-    subject_wise_DSC = get_dice_coef_per_subject(all_targets.reshape(all_preds.shape), all_preds, all_subjects)
-
-    return np.mean(np.array(dice_arr)), subject_wise_DSC, segmentation_outputs
-
-
 def Pgs_train_val(dataset, n_epochs, wmh_threshold, output_dir, learning_rate, args, cfg, seed):
     inputs_dim = [4, 64, 96, 128, 256, 768, 384, 224, 160]
     outputs_dim = [64, 96, 128, 256, 512, 256, 128, 96, 64, 4]
@@ -661,14 +433,15 @@ def Pgs_train_val(dataset, n_epochs, wmh_threshold, output_dir, learning_rate, a
 
     wandb.run.name = "{}_PGS_{}_{}_supRate{}_seed{}_".format(cfg.experiment_mode, "trainALL2018", "valNew2019",
                                                              cfg.train_sup_rate, seed)
+
+    '''  uncomment this when you want to create a new split
     dataroot_dir = f'data/brats20'
     all_train_csv = os.path.join(dataroot_dir, 'trainset/brats2018.csv')
     supdir_path = os.path.join(dataroot_dir, 'trainset')
 
-    # semi_sup_split(all_train_csv=all_train_csv, sup_dir_path=supdir_path, unsup_dir_path=supdir_path,
-    #                ratio=cfg.train_sup_rate / 100, seed=cfg.seed)
-
-    step_size = cfg.scheduler_step_size
+     semi_sup_split(all_train_csv=all_train_csv, sup_dir_path=supdir_path, unsup_dir_path=supdir_path,
+                    ratio=cfg.train_sup_rate / 100, seed=cfg.seed)
+    '''
 
     best_score = 0
     start_epoch = 0
@@ -753,11 +526,8 @@ def Pgs_train_val(dataset, n_epochs, wmh_threshold, output_dir, learning_rate, a
     pgsnet.to(device)
     optimizer = torch.optim.SGD(pgsnet.parameters(), learning_rate, momentum=0.9, weight_decay=1e-4)
     # optimizer = torch.optim.Adam(pgsnet.parameters(), lr=1e-2)
-    scheduler = lr_scheduler.StepLR(optimizer, step_size=cfg.scheduler_step_size, gamma=cfg.lr_gamma)  # don't use it
-    # final_dice, final_PPV, final_sensitivity, final_specificity, final_hd = eval_per_subjectPgs(pgsnet, device,
-    #                                                                                             wmh_threshold,
-    #                                                                                             cfg,
-    #                                                                                             cfg.val_mode)
+    scheduler = lr_scheduler.StepLR(optimizer, step_size=cfg.scheduler_step_size, gamma=cfg.lr_gamma)
+
     train_sup_loader = utils.get_trainset(dataset, batch_size=cfg.batch_size, intensity_rescale=cfg.intensity_rescale,
                                           mixup_threshold=cfg.mixup_threshold, mode=cfg.train_sup_mode, t1=cfg.t1,
                                           t2=cfg.t2, t1ce=cfg.t1ce, augment=cfg.augment, seed=cfg.seed)
@@ -772,6 +542,13 @@ def Pgs_train_val(dataset, n_epochs, wmh_threshold, output_dir, learning_rate, a
                                                 augment=cfg.augment, seed=cfg.seed)
         print('size of unlabeled training set: number of subjects:    ', len(train_unsup_loader.dataset.subjects_name))
         print("un labeled subjects  ", train_unsup_loader.dataset.subjects_name)
+
+    sup_loss_fn = torch.nn.CrossEntropyLoss()
+    if cfg.consistency_loss == 'balanced_CE':
+        cons_loss_fn = Consistency_CE()
+    else:
+        cons_loss_fn = None
+
     for epoch in range(start_epoch, n_epochs):
         print("iteration:  ", epoch)
 
@@ -790,7 +567,7 @@ def Pgs_train_val(dataset, n_epochs, wmh_threshold, output_dir, learning_rate, a
                                                   ramp_type=cfg['consist_w_unsup']['rampup'])
 
                 pgsnet, loss = trainPgs_semi(train_sup_loader, train_unsup_loader, pgsnet, optimizer, device,
-                                             (torch.nn.CrossEntropyLoss(), torch.nn.CrossEntropyLoss()), cons_w_unsup,
+                                             (torch.nn.CrossEntropyLoss(), cons_loss_fn), cons_w_unsup,
                                              epoch, cfg)
         elif cfg.experiment_mode == 'semi_downSample':
             cons_w_unsup = consistency_weight(final_w=cfg['consist_w_unsup']['final_w'],
@@ -799,8 +576,9 @@ def Pgs_train_val(dataset, n_epochs, wmh_threshold, output_dir, learning_rate, a
                                               ramp_type=cfg['consist_w_unsup']['rampup'])
 
             pgsnet, loss = trainPgs_semi_downSample(train_sup_loader, train_unsup_loader, pgsnet, optimizer, device,
-                                         (torch.nn.CrossEntropyLoss(), torch.nn.CrossEntropyLoss()), cons_w_unsup,
-                                         epoch, cfg)
+                                                    (torch.nn.CrossEntropyLoss(), cons_loss_fn),
+                                                    cons_w_unsup,
+                                                    epoch, cfg)
         # score, segmentations = evaluatePGS(pgsnet, dataset, device, wmh_threshold, cfg, cfg.val_mode)
         elif cfg.experiment_mode == 'partially_sup':
             pgsnet, loss = trainPgs_sup(train_sup_loader, pgsnet, optimizer, device,

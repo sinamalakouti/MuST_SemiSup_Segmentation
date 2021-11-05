@@ -26,7 +26,8 @@ class Consistency_CE:
             center = self.centers[center_id]
             teach_pred = torch.nn.functional.softmax((teach_output - center) / 0.2, dim=1)
         self.update_center(center_id, teach_output)
-        loss = - torch.mean(torch.sum(teach_pred.detach()* torch.nn.functional.log_softmax(stud_logit / 0.5, dim=1), dim=1))
+        loss = - torch.mean(torch.sum(teach_pred.detach()
+                                      * torch.nn.functional.log_softmax(stud_logit / 0.5, dim=1), dim=1))
 
         return loss
 
