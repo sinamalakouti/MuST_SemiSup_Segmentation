@@ -4,6 +4,33 @@ import torch.nn.functional as F
 import torch.nn as nn
 
 
+class Consistency_CE:
+    def __init__(self, n_cls):
+        super(Consistency_CE, self).__init__()
+        self.centers = [None for i in range(0, n_cls)]
+        self.center_momentum = 0.9
+
+    @torch.no_grad
+    def update_center(self, center_id, teacher_output):
+        batch_center = torch.sum(teacher_output, dim=0, keepdim=True)
+        batch_center = batch_center / (len(teacher_output))
+        self.centers[center_id] *= self.center_momentum
+        self.centers[center_id] += batch_center * (1 - self.center_momentum)
+
+    def __call__(self, stud_logit, teach_output, center_id, use_softmax=True):
+
+        if self.centers[center_id] is None:
+            self.centers[center_id] = torch.zeros(
+                (1, teach_output.shape[1], teach_output.shape[2], teach_output.shape[3])).to(teach_output.device)
+        if use_softmax:
+            center = self.centers[center_id]
+            teach_pred = torch.nn.functional.softmax((teach_output - center) / 0.2, dim=1)
+        self.update_center(center_id, teach_output)
+        loss = - torch.mean(torch.sum(teach_pred.detach()* torch.nn.functional.log_softmax(stud_logit / 0.5, dim=1), dim=1))
+
+        return loss
+
+
 def softmax_ce_consistency_loss(x, y):
     return - torch.mean(
         torch.sum(y.detach()
@@ -13,7 +40,7 @@ def softmax_ce_consistency_loss(x, y):
 def softmax_kl_loss(inputs, targets, conf_mask=False, threshold=None, use_softmax=False):
     assert inputs.requires_grad == True and targets.requires_grad == False
     assert inputs.size() == targets.size()
-    input_log_softmax = F.log_softmax(inputs, dim=1)
+    input_log_softmax = F.log_softmax(inputs / 0.5, dim=1)
     if use_softmax:
         targets = F.softmax(targets, dim=1)
 
@@ -24,7 +51,7 @@ def softmax_kl_loss(inputs, targets, conf_mask=False, threshold=None, use_softma
         if loss_mat.shape.numel() == 0: loss_mat = torch.tensor([0.]).to(inputs.device)
         return loss_mat.sum() / mask.shape.numel()
     else:
-        return F.kl_div(input_log_softmax, targets, reduction='mean')
+        return F.kl_div(input_log_softmax, targets, reduction='batchmean')
 
 
 def mse_power(x, y, power=3):
@@ -125,7 +152,7 @@ class soft_dice_loss(torch.nn.Module):
         return 1 - torch.mean((numerator + epsilon) / (denominator + epsilon))  # average over classes and batch
 
 
-class abCE_loss (nn.Module):
+class abCE_loss(nn.Module):
     """
     Annealed-Bootstrapped cross-entropy loss
     """
