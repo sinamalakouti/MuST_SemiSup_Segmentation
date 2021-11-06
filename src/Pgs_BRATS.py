@@ -47,7 +47,6 @@ def __fw_outputwise_unsup_loss(y_stud, y_teach, loss_functions, cfg):
         stud_pred = y_stud[i]
         assert teach_pred.shape == stud_pred.shape, "Error! for preds number {}, supervised and unsupervised" \
                                                     " prediction shape is not similar!".format(i)
-
         if cfg.consistency_loss == 'CE':
             losses.append(- torch.mean(
                 torch.sum(teach_pred.detach()
