@@ -48,15 +48,22 @@ def __fw_outputwise_unsup_loss(y_stud, y_teach, loss_functions, cfg):
         assert teach_pred.shape == stud_pred.shape, "Error! for preds number {}, supervised and unsupervised" \
                                                     " prediction shape is not similar!".format(i)
         if cfg.consistency_loss == 'CE':
+            teach_pred = torch.nn.functional.softmax(teach_pred, dim = 1)
             losses.append(- torch.mean(
                 torch.sum(teach_pred.detach()
-                          * torch.nn.functional.log_softmax(stud_pred / 0.5, dim=1), dim=1)))
+                          * torch.nn.functional.log_softmax(stud_pred , dim=1), dim=1)))
         elif cfg.consistency_loss == 'KL':
             losses.append(
-                softmax_kl_loss(stud_pred, teach_pred.detach(), conf_mask=False, threshold=None, use_softmax=False))
+                softmax_kl_loss(stud_pred, teach_pred.detach(), conf_mask=False, threshold=None, use_softmax=True))
         elif cfg.consistency_loss == 'balanced_CE':
             losses.append(
                 unsup_loss(stud_pred, teach_pred, i, use_softmax=True))
+        elif cfg.consistency_loss =='MSE':
+            teach_pred = torch.nn.functional.softmax(teach_pred, dim = 1)
+            student_pred = torch.nn.functional.softmax(stud_pred, dim = 1)
+            mse = torch.nn.MSELoss()
+            loss = mse(teach_pred.detach(), student_pred)
+            losses.append(loss)
     total_loss = sum(losses)
     return total_loss
 
@@ -430,7 +437,7 @@ def Pgs_train_val(dataset, n_epochs, wmh_threshold, output_dir, learning_rate, a
     kernels = [5, 3, 3, 3, 3, 3, 3, 3, 3]
     strides = [1, 1, 1, 1, 1, 1, 1, 1, 1]
 
-    wandb.run.name = "{}_PGS_{}_{}_supRate{}_seed{}_".format(cfg.experiment_mode, "trainALL2018", "valNew2019",
+    wandb.run.name = "{}_PGS_{}_{}_supRate{}_seed{}_".format(cfg.experiment_mode, "trainALL2018", cfg.val_mode,
                                                              cfg.train_sup_rate, seed)
 
     '''  uncomment this when you want to create a new split
