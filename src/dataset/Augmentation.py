@@ -248,17 +248,21 @@ class Perturbator(nn.Module):
         self.cfg = cfg
 
     def __fw_geometrical_aug(self, x, y):
-        random_selector = np.random.randint(2)
+        random_selector = np.random.randint(4)
 
         if random_selector == 0:  # scale
             x_transform, y_transform = self.scale_decoder(x, y)
         elif random_selector == 1:  # rotate
             x_transform, y_transform = self.rotation_decoder(x, y)
-        elif random_selector == 2:  # hflip
+        elif random_selector == 2:
+            x_transform, y_transform = self.uni_decoder(x, y)
+        elif random_selector == 3:
+            x_transform, y_transform = x, y
+        elif random_selector == 4:  # hflip
             x_transform, y_transform = self.hflip_decoder(x, y)
-        elif random_selector == 3:  # vflip
+        elif random_selector == 5:  # vflip
             x_transform, y_transform = self.vflip_decoder(x, y)
-        elif random_selector == 4:
+        elif random_selector == 6:
             x_transform, y_transform = x,y
         return x_transform, y_transform
 
