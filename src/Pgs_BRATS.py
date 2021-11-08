@@ -229,9 +229,9 @@ def trainPgs_semi_downSample(train_sup_loader, train_unsup_loader, model, optimi
             y_WT = seg2WT(y_pred, 0.5, cfg.oneHot)
             dice_score = dice_coef(target_sup.reshape(y_WT.shape), y_WT)
             wandb.log(
-                {"sup_batch_id": batch_idx + epochid * min(len(train_unsup_loader), len(train_sup_loader)),
+                {"sup_batch_id": batch_idx + epochid * min(len(train_sup_loader), len(train_sup_loader)),
                  "sup loss": sLoss,
-                 "unsup_batch_id": batch_idx + epochid * min(len(train_unsup_loader), len(train_sup_loader)),
+                 "unsup_batch_id": batch_idx + epochid * min(len(train_sup_loader), len(train_sup_loader)),
                  "unsup loss": uLoss,
                  "batch_score_WT": dice_score,
                  'weight unsup': weight_unsup
@@ -303,6 +303,59 @@ def trainPgs_semi_alternate(train_sup_loader, train_unsup_loader, model, optimiz
                  "unsup loss": uLoss,
                  'weight unsup': weight_unsup
                  })
+    return model, total_loss
+
+
+
+
+def trainPgs_semi_alternate2(train_sup_loader, train_unsup_loader, model, optimizer, device, loss_functions,
+                            cons_w_unsup, epochid,
+                            cfg):
+    total_loss = 0
+    model.train()
+
+    semi_loader = zip(train_sup_loader, train_unsup_loader)
+    for batch_idx, (batch_sup, batch_unsup) in enumerate(semi_loader):
+        optimizer[0].zero_grad()
+        optimizer[1].zero_grad()
+        b_unsup = batch_unsup['data']
+        b_unsup = b_unsup.to(device)
+
+
+
+        b_sup = batch_sup['data'].to(device)
+        target_sup = batch_sup['label'].to(device)
+        sup_outputs, _ = model(b_sup, is_supervised=True)
+        sLoss = compute_loss(sup_outputs, target_sup, loss_functions, is_supervised=True, cfg=cfg)
+        sLoss.backward()
+        optimizer[0].step()
+
+        teacher_outputs, student_outputs = model(b_unsup, is_supervised=False)
+        uLoss = compute_loss(student_outputs, teacher_outputs, loss_functions, is_supervised=False, cfg=cfg)
+
+        print("**************** UNSUP LOSSS  : {} ****************".format(uLoss))
+        print("**************** SUP LOSSS  : {} ****************".format(sLoss))
+        weight_unsup = cons_w_unsup(epochid, batch_idx)
+        total_loss = uLoss
+        total_loss.backward()
+        optimizer[1].step()
+
+        with torch.no_grad():
+            sf = torch.nn.Softmax2d()
+            target_sup[target_sup >= 1] = 1
+            target_sup = target_sup
+            y_pred = sf(sup_outputs[-1])
+            y_WT = seg2WT(y_pred, 0.5, cfg.oneHot)
+            dice_score = dice_coef(target_sup.reshape(y_WT.shape), y_WT)
+            wandb.log(
+                {"sup_batch_id": batch_idx + epochid * len(train_unsup_loader),
+                 "sup loss": sLoss,
+                 "unsup_batch_id": batch_idx + epochid * len(train_unsup_loader),
+                 "unsup loss": uLoss,
+                 "batch_score_WT": dice_score,
+                 'weight unsup': weight_unsup
+                 })
+
     return model, total_loss
 
 
@@ -676,12 +729,18 @@ def Pgs_train_val(dataset, n_epochs, wmh_threshold, output_dir, learning_rate, a
                                                     cons_w_unsup,
                                                     epoch, cfg)
         elif cfg.experiment_mode == 'semi_alternate':
+            optimizer_unsup = torch.optim.SGD(pgsnet.parameters(), learning_rate, momentum=0.9, weight_decay=1e-4)
+            optimizer_sup = torch.optim.SGD(pgsnet.parameters(), learning_rate, momentum=0.9, weight_decay=1e-4)
+
+            scheduler_unsup = lr_scheduler.StepLR(optimizer, step_size=cfg.scheduler_step_size, gamma=cfg.lr_gamma)
+            scheduler_sup = lr_scheduler.StepLR(optimizer, step_size= 5, gamma=cfg.lr_gamma)
+
             cons_w_unsup = consistency_weight(final_w=cfg['consist_w_unsup']['final_w'],
                                               iters_per_epoch=len(train_unsup_loader),
                                               rampup_ends=cfg['consist_w_unsup']['rampup_ends'],
                                               ramp_type=cfg['consist_w_unsup']['rampup'])
 
-            pgsnet, loss = trainPgs_semi_alternate(train_sup_loader, train_unsup_loader, pgsnet, optimizer, device,
+            pgsnet, loss = trainPgs_semi_alternate2(train_sup_loader, train_unsup_loader, pgsnet, [optimizer_sup, optimizer_unsup], device,
                                                    (torch.nn.CrossEntropyLoss(), cons_loss_fn),
                                                    cons_w_unsup,
                                                    epoch, cfg)
@@ -783,7 +842,8 @@ def Pgs_train_val(dataset, n_epochs, wmh_threshold, output_dir, learning_rate, a
             #            'TC_subject_wise_val_SENSITIVITY': final_sensitivity['TC']
             #            })
 
-        scheduler.step()
+        scheduler[0].step()
+        scheduler[1].step()
 
     final_dice, final_PPV, final_sensitivity, final_specificity, final_hd = eval_per_subjectPgs(pgsnet, device,
                                                                                                 wmh_threshold,
