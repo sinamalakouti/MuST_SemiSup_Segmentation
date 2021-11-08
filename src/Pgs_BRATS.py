@@ -42,7 +42,7 @@ def __fw_cross_consistency_loss(y_logits, loss_functions, cfg):
 
         for stud_ind in range(0, teach_ind):
             stud_logit = y_logits[stud_ind]
-            #upsample?
+            # upsample?
             if cfg.consistency_loss == 'CE':
                 teach_pred = torch.nn.functional.softmax(teach_logits, dim=1)
                 loss = - torch.mean(
@@ -72,19 +72,19 @@ def __fw_outputwise_unsup_loss(y_stud, y_teach, loss_functions, cfg):
         assert teach_pred.shape == stud_pred.shape, "Error! for preds number {}, supervised and unsupervised" \
                                                     " prediction shape is not similar!".format(i)
         if cfg.consistency_loss == 'CE':
-            teach_pred = torch.nn.functional.softmax(teach_pred, dim = 1)
+            teach_pred = torch.nn.functional.softmax(teach_pred, dim=1)
             losses.append(- torch.mean(
                 torch.sum(teach_pred.detach()
-                          * torch.nn.functional.log_softmax(stud_pred , dim=1), dim=1)))
+                          * torch.nn.functional.log_softmax(stud_pred, dim=1), dim=1)))
         elif cfg.consistency_loss == 'KL':
             losses.append(
                 softmax_kl_loss(stud_pred, teach_pred.detach(), conf_mask=False, threshold=None, use_softmax=True))
         elif cfg.consistency_loss == 'balanced_CE':
             losses.append(
                 unsup_loss(stud_pred, teach_pred, i, use_softmax=True))
-        elif cfg.consistency_loss =='MSE':
-            teach_pred = torch.nn.functional.softmax(teach_pred, dim = 1)
-            student_pred = torch.nn.functional.softmax(stud_pred, dim = 1)
+        elif cfg.consistency_loss == 'MSE':
+            teach_pred = torch.nn.functional.softmax(teach_pred, dim=1)
+            student_pred = torch.nn.functional.softmax(stud_pred, dim=1)
             mse = torch.nn.MSELoss()
             loss = mse(teach_pred.detach(), student_pred)
             losses.append(loss)
@@ -238,49 +238,47 @@ def trainPgs_semi_downSample(train_sup_loader, train_unsup_loader, model, optimi
                  })
 
     return model, total_loss
+
+
 def trainPgs_semi_alternate(train_sup_loader, train_unsup_loader, model, optimizer, device, loss_functions,
-                             cons_w_unsup, epochid,
-                             cfg):
+                            cons_w_unsup, epochid,
+                            cfg):
     total_loss = 0
     model.train()
-    # dataloader
-    semi_dataLoader = zip(train_sup_loader, train_unsup_loader)
 
-    for batch_idx, (batch_sup, batch_unsup) in enumerate(semi_dataLoader):
+    train_sup_iterator = iter(train_sup_loader)
+    sup_step = 0
+    has_sup = True
+    for unsup_step, batch_unsup in enumerate(train_unsup_loader):
         optimizer.zero_grad()
-        # read labeled data
-        b_sup = batch_sup['data'].to(device)
-        target_sup = batch_sup['label'].to(device)
-        # forward-pass: supervised model
-        sup_outputs, _ = model(b_sup, is_supervised=True)
-        # compute supervised loss
-        sLoss = compute_loss(sup_outputs, target_sup, loss_functions, is_supervised=True, cfg=cfg)
-        # remove supervised batch
-        del b_sup
-
-        sLoss.backward()
-        optimizer.step()
-        optimizer.zero_grad()
-        # read unlabeled data
         b_unsup = batch_unsup['data']
         b_unsup = b_unsup.to(device)
-        # forward pass: consistency (unsupevised) model
-        teacher_outputs, student_outputs = model(b_unsup, is_supervised=False)
 
-        # compute unsupervised loss
-        uLoss = compute_loss(student_outputs, teacher_outputs, loss_functions, is_supervised=False, cfg=cfg)
+    if has_sup:
+        try:
+            batch_sup = next(train_sup_iterator)
+            b_sup = batch_sup['data'].to(device)
+            target_sup = batch_sup['label'].to(device)
 
-        print("**************** UNSUP LOSSS  : {} ****************".format(uLoss))
-        print("**************** SUP LOSSS  : {} ****************".format(sLoss))
-        # compute consistency weigth ( for unsupervised loss)
-        weight_unsup = cons_w_unsup(epochid, batch_idx)
-        # compute total loss
-        # total_loss = sLoss + weight_unsup * uLoss
-        # backward pass & optimizer step
-        # total_loss.backward()
-        uLoss.backward()
-        optimizer.step()
-        # compute batch scores and log to Wandb
+            sup_outputs, _ = model(b_sup, is_supervised=True)
+            sLoss = compute_loss(sup_outputs, target_sup, loss_functions, is_supervised=True, cfg=cfg)
+
+        except StopIteration:
+            has_sup = False
+            sLoss = 0
+    else:
+        sLoss = 0
+
+    teacher_outputs, student_outputs = model(b_unsup, is_supervised=False)
+    uLoss = compute_loss(student_outputs, teacher_outputs, loss_functions, is_supervised=False, cfg=cfg)
+
+    print("**************** UNSUP LOSSS  : {} ****************".format(uLoss))
+    print("**************** SUP LOSSS  : {} ****************".format(sLoss))
+    weight_unsup = cons_w_unsup(epochid, unsup_step)
+    total_loss = sLoss + uLoss
+    total_loss.backward()
+    optimizer.step()
+    if has_sup:
         with torch.no_grad():
             sf = torch.nn.Softmax2d()
             target_sup[target_sup >= 1] = 1
@@ -289,14 +287,22 @@ def trainPgs_semi_alternate(train_sup_loader, train_unsup_loader, model, optimiz
             y_WT = seg2WT(y_pred, 0.5, cfg.oneHot)
             dice_score = dice_coef(target_sup.reshape(y_WT.shape), y_WT)
             wandb.log(
-                {"sup_batch_id": batch_idx + epochid * min(len(train_unsup_loader), len(train_sup_loader)),
+                {"sup_batch_id": sup_step + epochid * len(train_unsup_loader),
                  "sup loss": sLoss,
-                 "unsup_batch_id": batch_idx + epochid * min(len(train_unsup_loader), len(train_sup_loader)),
+                 "unsup_batch_id": unsup_step + epochid * len(train_unsup_loader),
                  "unsup loss": uLoss,
                  "batch_score_WT": dice_score,
                  'weight unsup': weight_unsup
                  })
 
+        sup_step += 1
+    else:
+        wandb.log(
+            {
+             "unsup_batch_id": unsup_step + epochid * len(train_unsup_loader),
+             "unsup loss": uLoss,
+             'weight unsup': weight_unsup
+             })
     return model, total_loss
 
 
@@ -671,14 +677,14 @@ def Pgs_train_val(dataset, n_epochs, wmh_threshold, output_dir, learning_rate, a
                                                     epoch, cfg)
         elif cfg.experiment_mode == 'semi_alternate':
             cons_w_unsup = consistency_weight(final_w=cfg['consist_w_unsup']['final_w'],
-                                              iters_per_epoch=len(train_sup_loader),
+                                              iters_per_epoch=len(train_unsup_loader),
                                               rampup_ends=cfg['consist_w_unsup']['rampup_ends'],
                                               ramp_type=cfg['consist_w_unsup']['rampup'])
 
             pgsnet, loss = trainPgs_semi_alternate(train_sup_loader, train_unsup_loader, pgsnet, optimizer, device,
-                                                    (torch.nn.CrossEntropyLoss(), cons_loss_fn),
-                                                    cons_w_unsup,
-                                                    epoch, cfg)
+                                                   (torch.nn.CrossEntropyLoss(), cons_loss_fn),
+                                                   cons_w_unsup,
+                                                   epoch, cfg)
 
 
 
