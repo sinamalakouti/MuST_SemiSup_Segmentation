@@ -54,7 +54,8 @@ class CLS(nn.Module):
 
 class Up(torch.nn.Module):
 
-    def __init__(self, in_channels, out_channels, bilinear=False):
+    def __init__(self, in_channels, out_channels, bilinear
+    =False):
 
         ic = in_channels
         oc = out_channels
@@ -75,6 +76,7 @@ class Up(torch.nn.Module):
             x1 = self.up(x1)
         else:
             x1 = self.up(transformer(x1)[0])
+            x2 = transformer(transformer(x2)[0])
         # bxcxhxw
         h_diff = x2.size()[2] - x1.size()[2]
         w_diff = x2.size()[3] - x1.size()[3]
@@ -164,7 +166,7 @@ class PGS(nn.Module):
 
             return sup_outputs, unsup_outputs
 
-    def __fw_unsupervised_layerwise(self, X):
+    def __fw_unsupervised_layerwise(self, X): #only geometrical aug
         cascade = False
         # contracting path
         c1, d1, c2, d2, c3, d3, c4, d4 = self.__fw_contracting_path(X)
@@ -175,7 +177,7 @@ class PGS(nn.Module):
             c5_teach = self.__fw_bottleneck(d4).detach()
             output5_teach = self.cls5(c5_teach).detach()
 
-        d4_stud, aug_output5_teach = self.transformer(d4, output5_teach, cascade=cascade)
+        d4_stud, aug_output5_teach = self.transformer(d4, output5_teach, perturbation_mode='G', cascade=cascade)
         c5_stud = self.__fw_bottleneck(d4_stud)
         output5_stud = self.cls5(c5_stud)
 
@@ -187,7 +189,7 @@ class PGS(nn.Module):
             c6_teach = self.__fw_expand_4layer(up1).detach()
             output6_teach = self.cls6(c6_teach).detach()
 
-        aug_up1, aug_output6_teach = self.transformer(up1, output6_teach, cascade=cascade)
+        aug_up1, aug_output6_teach = self.transformer(up1, output6_teach, perturbation_mode='G', cascade=cascade)
         c6_stud = self.__fw_expand_4layer(aug_up1)
         output6_stud = self.cls6(c6_stud)
         ######
@@ -198,7 +200,7 @@ class PGS(nn.Module):
             c7_teach = self.__fw_expand_3layer(up2).detach()
             output7_teach = self.cls7(c7_teach).detach()
 
-        aug_up2, aug_output7_teach = self.transformer(up2, output7_teach, cascade=cascade)
+        aug_up2, aug_output7_teach = self.transformer(up2, output7_teach, perturbation_mode='G', cascade=cascade)
         c7_stud = self.__fw_expand_3layer(aug_up2)
         output7_stud = self.cls7(c7_stud)
 
@@ -210,7 +212,7 @@ class PGS(nn.Module):
             c8_teach = self.__fw_expand_2layer(up3).detach()
             output8_teach = self.cls8(c8_teach).detach()
 
-        aug_up3, aug_output8_teach = self.transformer(up3, output8_teach, cascade=cascade)
+        aug_up3, aug_output8_teach = self.transformer(up3, output8_teach, perturbation_mode='G', cascade=cascade)
         c8_stud = self.__fw_expand_2layer(aug_up3)
         output8_stud = self.cls8(c8_stud)
 
@@ -223,7 +225,7 @@ class PGS(nn.Module):
             c9_teach = self.__fw_expand_1layer(up4).detach()
             output9_teach = self.cls9(c9_teach).detach()
 
-        aug_up4, aug_output9_teach = self.transformer(up4, output9_teach, cascade=cascade)
+        aug_up4, aug_output9_teach = self.transformer(up4, output9_teach, perturbation_mode='G', cascade=cascade)
         c9_stud = self.__fw_expand_1layer(aug_up4)
         output9_stud = self.cls9(c9_stud)
 
@@ -231,7 +233,90 @@ class PGS(nn.Module):
         unsupervised_outputs = output5_stud, output6_stud, output7_stud, output8_stud, output9_stud
         return supervised_outputs, unsupervised_outputs
 
-    def __fw_unsupervised_layerwise2(self, X):
+    def __fw_unsupervised_layerwise2(self, X): #only_feature space aug
+        cascade = False
+        # contracting path
+        c1, d1, c2, d2, c3, d3, c4, d4 = self.__fw_contracting_path(X)
+
+        # bottleneck
+
+        with torch.no_grad():
+            c5_teach = self.__fw_bottleneck(d4).detach()
+            aug_output5_teach = self.cls5(c5_teach).detach()
+
+        d4_stud, _ = self.transformer(d4, None, perturbation_mode='F', cascade=cascade)
+        c5_stud = self.__fw_bottleneck(d4_stud)
+        output5_stud = self.cls5(c5_stud)
+
+        # expanding path
+        teach_up1 = self.__fw_up(c5_teach, c4, self.up1,
+                                 transformer=None) if self.config.information_passing_strategy == 'teacher' \
+            else self.__fw_up(c5_stud, c4, self.up1, transformer=None)
+
+        stud_up1 = self.__fw_up(c5_teach, c4, self.up1,
+                                transformer=self.transformer) if self.config.information_passing_strategy == 'teacher' \
+            else self.__fw_up(c5_stud, c4, self.up1, transformer=self.transformer)
+
+        with torch.no_grad():
+            c6_teach = self.__fw_expand_4layer(teach_up1).detach()
+            aug_output6_teach = self.cls6(c6_teach).detach()
+
+        c6_stud = self.__fw_expand_4layer(stud_up1)
+        output6_stud = self.cls6(c6_stud)
+        ######
+        teach_up2 = self.__fw_up(c6_teach, c3, self.up2,
+                                 transformer=None) if self.config.information_passing_strategy == 'teacher' \
+            else self.__fw_up(c6_stud, c3, self.up2, transformer=None)
+
+        stud_up2 = self.__fw_up(c6_teach, c3, self.up2,
+                                transformer=self.transformer) if self.config.information_passing_strategy == 'teacher' \
+            else self.__fw_up(c6_stud, c3, self.up2, transformer=self.transformer)
+
+        with torch.no_grad():
+            c7_teach = self.__fw_expand_3layer(teach_up2).detach()
+            aug_output7_teach = self.cls7(c7_teach).detach()
+
+        c7_stud = self.__fw_expand_3layer(stud_up2)
+        output7_stud = self.cls7(c7_stud)
+
+        #####
+        teach_up3 = self.__fw_up(c7_teach, c2, self.up3,
+                                 transformer=None) if self.config.information_passing_strategy == 'teacher' \
+            else self.__fw_up(c7_stud, c2, self.up3, transformer=None)
+
+        stud_up3 = self.__fw_up(c7_teach, c2, self.up3,
+                                transformer=self.transformer) if self.config.information_passing_strategy == 'teacher' \
+            else self.__fw_up(c7_stud, c2, self.up3, transformer=self.transformer)
+
+        with torch.no_grad():
+            c8_teach = self.__fw_expand_2layer(teach_up3).detach()
+            aug_output8_teach = self.cls8(c8_teach).detach()
+
+        c8_stud = self.__fw_expand_2layer(stud_up3)
+        output8_stud = self.cls8(c8_stud)
+
+        ####
+        teach_up4 = self.__fw_up(c8_teach, c1, self.up4,
+                                 transformer=None) if self.config.information_passing_strategy == 'teacher' \
+            else self.__fw_up(c8_stud, c1, self.up4, transformer=None)
+
+        stud_up4 = self.__fw_up(c8_teach, c1, self.up4,
+                                transformer=self.transformer) if self.config.information_passing_strategy == 'teacher' \
+            else self.__fw_up(c8_stud, c1, self.up4, transformer=self.transformer)
+
+        with torch.no_grad():
+            # output9 is the main output of the network
+            c9_teach = self.__fw_expand_1layer(teach_up4).detach()
+            aug_output9_teach = self.cls9(c9_teach).detach()
+
+        c9_stud = self.__fw_expand_1layer(stud_up4)
+        output9_stud = self.cls9(c9_stud)
+
+        supervised_outputs = aug_output5_teach, aug_output6_teach, aug_output7_teach, aug_output8_teach, aug_output9_teach
+        unsupervised_outputs = output5_stud, output6_stud, output7_stud, output8_stud, output9_stud
+        return supervised_outputs, unsupervised_outputs
+
+    def __fw_unsupervised_cross_consistency(self, X):
         cascade = False
         # contracting path
         c1, d1, c2, d2, c3, d3, c4, d4 = self.__fw_contracting_path(X)
@@ -264,7 +349,7 @@ class PGS(nn.Module):
         ######
         teach_up2 = self.__fw_up(c6_teach, c3, self.up2,
                                  transformer=None) if self.config.information_passing_strategy == 'teacher' \
-            else self.__fw_up(c6_stud, c3, self.up2,transformer=None)
+            else self.__fw_up(c6_stud, c3, self.up2, transformer=None)
 
         stud_up2 = self.__fw_up(c6_teach, c3, self.up2,
                                 transformer=self.transformer) if self.config.information_passing_strategy == 'teacher' \
@@ -278,7 +363,8 @@ class PGS(nn.Module):
         output7_stud = self.cls7(c7_stud)
 
         #####
-        teach_up3 = self.__fw_up(c7_teach, c2, self.up3,transformer=None) if self.config.information_passing_strategy == 'teacher' \
+        teach_up3 = self.__fw_up(c7_teach, c2, self.up3,
+                                 transformer=None) if self.config.information_passing_strategy == 'teacher' \
             else self.__fw_up(c7_stud, c2, self.up3, transformer=None)
 
         stud_up3 = self.__fw_up(c7_teach, c2, self.up3,
@@ -293,7 +379,8 @@ class PGS(nn.Module):
         output8_stud = self.cls8(c8_stud)
 
         ####
-        teach_up4 = self.__fw_up(c8_teach, c1, self.up4, transformer=None) if self.config.information_passing_strategy == 'teacher' \
+        teach_up4 = self.__fw_up(c8_teach, c1, self.up4,
+                                 transformer=None) if self.config.information_passing_strategy == 'teacher' \
             else self.__fw_up(c8_stud, c1, self.up4, transformer=None)
 
         stud_up4 = self.__fw_up(c8_teach, c1, self.up4,
@@ -362,158 +449,21 @@ class PGS(nn.Module):
         # out = self.cls5(c5)
         return c5
 
-    def __fw_up(self, X_expand, X_contract, up_module, transformer=None, noise_dist=None, is_supervised=True):
-        if is_supervised:
-            return up_module((X_expand, X_contract), transformer)
-        else:
-            # 1st augmentation
-            noise_vector = noise_dist.sample(X_expand.shape[1:]).to(X_expand.device)  # .unsqueeze(0)
-            noise_vector = noise_vector.reshape(X_expand.shape[1:])
-            X_expand = X_expand.mul(noise_vector) + X_expand
-
-            # 2nd augmentation
-
-            noise_vector = noise_dist.sample(X_contract.shape[1:]).to(X_contract.device)  # .unsqueeze(0)
-            noise_vector = noise_vector.reshape(X_contract.shape[1:])
-            X_contract = X_contract.mul(noise_vector) + X_contract
-
-            up = up_module((X_expand, X_contract))
-            # noise_vector = noise_dist.sample(up.shape[1:]).to(up.device)  # .unsqueeze(0)
-            # noise_vector = noise_vector.reshape(up.shape[1:])
-            # up = up.mul(noise_vector) + up
-            return up
+    def __fw_up(self, X_expand, X_contract, up_module, transformer=None):
+        return up_module((X_expand, X_contract), transformer)
 
     def __fw_expand_4layer(self, X):
-        # u1 = self.up1((X_expand, X_contract))
         c6 = self.conv6(X)
-        # output6 = self.cls6(c6)
         return c6
 
     def __fw_expand_3layer(self, X):
-
-        # u2 = self.up2((X_expand, X_contract))
         c7 = self.conv7(X)
-        # output7 = self.cls7(c7)
         return c7
 
     def __fw_expand_2layer(self, X):
-        # u3 = self.up3((X_expand, X_contract))
         c8 = self.conv8(X)
-        # output8 = self.cls8(c8)
         return c8
 
     def __fw_expand_1layer(self, X):
-        # u4 = self.up4((X_expand, X_contract))
         c9 = self.conv9(X)
-        # output9 = self.cls9(c9)
         return c9
-
-
-def __fw_sup_loss(y_preds, y_true, loss_functions):
-    (sup_loss, unsup_loss) = loss_functions
-    total_loss = 0
-    losses = []
-    for output in y_preds:
-        ratio = int(np.round(y_true.shape[2] / output.shape[2]))
-        maxpool = nn.MaxPool2d(kernel_size=2, stride=ratio, padding=0)
-        #
-        target = maxpool(y_true)
-        if target.shape != output.shape:
-            h_diff = output.size()[2] - target.size()[2]
-            w_diff = output.size()[3] - target.size()[3]
-            #
-            target = F.pad(target, (w_diff // 2, w_diff - w_diff // 2,
-                                    h_diff // 2, h_diff - h_diff // 2))
-        #
-        # print("SUPERVISED : padded target!!!")
-        #
-        #
-        assert output.shape == target.shape, "output and target shape is not similar!!"
-        losses.append(sup_loss(output, target))
-    total_loss = sum(losses)
-    return total_loss
-
-
-def __fw_self_unsup_loss(y_preds, loss_functions):
-    main_output = y_preds[-1].detach()
-    (_, unsup_loss) = loss_functions
-    total_loss = 0
-    losses = []
-    for i in range(len(y_preds) - 1):
-        # if out
-        assert not (main_output.shape == y_preds[i].shape), "Wrong output: comparing main output with itself"
-        with torch.no_grad():
-            ratio = int(np.round(main_output.shape[2] / y_preds[i].shape[2]))
-
-            maxpool = nn.MaxPool2d(kernel_size=2, stride=ratio, padding=0)
-
-            pooled_main_output = maxpool(main_output)
-            if pooled_main_output.shape != y_preds[i].shape:
-                h_diff = y_preds[i].size()[2] - pooled_main_output.size()[2]
-                w_diff = y_preds[i].size()[3] - pooled_main_output.size()[3]
-
-                pooled_main_output = F.pad(pooled_main_output, (w_diff // 2, w_diff - w_diff // 2,
-                                                                h_diff // 2, h_diff - h_diff // 2))
-                # print(pooled_main_output)
-                # print("Unsupervised: Padded OUTPUT!!!")
-
-            assert pooled_main_output.shape == y_preds[i].shape, \
-                "Error! shapes has to be equal but got {} and {}".format(pooled_main_output.shape,
-                                                                         y_preds[i].shape)
-        losses.append(total_loss + unsup_loss(y_preds[i], pooled_main_output))
-    total_loss = sum(losses)
-    return total_loss
-
-
-def __fw_outputwise_unsup_loss(y_noisy, y_orig, loss_functions):
-    (_, unsup_loss) = loss_functions
-    total_loss = 0
-    losses = []
-    assert len(y_orig) == len(y_noisy), "Error! unsup_preds and sup_preds have to have same length"
-    num_preds = len(y_orig)
-
-    for i in range(num_preds):
-        orig_pred = y_orig[i]
-        noisy_pred = y_noisy[i]
-        assert orig_pred.shape == noisy_pred.shape, "Error! for preds number {}, supervised and unsupervised" \
-                                                    " prediction shape is not similar!".format(i)
-        losses.append(unsup_loss(noisy_pred, orig_pred.detach()))
-    total_loss = sum(losses)
-    return total_loss
-
-
-# def compute_loss(y_preds, y_true, loss_functions, is_supervised):
-#     if is_supervised:
-#         total_loss = __fw_sup_loss(y_preds, y_true, loss_functions)
-#     else:
-#         # for comparing outputs together!
-#         # total_loss = self.__fw_self_unsup_loss(y_preds, loss_functions)
-#
-#         # consistency of original output and noisy output
-#         total_loss = __fw_outputwise_unsup_loss(y_preds, y_true, loss_functions)
-#
-#     return total_loss
-
-
-if __name__ == '__main__':
-    inputs_dim = [1, 64, 96, 128, 256, 768, 384, 224, 160]
-    outputs_dim = [64, 96, 128, 256, 512, 256, 128, 96, 64]
-    kernels = [5, 3, 3, 3, 3, 3, 3, 3, 3]
-    strides = [1, 1, 1, 1, 1, 1, 1, 1, 1]
-
-    # dim_inputs, dim_outputs, kernel_sizes, strides):
-    wnet = PGS(inputs_dim, outputs_dim, kernels, strides)
-    # wnet.build()
-
-    a = np.random.rand(20, 1, 212, 256)
-    X = list(a)
-    X = torch.FloatTensor(X)
-    Y = wnet(X)
-    # optimizer = torch.optim.SGD(wnet.parameters(), 0.001)
-    print("hererere")
-    for y in Y:
-        print(y.shape)
-
-    loss = wnet.compute_loss(Y, Y, (nn.MSELoss(), nn.MSELoss()), False)
-    print("loss")
-    print(loss)

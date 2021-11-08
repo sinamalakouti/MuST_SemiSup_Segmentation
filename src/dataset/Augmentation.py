@@ -19,7 +19,7 @@ class FeatureDropDecoder(nn.Module):
         drop_mask = (attention < threshold).float()
         return x.mul(drop_mask)
 
-    def forward(self, x, y):
+    def forward(self, x, y=None):
         x = self.f_dropout(x)
 
         return x, y
@@ -30,8 +30,8 @@ class DropOutDecoder(nn.Module):
         super(DropOutDecoder, self).__init__()
         self.dropout = nn.Dropout2d(p=drop_rate) if spatial_dropout else nn.Dropout(drop_rate)
 
-    def forward(self, x, y):
-        x = torch.nn.functional.dropout(x, 0.3, training=True)
+    def forward(self, x, y=None):
+        x = torch.nn.functional.dropout(x, 0.1, training=True)
         x = self.dropout(x)
         return x, y
 
@@ -44,6 +44,8 @@ class RotationDecoder(nn.Module):
         self.angle_max = angle_max
 
     def forward(self, x, y):
+        if y is None:
+            return x, None
         angle = np.random.uniform(self.angle_min, self.angle_max)
         x_transform = F.affine(x,
                                angle=angle, translate=(0, 0), shear=0, scale=1)
@@ -60,6 +62,8 @@ class ScaleDecoder(nn.Module):
         self.angle_max = scale_max
 
     def forward(self, x, y):
+        if y is None:
+            return x, y
         scale = np.random.uniform(.8, 1.2)
 
         x_transform = F.affine(x,
@@ -90,7 +94,7 @@ class GaussianNoiseDecoder(nn.Module):
         self.sigma = std
 
     def forward(self, x, y):
-        x_transform = x + torch.randn(x.size()).to(x.device) * self.sigma + self.mu
+        x_transform = x + x.mul(torch.randn(x.size()).to(x.device) * self.sigma + self.mu)
         return x_transform, y
 
 
@@ -118,6 +122,48 @@ class MixupDecoder(nn.Module):
 
     def forward(self, x_transform, y_transform):
         None
+
+
+# class MixFeat(nn.Module):
+#     """MixFeat <https://openreview.net/forum?id=HygT9oRqFX>"""
+#
+#     def __init__(self, sigma=0.2, **kargs):
+#         super().__init__(**kargs)
+#         self.sigma = sigma
+#
+#     def compute_output_shape(self, input_shape):
+#         return input_shape
+#
+#     def call(self, inputs, training=None):  # pylint: disable=arguments-differ
+#         def _passthru():
+#             return inputs
+#
+#         def _mixfeat():
+#             @tf.custom_gradient
+#             def (x):
+#                 shape = x.shape
+#                 indices = torch.arange(start=0, stop=shape[0])
+#                 indices = tf.random.shuffle(indices)
+#                 rs = K.concatenate([K.constant([1], dtype="int32"), shape[1:]])
+#                 r = K.random_normal(rs, 0, self.sigma, dtype="float16")
+#                 theta = K.random_uniform(rs, -np.pi, +np.pi, dtype="float16")
+#                 a = 1 + r * K.cos(theta)
+#                 b = r * K.sin(theta)
+#                 y = x * K.cast(a, K.floatx()) + K.gather(x, indices) * K.cast(
+#                     b, K.floatx()
+#                 )
+#
+#                 def _backword(dy):
+#                     inv = tf.math.invert_permutation(indices)
+#                     return dy * K.cast(a, K.floatx()) + K.gather(dy, inv) * K.cast(
+#                         b, K.floatx()
+#                     )
+#
+#                 return y, _backword
+#
+#             return _forward(inputs)
+#
+#         return K.in_train_phase(_mixfeat, _passthru, training=training)
 
 
 def get_r_adv(x, y_tr, it=1, xi=1e-1, eps=10.0):
@@ -200,115 +246,47 @@ class Perturbator(nn.Module):
         self.uni_decoder = UniformNoiseDecoder()
         self.gaussian_decoder = GaussianNoiseDecoder()
         self.cfg = cfg
-    def forward(self, x, y, cascade=False ):
 
+    def __fw_geometrical_aug(self, x, y):
+        random_selector = np.random.randint(2)
 
-        random_selector = np.random.randint(self.cfg.num_perturbators)
+        if random_selector == 0:  # scale
+            x_transform, y_transform = self.scale_decoder(x, y)
+        elif random_selector == 1:  # rotate
+            x_transform, y_transform = self.rotation_decoder(x, y)
+        elif random_selector == 2:  # hflip
+            x_transform, y_transform = self.hflip_decoder(x, y)
+        elif random_selector == 3:  # vflip
+            x_transform, y_transform = self.vflip_decoder(x, y)
+        elif random_selector == 4:
+            x_transform, y_transform = x,y
+        return x_transform, y_transform
 
-        # print("random selector is ", random_selector)
-        if cascade:
-            None
-            # x_transform = F.affine(x,
-            #                        angle=0, translate=(0, 0), shear=0, scale=scale)
-            # y_transform = F.affine(y,
-            #                        angle=0, translate=(0, 0), shear=0, scale=scale)
-            # x_transform = F.affine(x_transform,
-            #                        angle=angle, translate=(0, 0), shear=0, scale=1)
-            # y_transform = F.affine(y_transform,
-            #                        angle=angle, translate=(0, 0), shear=0, scale=1)
-            # noise = uni_dist.sample(x_transform.shape[1:]).to(x_transform.device)
-            # x_transform = x_transform.mul(noise) + x_transform
-            # y_transform = y_transform
+    def __fw_feature_space_aug(self, x, y):
+        random_selector = np.random.randint(5)
+        if random_selector == 0:  # feature drop out
+            x_transform, y_transform = self.feature_dropout(x, y)
+        elif random_selector == 1:  # spatial drop out
+            x_transform, y_transform = self.spatial_dropout(x, y)
+        elif random_selector == 2:  # uniform dist
+            x_transform, y_transform = self.uni_decoder(x, y)
+        elif random_selector == 3:
+            x_transform, y_transform = self.gaussian_decoder(x, y)
+        elif random_selector == 5:
+            x_transform, y_transform = x, y
+        return x_transform, y_transform
 
-            return None, None
+    def __fw_mix(self, x, y):
+        None
+
+    def forward(self, x, y, perturbation_mode='F', use_softmax=False,
+                cascade=False):  # mode = F (feature_space), G (geometrical), M (mix)
+        if use_softmax or perturbation_mode == 'G':
+            y = torch.nn.functional.softmax(y, dim=1)
+        if perturbation_mode == 'F':
+            x_transform, y_transform = self.__fw_geometrical_aug(x, y)
+        elif perturbation_mode == 'G':
+            x_transform, y_transform = self.__fw_feature_space_aug(x, y)
         else:
-
-            if random_selector == 0:  # rotate
-
-                x_transform, y_transform = self.rotation_decoder(x, y)
-                # noise = uni_dist.sample(x.shape[1:]).to(x.device)
-                # x_transform = x.mul(noise) + x
-                # y_transform = y
-
-            elif random_selector == 1:  # scale
-                x_transform, y_transform = self.scale_decoder(x, y)
-
-            elif random_selector == 2:  # feature drop out
-                x_transform, y_transform = self.feature_dropout(x, y)
-
-            elif random_selector == 3:  # spatial dropout
-                x_transform, y_transform = self.spatial_dropout(x, y)
-
-            if random_selector % 2 == 0:
-                x_transform, y_transform = self.uni_decoder(x_transform, y_transform)
-            else:
-                x_transform, y_transform = self.gaussian_decoder(x_transform, y_transform)
-            # elif random_selector == 5: #scale + feature dropout
-            #
-            #     x_transform = F.affine(x,
-            #                            angle=0, translate=(0, 0), shear=0, scale=scale)
-            #     y_transform = F.affine(y,
-            #                            angle=0, translate=(0, 0), shear=0, scale=scale)
-            #     module = FeatureDropDecoder()
-            #     x_transform = module(x_transform)
-            #     y_transform = y_transform
-            # perform scaling
-            # if random_selector == 0: #feature drop out
-            #     module = FeatureDropDecoder()
-            #     x_transform = module(x)
-            #     y_transform = y
-            #
-            # elif random_selector == 1: #spatial dropout
-            #     x_transform = torch.nn.functional.dropout(x, 0.3, training=True)
-            #     y_transform = y
-            #     # x_transform = F.affine(x,
-            #     #                        angle=angle, translate=(0, 0), shear=0, scale=1)
-            #     # y_transform = F.affine(y,
-            #     #                        angle=an
-            #     gle, translate=(0, 0), shear=0, scale=1)
-            # elif random_selector == 2: #uniform noise
-            #
-            #     noise = uni_dist.sample(x.shape[1:]).to(x.device)
-            #     x_transform = x.mul(noise) + x
-            #     y_transform = y
-            #
-            # elif random_selector == 3: #rotate
-            #     x_transform = F.affine(x,
-            #                            angle=angle, translate=(0, 0), shear=0, scale=1)
-            #     y_transform = F.affine(y,
-            #                            angle=angle, translate=(0, 0), shear=0, scale=1)
-            #
-            # elif random_selector == 4: #scale
-            #     x_transform = F.affine(x,
-            #                            angle=0, translate=(0, 0), shear=0, scale=scale)
-            #     y_transform = F.affine(y,
-            #                            angle=0, translate=(0, 0), shear=0, scale=scale)
-            # elif random_selector == 5: #scale + feature dropout
-            #
-            #     x_transform = F.affine(x,
-            #                            angle=0, translate=(0, 0), shear=0, scale=scale)
-            #     y_transform = F.affine(y,
-            #                            angle=0, translate=(0, 0), shear=0, scale=scale)
-            #     module = FeatureDropDecoder()
-            #     x_transform = module(x_transform)
-            #     y_transform = y_transform
-            #
-            # elif random_selector == 6: #rotate + feature dropout
-            #     x_transform = F.affine(x,
-            #                            angle=angle, translate=(0, 0), shear=0, scale=1)
-            #     y_transform = F.affine(y,
-            #                            angle=angle, translate=(0, 0), shear=0, scale=1)
-            #     module = FeatureDropDecoder()
-            #     x_transform = module(x_transform)
-            #     y_transform = y_transform
-            # elif random_selector == 7: # vertical flip
-            #     x_transform = F.vflip(x)
-            #     y_transform = F.vflip(y)
-            # elif random_selector == 8: #horizontal flip
-            #     x_transform = F.hflip(x)
-            #     y_transform = F.hflip(y)
-            # elif random_selector == 9: #feature_mixup
-            #     x_transform, y_transform = mixup_featureSpace(x,y)
-            # elif random_selector == 10:  # feature_mixup
-            #     x_transform, y_transform = mixup_featureSpace(x, y)
-            return x_transform, y_transform
+            x_transform, y_transform = None, None
+        return x_transform, y_transform
