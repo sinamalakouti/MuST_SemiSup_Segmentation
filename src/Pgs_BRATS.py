@@ -541,7 +541,7 @@ def Pgs_train_val(dataset, n_epochs, wmh_threshold, output_dir, learning_rate, a
             os.mkdir(output_dir, 0o777)
         except OSError:
             print("Creation of the directory %s failed" % output_dir)
-    if cfg.experiment_mode == 'semi' or cfg.experiment_mode == 'partially_sup_upSample' or cfg.experiment_mode == 'semi_downSample':
+    if cfg.experiment_mode == 'semi' or cfg.experiment_mode == 'partially_sup_upSample' or cfg.experiment_mode == 'semi_downSample' or cfg.experiment_mode == 'semi_alternate':
         output_dir = os.path.join(output_dir, "sup_ratio_{}".format(cfg.train_sup_rate))
         if not os.path.isdir(output_dir):
             try:
@@ -625,7 +625,7 @@ def Pgs_train_val(dataset, n_epochs, wmh_threshold, output_dir, learning_rate, a
     print('size of labeled training set: number of subjects:    ', len(train_sup_loader.dataset.subjects_name))
     print("labeled subjects  ", train_sup_loader.dataset.subjects_name)
 
-    if cfg.experiment_mode == 'semi' or cfg.experiment_mode == 'partially_sup_upSample' or cfg.experiment_mode == 'semi_downSample':
+    if cfg.experiment_mode == 'semi' or cfg.experiment_mode == 'partially_sup_upSample' or cfg.experiment_mode == 'semi_downSample' or cfg.experiment_mode == 'semi_alternate':
         train_unsup_loader = utils.get_trainset(dataset, batch_size=32, intensity_rescale=cfg.intensity_rescale,
                                                 mixup_threshold=cfg.mixup_threshold,
                                                 mode=cfg.train_unsup_mode, t1=cfg.t1, t2=cfg.t2, t1ce=cfg.t1ce,
@@ -669,6 +669,19 @@ def Pgs_train_val(dataset, n_epochs, wmh_threshold, output_dir, learning_rate, a
                                                     (torch.nn.CrossEntropyLoss(), cons_loss_fn),
                                                     cons_w_unsup,
                                                     epoch, cfg)
+        elif cfg.experiment_mode == 'semi_alternate':
+            cons_w_unsup = consistency_weight(final_w=cfg['consist_w_unsup']['final_w'],
+                                              iters_per_epoch=len(train_sup_loader),
+                                              rampup_ends=cfg['consist_w_unsup']['rampup_ends'],
+                                              ramp_type=cfg['consist_w_unsup']['rampup'])
+
+            pgsnet, loss = trainPgs_semi_alternate(train_sup_loader, train_unsup_loader, pgsnet, optimizer, device,
+                                                    (torch.nn.CrossEntropyLoss(), cons_loss_fn),
+                                                    cons_w_unsup,
+                                                    epoch, cfg)
+
+
+
         # score, segmentations = evaluatePGS(pgsnet, dataset, device, wmh_threshold, cfg, cfg.val_mode)
         elif cfg.experiment_mode == 'partially_sup':
             pgsnet, loss = trainPgs_sup(train_sup_loader, pgsnet, optimizer, device,
@@ -969,7 +982,7 @@ def main():
     random.seed(cfg.seed)
     os.environ['CUDA_VISIBLE_DEVICES'] = cfg.cuda
 
-    if cfg.experiment_mode == 'semi' or cfg.experiment_mode == 'partially_sup_upSample' or cfg.experiment_mode == 'semi_downSample':
+    if cfg.experiment_mode == 'semi' or cfg.experiment_mode == 'partially_sup_upSample' or cfg.experiment_mode == 'semi_downSample' or cfg.experiment_mode == 'semi_alternate':
         cfg.train_sup_mode = 'train2018_semi_sup' + str(cfg.train_sup_rate)
         cfg.train_unsup_mode = 'train2018_semi_unsup' + str(cfg.train_sup_rate)
     elif cfg.experiment_mode == 'partially_sup':
