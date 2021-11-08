@@ -34,6 +34,30 @@ utils.Constants.USE_CUDA = True
 parser = argparse.ArgumentParser()
 
 
+def __fw_cross_consistency_loss(y_logits, loss_functions, cfg):
+    (_, unsup_loss) = loss_functions
+    losses = []
+    for teach_ind in range(len(y_logits) - 2, len(y_logits)):
+        teach_logits = y_logits[teach_ind]
+
+        for stud_ind in range(0, teach_ind):
+            stud_logit = y_logits[stud_ind]
+            #upsample?
+            if cfg.consistency_loss == 'CE':
+                teach_pred = torch.nn.functional.softmax(teach_logits, dim=1)
+                loss = - torch.mean(
+                    torch.sum(teach_pred.detach()
+                              * torch.nn.functional.log_softmax(stud_logit, dim=1), dim=1))
+            elif cfg.consistency_loss == 'KL':
+                loss = None  # compute loss
+            elif cfg.consistency_loss == 'balanced_CE':
+                loss = None  # compute loss
+            losses.append(loss)
+    return sum(losses)
+
+    # top two layers are teachers. Each time others are studens ( bottom layers)
+
+
 def __fw_outputwise_unsup_loss(y_stud, y_teach, loss_functions, cfg):
     (_, unsup_loss) = loss_functions
 
@@ -195,6 +219,66 @@ def trainPgs_semi_downSample(train_sup_loader, train_unsup_loader, model, optimi
         total_loss = sLoss + weight_unsup * uLoss
         # backward pass & optimizer step
         total_loss.backward()
+        optimizer.step()
+        # compute batch scores and log to Wandb
+        with torch.no_grad():
+            sf = torch.nn.Softmax2d()
+            target_sup[target_sup >= 1] = 1
+            target_sup = target_sup
+            y_pred = sf(sup_outputs[-1])
+            y_WT = seg2WT(y_pred, 0.5, cfg.oneHot)
+            dice_score = dice_coef(target_sup.reshape(y_WT.shape), y_WT)
+            wandb.log(
+                {"sup_batch_id": batch_idx + epochid * min(len(train_unsup_loader), len(train_sup_loader)),
+                 "sup loss": sLoss,
+                 "unsup_batch_id": batch_idx + epochid * min(len(train_unsup_loader), len(train_sup_loader)),
+                 "unsup loss": uLoss,
+                 "batch_score_WT": dice_score,
+                 'weight unsup': weight_unsup
+                 })
+
+    return model, total_loss
+def trainPgs_semi_alternate(train_sup_loader, train_unsup_loader, model, optimizer, device, loss_functions,
+                             cons_w_unsup, epochid,
+                             cfg):
+    total_loss = 0
+    model.train()
+    # dataloader
+    semi_dataLoader = zip(train_sup_loader, train_unsup_loader)
+
+    for batch_idx, (batch_sup, batch_unsup) in enumerate(semi_dataLoader):
+        optimizer.zero_grad()
+        # read labeled data
+        b_sup = batch_sup['data'].to(device)
+        target_sup = batch_sup['label'].to(device)
+        # forward-pass: supervised model
+        sup_outputs, _ = model(b_sup, is_supervised=True)
+        # compute supervised loss
+        sLoss = compute_loss(sup_outputs, target_sup, loss_functions, is_supervised=True, cfg=cfg)
+        # remove supervised batch
+        del b_sup
+
+        sLoss.backward()
+        optimizer.step()
+        optimizer.zero_grad()
+        # read unlabeled data
+        b_unsup = batch_unsup['data']
+        b_unsup = b_unsup.to(device)
+        # forward pass: consistency (unsupevised) model
+        teacher_outputs, student_outputs = model(b_unsup, is_supervised=False)
+
+        # compute unsupervised loss
+        uLoss = compute_loss(student_outputs, teacher_outputs, loss_functions, is_supervised=False, cfg=cfg)
+
+        print("**************** UNSUP LOSSS  : {} ****************".format(uLoss))
+        print("**************** SUP LOSSS  : {} ****************".format(sLoss))
+        # compute consistency weigth ( for unsupervised loss)
+        weight_unsup = cons_w_unsup(epochid, batch_idx)
+        # compute total loss
+        # total_loss = sLoss + weight_unsup * uLoss
+        # backward pass & optimizer step
+        # total_loss.backward()
+        uLoss.backward()
         optimizer.step()
         # compute batch scores and log to Wandb
         with torch.no_grad():
