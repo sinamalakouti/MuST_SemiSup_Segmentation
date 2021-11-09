@@ -74,7 +74,7 @@ class Up(torch.nn.Module):
             x1 = self.up(x1)
         else:
             x1 = self.up(transformer(x1, None, perturbation_mode='F')[0])
-            x2 = transformer(transformer(x2, None, perturbation_mode='F')[0])
+            x2 = transformer(x2, None, perturbation_mode='F')[0]
         # bxcxhxw
         h_diff = x2.size()[2] - x1.size()[2]
         w_diff = x2.size()[3] - x1.size()[3]
