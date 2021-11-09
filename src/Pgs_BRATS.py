@@ -71,18 +71,18 @@ def __fw_outputwise_unsup_loss(y_stud, y_teach, loss_functions, cfg):
         stud_pred = y_stud[i]
         assert teach_pred.shape == stud_pred.shape, "Error! for preds number {}, supervised and unsupervised" \
                                                     " prediction shape is not similar!".format(i)
-        if cfg.consistency_loss == 'CE':
+        if cfg.unsupervised_training.consistency_loss == 'CE':
             teach_pred = torch.nn.functional.softmax(teach_pred, dim=1)
             losses.append(- torch.mean(
                 torch.sum(teach_pred.detach()
                           * torch.nn.functional.log_softmax(stud_pred, dim=1), dim=1)))
-        elif cfg.consistency_loss == 'KL':
+        elif cfg.unsupervised_training.consistency_loss == 'KL':
             losses.append(
                 softmax_kl_loss(stud_pred, teach_pred.detach(), conf_mask=False, threshold=None, use_softmax=True))
-        elif cfg.consistency_loss == 'balanced_CE':
+        elif cfg.unsupervised_training.consistency_loss == 'balanced_CE':
             losses.append(
                 unsup_loss(stud_pred, teach_pred, i, use_softmax=True))
-        elif cfg.consistency_loss == 'MSE':
+        elif cfg.unsupervised_training.consistency_loss == 'MSE':
             teach_pred = torch.nn.functional.softmax(teach_pred, dim=1)
             student_pred = torch.nn.functional.softmax(stud_pred, dim=1)
             mse = torch.nn.MSELoss()
@@ -736,7 +736,7 @@ def Pgs_train_val(dataset, n_epochs, wmh_threshold, output_dir, args, cfg, seed)
         elif cfg.experiment_mode == 'semi_alternate':
             optimizer_unsup = torch.optim.SGD(pgsnet.parameters(), cfg.unsupervised_training.lr, momentum=0.9,
                                               weight_decay=1e-4)
-            optimizer_sup = torch.optim.SGD(pgsnet.parameters(), cfg.unsupervised_training.lr, momentum=0.9,
+            optimizer_sup = torch.optim.SGD(pgsnet.parameters(), cfg.supervised_training.lr, momentum=0.9,
                                             weight_decay=1e-4)
 
             scheduler_unsup = lr_scheduler.StepLR(optimizer_unsup,
