@@ -34,28 +34,28 @@ utils.Constants.USE_CUDA = True
 parser = argparse.ArgumentParser()
 
 
-def __fw_cross_consistency_loss(y_logits, loss_functions, cfg):
-    (_, unsup_loss) = loss_functions
-    losses = []
-    for teach_ind in range(len(y_logits) - 2, len(y_logits)):
-        teach_logits = y_logits[teach_ind]
-
-        for stud_ind in range(0, teach_ind):
-            stud_logit = y_logits[stud_ind]
-            # upsample?
-            if cfg.consistency_loss == 'CE':
-                teach_pred = torch.nn.functional.softmax(teach_logits, dim=1)
-                loss = - torch.mean(
-                    torch.sum(teach_pred.detach()
-                              * torch.nn.functional.log_softmax(stud_logit, dim=1), dim=1))
-            elif cfg.consistency_loss == 'KL':
-                loss = None  # compute loss
-            elif cfg.consistency_loss == 'balanced_CE':
-                loss = None  # compute loss
-            losses.append(loss)
-    return sum(losses)
-
-    # top two layers are teachers. Each time others are studens ( bottom layers)
+# def __fw_cross_consistency_loss(y_logits, loss_functions, cfg):
+#     (_, unsup_loss) = loss_functions
+#     losses = []
+#     for teach_ind in range(len(y_logits) - 2, len(y_logits)):
+#         teach_logits = y_logits[teach_ind]
+#
+#         for stud_ind in range(0, teach_ind):
+#             stud_logit = y_logits[stud_ind]
+#             # upsample?
+#             if cfg.consistency_loss == 'CE':
+#                 teach_pred = torch.nn.functional.softmax(teach_logits, dim=1)
+#                 loss = - torch.mean(
+#                     torch.sum(teach_pred.detach()
+#                               * torch.nn.functional.log_softmax(stud_logit, dim=1), dim=1))
+#             elif cfg.consistency_loss == 'KL':
+#                 loss = None  # compute loss
+#             elif cfg.consistency_loss == 'balanced_CE':
+#                 loss = None  # compute loss
+#             losses.append(loss)
+#     return sum(losses)
+#
+#     # top two layers are teachers. Each time others are studens ( bottom layers)
 
 
 def __fw_outputwise_unsup_loss(y_stud, y_teach, loss_functions, cfg):
@@ -691,7 +691,7 @@ def Pgs_train_val(dataset, n_epochs, wmh_threshold, output_dir, args, cfg, seed)
         print("un labeled subjects  ", train_unsup_loader.dataset.subjects_name)
 
     sup_loss_fn = torch.nn.CrossEntropyLoss()
-    if cfg.consistency_loss == 'balanced_CE':
+    if cfg.unsupervised_training.consistency_loss == 'balanced_CE':
         cons_loss_fn = Consistency_CE(5)
     else:
         cons_loss_fn = None
