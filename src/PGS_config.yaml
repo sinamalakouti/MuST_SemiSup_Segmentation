@@ -1,10 +1,10 @@
 #trianing and test splits
 train_mode: "all_train2018_sup"
 val_mode: "test2019_new"
-test_mode: "only_test2018"
+test_mode: "test_2020_new"
 train_unsup_mode: "train2018_semi_unsup"
 train_sup_mode: "train2018_semi_sup"
-train_sup_rate: 10 #rate of labeled data
+train_sup_rate: 3 #rate of labeled data
 #data loader and pre-processing
 t1: True
 t2: True
@@ -19,21 +19,29 @@ semi_mode: "shared"   # shared, MT
 gradient_stop_strategy: "stop_feature" #stop_feature, stop_output
 information_passing_strategy: "teacher" #student, teacher
 oneHot: False
-#optimizer and scheduler
-scheduler_step_size: 5
-lr: 0.001 #learning rate
-lr_gamma: 0.3
+num_perturbators: 4
+#optimizer
 optimizer: "SGD" #SGD OR ADAM
-#losses
-sup_loss: 'CE' # CE, DSC, FOCAL, CE_DSC, CE_FOCAL, DSC_FOCAL, CE_FOCAL_DSC
-consistency_loss: 'CE' # CE, KL, DSC
-consist_w_unsup:
-  rampup: 'linear_rampup' #ramp_types = ['sigmoid_rampup', 'linear_rampup', 'cosine_rampup', 'log_rampup', 'exp_rampup']
-  final_w: 5
-  rampup_ends: 4
+#supervised training setting
+supervised_training:
+  sup_loss: 'CE' # CE, DSC, FOCAL, CE_DSC, CE_FOCAL, DSC_FOCAL, CE_FOCAL_DSC
+  lr: 0.01
+  lr_gamma: 0.5
+  scheduler_step_size: 5
+#unsupervised training
+unsupervised_training:
+  consistency_loss: 'MSE' # CE, KL, MSE, DSC
+  lr: 0.001
+  lr_gamma: 0.5
+  scheduler_step_size: 5
+  consist_w_unsup:
+    rampup: 'linear_rampup' #ramp_types = ['sigmoid_rampup', 'linear_rampup', 'cosine_rampup', 'log_rampup', 'exp_rampup']
+    final_w: 5
+    rampup_ends: 4
+
 #hyper parameters
-experiment_mode: "partially_sup_upSample"
-n_epochs: 50
+experiment_mode: "semi_alternate"
+n_epochs: 70
 batch_size: 32
 parallel: True
 cuda: "0,1"

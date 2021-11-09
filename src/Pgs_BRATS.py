@@ -299,29 +299,36 @@ def trainPgs_semi_alternate(train_sup_loader, train_unsup_loader, model, optimiz
         else:
             wandb.log(
                 {
-                 "unsup_batch_id": unsup_step + epochid * len(train_unsup_loader),
-                 "unsup loss": uLoss,
-                 'weight unsup': weight_unsup
-                 })
+                    "unsup_batch_id": unsup_step + epochid * len(train_unsup_loader),
+                    "unsup loss": uLoss,
+                    'weight unsup': weight_unsup
+                })
     return model, total_loss
 
 
-
-
 def trainPgs_semi_alternate2(train_sup_loader, train_unsup_loader, model, optimizer, device, loss_functions,
-                            cons_w_unsup, epochid,
-                            cfg):
+                             cons_w_unsup, epochid,
+                             cfg):
     total_loss = 0
     model.train()
 
     semi_loader = zip(train_sup_loader, train_unsup_loader)
+
     for batch_idx, (batch_sup, batch_unsup) in enumerate(semi_loader):
         optimizer[0].zero_grad()
         optimizer[1].zero_grad()
         b_unsup = batch_unsup['data']
         b_unsup = b_unsup.to(device)
 
+        teacher_outputs, student_outputs = model(b_unsup, is_supervised=False)
+        uLoss = compute_loss(student_outputs, teacher_outputs, loss_functions, is_supervised=False, cfg=cfg)
+        weight_unsup = cons_w_unsup(epochid, batch_idx)
+        total_loss = uLoss
+        total_loss.backward()
+        optimizer[1].step()
 
+        optimizer[0].zero_grad()
+        optimizer[1].zero_grad()
 
         b_sup = batch_sup['data'].to(device)
         target_sup = batch_sup['label'].to(device)
@@ -330,15 +337,8 @@ def trainPgs_semi_alternate2(train_sup_loader, train_unsup_loader, model, optimi
         sLoss.backward()
         optimizer[0].step()
 
-        teacher_outputs, student_outputs = model(b_unsup, is_supervised=False)
-        uLoss = compute_loss(student_outputs, teacher_outputs, loss_functions, is_supervised=False, cfg=cfg)
-
         print("**************** UNSUP LOSSS  : {} ****************".format(uLoss))
         print("**************** SUP LOSSS  : {} ****************".format(sLoss))
-        weight_unsup = cons_w_unsup(epochid, batch_idx)
-        total_loss = uLoss
-        total_loss.backward()
-        optimizer[1].step()
 
         with torch.no_grad():
             sf = torch.nn.Softmax2d()
@@ -574,7 +574,7 @@ def eval_per_subjectPgs(model, device, threshold, cfg, data_mode):
     # return np.mean(np.array(dice_arrWT)), np.mean(np.array(dice_arrET)), np.mean(np.array(dice_arrTC))
 
 
-def Pgs_train_val(dataset, n_epochs, wmh_threshold, output_dir, learning_rate, args, cfg, seed):
+def Pgs_train_val(dataset, n_epochs, wmh_threshold, output_dir, args, cfg, seed):
     inputs_dim = [4, 64, 96, 128, 256, 768, 384, 224, 160]
     outputs_dim = [64, 96, 128, 256, 512, 256, 128, 96, 64, 4]
     kernels = [5, 3, 3, 3, 3, 3, 3, 3, 3]
@@ -658,7 +658,8 @@ def Pgs_train_val(dataset, n_epochs, wmh_threshold, output_dir, learning_rate, a
     print("EXPERIMENT DESCRIPTION:   {}".format(cfg.information))
 
     print("******* TRAINING PGS ***********")
-    print("learning_rate is    ", learning_rate)
+    print("sup learning_rate is    ", cfg.supervised_training.lr)
+    print("unsup learning_rate is    ", cfg.unsupervised_training.lr)
     # print("scheduler step size is :   ", step_size)
     print("output_dir is    ", output_dir)
 
@@ -673,9 +674,6 @@ def Pgs_train_val(dataset, n_epochs, wmh_threshold, output_dir, learning_rate, a
 
     device = torch.device(device)
     pgsnet.to(device)
-    optimizer = torch.optim.SGD(pgsnet.parameters(), learning_rate, momentum=0.9, weight_decay=1e-4)
-    # optimizer = torch.optim.Adam(pgsnet.parameters(), lr=1e-2)
-    scheduler = lr_scheduler.StepLR(optimizer, step_size=cfg.scheduler_step_size, gamma=cfg.lr_gamma)
 
     train_sup_loader = utils.get_trainset(dataset, batch_size=cfg.batch_size, intensity_rescale=cfg.intensity_rescale,
                                           mixup_threshold=cfg.mixup_threshold, mode=cfg.train_sup_mode, t1=cfg.t1,
@@ -703,47 +701,61 @@ def Pgs_train_val(dataset, n_epochs, wmh_threshold, output_dir, learning_rate, a
 
         # pgsnet, loss = trainPGS(train_loader, pgsnet, optimizer, device, epoch)
         if cfg.experiment_mode == 'semi':
-            if epoch < 3 and False:  # todo if epoch < a -> train supervised
-                print("training supervised because epoch < 3")
-                pgsnet, loss = trainPgs_sup(train_sup_loader, pgsnet, optimizer, device,
-                                            (torch.nn.CrossEntropyLoss(), None),
-                                            epoch, cfg)
-            else:
+            optimizer = torch.optim.SGD(pgsnet.parameters(), cfg.supervised_training.lr, momentum=0.9,
+                                        weight_decay=1e-4)
 
-                cons_w_unsup = consistency_weight(final_w=cfg['consist_w_unsup']['final_w'],
-                                                  iters_per_epoch=len(train_unsup_loader),
-                                                  rampup_ends=cfg['consist_w_unsup']['rampup_ends'],
-                                                  ramp_type=cfg['consist_w_unsup']['rampup'])
+            scheduler = lr_scheduler.StepLR(optimizer, step_size=cfg.supervised_training.scheduler_step_size,
+                                            gamma=cfg.supervised_training.lr_gamma)
 
-                pgsnet, loss = trainPgs_semi(train_sup_loader, train_unsup_loader, pgsnet, optimizer, device,
-                                             (torch.nn.CrossEntropyLoss(), cons_loss_fn), cons_w_unsup,
-                                             epoch, cfg)
+            cons_w_unsup = consistency_weight(final_w=cfg['unsupervised_training']['consist_w_unsup']['final_w'],
+                                              iters_per_epoch=len(train_unsup_loader),
+                                              rampup_ends=cfg['unsupervised_training']['consist_w_unsup'][
+                                                  'rampup_ends'],
+                                              ramp_type=cfg['unsupervised_training']['consist_w_unsup']['rampup'])
+
+            pgsnet, loss = trainPgs_semi(train_sup_loader, train_unsup_loader, pgsnet, optimizer, device,
+                                         (torch.nn.CrossEntropyLoss(), cons_loss_fn), cons_w_unsup,
+                                         epoch, cfg)
         elif cfg.experiment_mode == 'semi_downSample':
-            cons_w_unsup = consistency_weight(final_w=cfg['consist_w_unsup']['final_w'],
-                                              iters_per_epoch=len(train_sup_loader),
-                                              rampup_ends=cfg['consist_w_unsup']['rampup_ends'],
-                                              ramp_type=cfg['consist_w_unsup']['rampup'])
+            optimizer = torch.optim.SGD(pgsnet.parameters(), cfg.supervised_training.lr, momentum=0.9,
+                                        weight_decay=1e-4)
+
+            scheduler = lr_scheduler.StepLR(optimizer, step_size=cfg.supervised_training.scheduler_step_size,
+                                            gamma=cfg.supervised_training.lr_gamma)
+
+            cons_w_unsup = consistency_weight(final_w=cfg['unsupervised_training']['consist_w_unsup']['final_w'],
+                                              iters_per_epoch=len(train_unsup_loader),
+                                              rampup_ends=cfg['unsupervised_training']['consist_w_unsup'][
+                                                  'rampup_ends'],
+                                              ramp_type=cfg['unsupervised_training']['consist_w_unsup']['rampup'])
 
             pgsnet, loss = trainPgs_semi_downSample(train_sup_loader, train_unsup_loader, pgsnet, optimizer, device,
                                                     (torch.nn.CrossEntropyLoss(), cons_loss_fn),
                                                     cons_w_unsup,
                                                     epoch, cfg)
         elif cfg.experiment_mode == 'semi_alternate':
-            optimizer_unsup = torch.optim.SGD(pgsnet.parameters(), learning_rate, momentum=0.9, weight_decay=1e-4)
-            optimizer_sup = torch.optim.SGD(pgsnet.parameters(), learning_rate, momentum=0.9, weight_decay=1e-4)
+            optimizer_unsup = torch.optim.SGD(pgsnet.parameters(), cfg.unsupervised_training.lr, momentum=0.9,
+                                              weight_decay=1e-4)
+            optimizer_sup = torch.optim.SGD(pgsnet.parameters(), cfg.unsupervised_training.lr, momentum=0.9,
+                                            weight_decay=1e-4)
 
-            scheduler_unsup = lr_scheduler.StepLR(optimizer, step_size=cfg.scheduler_step_size, gamma=cfg.lr_gamma)
-            scheduler_sup = lr_scheduler.StepLR(optimizer, step_size= 5, gamma=cfg.lr_gamma)
+            scheduler_unsup = lr_scheduler.StepLR(optimizer_unsup,
+                                                  step_size=cfg.unsupervised_training.scheduler_step_size,
+                                                  gamma=cfg.unsupervised_training.lr_gamma)
+            scheduler_sup = lr_scheduler.StepLR(optimizer_sup, step_size=cfg.supervised_training.scheduler_step_size,
+                                                gamma=cfg.supervised_training.lr_gamma)
 
-            cons_w_unsup = consistency_weight(final_w=cfg['consist_w_unsup']['final_w'],
+            cons_w_unsup = consistency_weight(final_w=cfg['unsupervised_training']['consist_w_unsup']['final_w'],
                                               iters_per_epoch=len(train_unsup_loader),
-                                              rampup_ends=cfg['consist_w_unsup']['rampup_ends'],
-                                              ramp_type=cfg['consist_w_unsup']['rampup'])
+                                              rampup_ends=cfg['unsupervised_training']['consist_w_unsup'][
+                                                  'rampup_ends'],
+                                              ramp_type=cfg['unsupervised_training']['consist_w_unsup']['rampup'])
 
-            pgsnet, loss = trainPgs_semi_alternate2(train_sup_loader, train_unsup_loader, pgsnet, [optimizer_sup, optimizer_unsup], device,
-                                                   (torch.nn.CrossEntropyLoss(), cons_loss_fn),
-                                                   cons_w_unsup,
-                                                   epoch, cfg)
+            pgsnet, loss = trainPgs_semi_alternate2(train_sup_loader, train_unsup_loader, pgsnet,
+                                                    [optimizer_sup, optimizer_unsup], device,
+                                                    (torch.nn.CrossEntropyLoss(), cons_loss_fn),
+                                                    cons_w_unsup,
+                                                    epoch, cfg)
 
 
 
@@ -762,88 +774,85 @@ def Pgs_train_val(dataset, n_epochs, wmh_threshold, output_dir, learning_rate, a
                                                  epoch, cfg)
 
         if epoch % 2 == 0:
-            final_dice, final_PPV, final_sensitivity, final_specificity, final_hd = eval_per_subjectPgs(pgsnet, device,
-                                                                                                        wmh_threshold,
-                                                                                                        cfg,
-                                                                                                        cfg.val_mode)
-            print(
-                "** (WT) SUBJECT WISE SCORE @ Iteration {} is DICE: {}, HD: {}, PPV:{}, Sensitivity: {}, Specificity: {}  **".
-                    format(epoch, final_dice['WT'], final_hd['WT'], final_PPV['WT'], final_sensitivity['WT'],
-                           final_specificity['WT']))
-            print(
-                "** (ET) SUBJECT WISE SCORE @ Iteration {} is DICE: {}, HD: {}, :{}, Sensitivity:{}, Specificity: {}  **".
-                    format(epoch, final_dice['ET'], final_hd['ET'], final_PPV['ET'], final_sensitivity['ET'],
-                           final_specificity['ET']))
-            print(
-                "** (TC) SUBJECT WISE SCORE @ Iteration {} is DICE: {}, HD: {}, PPV:{}, Sensitivity:{}, Specificity: {}  **".
-                    format(epoch, final_dice['TC'], final_hd['TC'], final_PPV['TC'], final_sensitivity['TC'],
-                           final_specificity['TC']))
+            val_final_dice, val_final_PPV, val_final_sensitivity, val_final_specificity, val_final_hd = eval_per_subjectPgs(
+                pgsnet, device,
+                wmh_threshold,
+                cfg,
+                cfg.val_mode)
 
-            if final_dice['WT'] > best_score:
+            test_final_dice, test_final_PPV, test_final_sensitivity, test_final_specificity, test_final_hd = eval_per_subjectPgs(
+                pgsnet, device,
+                wmh_threshold,
+                cfg,
+                cfg.test_mode)
+            # print(
+            #     "** (WT) SUBJECT WISE SCORE @ Iteration {} is DICE: {}, HD: {}, PPV:{}, Sensitivity: {}, Specificity: {}  **".
+            #         format(epoch, val_final_dice['WT'], final_hd['WT'], final_PPV['WT'], final_sensitivity['WT'],
+            #                final_specificity['WT']))
+            # print(
+            #     "** (ET) SUBJECT WISE SCORE @ Iteration {} is DICE: {}, HD: {}, :{}, Sensitivity:{}, Specificity: {}  **".
+            #         format(epoch, final_dice['ET'], final_hd['ET'], final_PPV['ET'], final_sensitivity['ET'],
+            #                final_specificity['ET']))
+            # print(
+            #     "** (TC) SUBJECT WISE SCORE @ Iteration {} is DICE: {}, HD: {}, PPV:{}, Sensitivity:{}, Specificity: {}  **".
+            #         format(epoch, final_dice['TC'], final_hd['TC'], final_PPV['TC'], final_sensitivity['TC'],
+            #                final_specificity['TC']))
+
+            if val_final_dice['WT'] > best_score:
                 print("****************** BEST SCORE @ ITERATION {} is {} ******************".format(epoch,
-                                                                                                     final_dice['WT']))
-                best_score = final_dice['WT']
-                path = os.path.join(output_model_dir, 'pgsnet_best_lr{}.model'.format(learning_rate))
+                                                                                                     val_final_dice[
+                                                                                                         'WT']))
+                best_score = val_final_dice['WT']
+                path = os.path.join(output_model_dir, 'pgsnet_best.model')
                 with open(path, 'wb') as f:
                     torch.save(pgsnet, f)
-            save_score_all(output_image_dir, (final_dice, final_hd, final_PPV, final_sensitivity, final_specificity),
-                           epoch)
+            save_score_all(output_image_dir,
+                           (val_final_dice, val_final_hd, val_final_PPV, val_final_sensitivity, val_final_specificity),
+                           epoch, mode=cfg.val_mode)
+            save_score_all(output_image_dir,
+                           (test_final_dice, test_final_hd, test_final_PPV, test_final_sensitivity,
+                            test_final_specificity),
+                           epoch, mode=cfg.test_mode)
+
             wandb.log({'epoch_id': epoch,
-                       'WT_subject_wise_val_DSC': final_dice['WT'],
-                       'WT_subject_wise_val_HD': final_hd['WT'],
-                       'WT_subject_wise_val_PPV': final_PPV['WT'],
-                       'WT_subject_wise_val_SENSITIVITY': final_sensitivity['WT'],
-                       'WT_subject_wise_val_SPECIFCITY': final_specificity['WT'],
-                       'ET_subject_wise_val_DSC': final_dice['ET'],
-                       'ET_subject_wise_val_HD': final_hd['ET'],
-                       'ET_subject_wise_val_PPV': final_PPV['ET'],
-                       'ET_subject_wise_val_SENSITIVITY': final_sensitivity['ET'],
-                       'ET_subject_wise_val_SPECIFCITY': final_specificity['ET'],
-                       'TC_subject_wise_val_DSC': final_dice['TC'],
-                       'TC_subject_wise_val_HD': final_hd['TC'],
-                       'TC_subject_wise_val_PPV': final_PPV['TC'],
-                       'TC_subject_wise_val_SENSITIVITY': final_sensitivity['TC'],
-                       'TC_subject_wise_val_SPECIFCITY': final_specificity['TC'],
+                       'val_WT_subject_wise_DSC': val_final_dice['WT'],
+                       'val_WT_subject_wise_HD': val_final_hd['WT'],
+                       'val_WT_subject_wise_PPV': val_final_PPV['WT'],
+                       'val_WT_subject_wise_SENSITIVITY': val_final_sensitivity['WT'],
+                       'WT_subject_wise_val_SPECIFCITY': val_final_specificity['WT'],
+                       'val_ET_subject_wise_DSC': val_final_dice['ET'],
+                       'val_ET_subject_wise_HD': val_final_hd['ET'],
+                       'val_ET_subject_wise_PPV': val_final_PPV['ET'],
+                       'val_ET_subject_wise_SENSITIVITY': val_final_sensitivity['ET'],
+                       'ET_subject_wise_val_SPECIFCITY': val_final_specificity['ET'],
+                       'val_TC_subject_wise_DSC': val_final_dice['TC'],
+                       'val_TC_subject_wise_HD': val_final_hd['TC'],
+                       'val_TC_subject_wise_PPV': val_final_PPV['TC'],
+                       'val_TC_subject_wise_SENSITIVITY': val_final_sensitivity['TC'],
+                       'TC_subject_wise_val_SPECIFCITY': val_final_specificity['TC'],
+
+                       'test_WT_subject_wis_DSC': val_final_dice['WT'],
+                       'test_WT_subject_wise_HD': val_final_hd['WT'],
+                       'test_WT_subject_wise_PPV': val_final_PPV['WT'],
+                       'test_WT_subject_wise_SENSITIVITY': val_final_sensitivity['WT'],
+                       # 'WT_subject_wise_val_SPECIFCITY': val_final_specificity['WT'],
+                       'test_ET_subject_wise_DSC': val_final_dice['ET'],
+                       'test_ET_subject_wise_HD': val_final_hd['ET'],
+                       'test_ET_subject_wise_PPV': val_final_PPV['ET'],
+                       'test_ET_subject_wise_SENSITIVITY': val_final_sensitivity['ET'],
+                       # 'ET_subject_wise_val_SPECIFCITY': val_final_specificity['ET'],
+                       'test_TC_subject_wise_DSC': val_final_dice['TC'],
+                       'test_TC_subject_wise_HD': val_final_hd['TC'],
+                       'test_TC_subject_wise_PPV': val_final_PPV['TC'],
+                       'test_TC_subject_wise_SENSITIVITY': val_final_sensitivity['TC'],
+                       # 'TC_subject_wise_val_SPECIFCITY': val_final_specificity['TC'],
                        })
 
-            # final_dice, final_hd, final_PPV, final_sensitivity = eval_per_subjectPgs2(pgsnet, device, wmh_threshold,
-            #                                                                           cfg, cfg.val_mode)
-            #
-            # print("** (WT) SUBJECT WISE SCORE @ Iteration {} is DICE: {}, H95: {}, PPV:{}, Sensitivity:{} **".
-            #       format(epoch, final_dice['WT'], final_hd['WT'], final_PPV['WT'], final_sensitivity['WT']))
-            # print("** (ET) SUBJECT WISE SCORE @ Iteration {} is DICE: {}, H95: {}, PPV:{}, Sensitivity:{} **".
-            #       format(epoch, final_dice['ET'], final_hd['ET'], final_PPV['ET'], final_sensitivity['ET']))
-            # print("** (TC) SUBJECT WISE SCORE @ Iteration {} is DICE: {}, H95: PPV{}, PPV:{}, Sensitivity:{} **".
-            #       format(epoch, final_dice['TC'], final_hd['TC'], final_PPV['TC'], final_sensitivity['TC']))
-            #
-            #
-            # if final_dice['WT'] > best_score:
-            #     print("****************** BEST SCORE @ ITERATION {} is {} ******************".format(epoch,
-            #                                                                                          final_dice['WT']))
-            #     best_score = final_dice['WT']
-            #     path = os.path.join(output_model_dir, 'pgsnet_best_lr{}.model'.format(learning_rate))
-            #     with open(path, 'wb') as f:
-            #         torch.save(pgsnet, f)
-            #     # batch_wise_test_DSC, subject_wise_test_DSC, _ = evaluatePGS(pgsnet, dataset, device, wmh_threshold,
-            #     #                                                             cfg, cfg.test_mode)
-            #     # subject_wise_test_DSC = eval_per_subjectPgs(pgsnet, device, wmh_threshold, cfg, cfg.test_mode)
-            #     #
-            #     # wandb.log({"epoch_id": epoch, "subject_wise_test_DSC": subject_wise_test_DSC})
-            # save_score_all(output_image_dir, (final_dice, final_hd, final_PPV, final_sensitivity), epoch)
-            # wandb.log({'epoch_id': epoch,
-            #            'WT_subject_wise_val_DSC': final_dice['WT'], 'WT_subject_wise_val_H95': final_hd['WT'],
-            #            'WT_subject_wise_val_PPV': final_PPV['WT'],
-            #            'WT_subject_wise_val_SENSITIVITY': final_sensitivity['WT'],
-            #            'ET_subject_wise_val_DSC': final_dice['ET'], 'ET_subject_wise_val_H95': final_hd['ET'],
-            #            'ET_subject_wise_val_PPV': final_PPV['ET'],
-            #            'ET_subject_wise_val_SENSITIVITY': final_sensitivity['ET'],
-            #            'TC_subject_wise_val_DSC': final_dice['TC'], 'TC_subject_wise_val_H95': final_hd['TC'],
-            #            'TC_subject_wise_val_PPV': final_PPV['TC'],
-            #            'TC_subject_wise_val_SENSITIVITY': final_sensitivity['TC']
-            #            })
-
-        scheduler[0].step()
-        scheduler[1].step()
+    if cfg.experiment_mode == 'semi_alternate':
+        scheduler_sup.step()
+        scheduler_unsup.step()
+    else:
+        scheduler.step()
 
     final_dice, final_PPV, final_sensitivity, final_specificity, final_hd = eval_per_subjectPgs(pgsnet, device,
                                                                                                 wmh_threshold,
@@ -939,14 +948,14 @@ def save_score(dir_path, score, iter):
                 "average TC dice score per subject    {}\n".format(iter, score['WT'], score['ET'], score['TC']))
 
 
-def save_score_all(dir_path, scores, iter):
+def save_score_all(dir_path, scores, iter, mode):  # mode = 2020 test or 2019 test
     final_dice = scores[0]
     final_hd = scores[1]
     final_PPV = scores[2]
     final_sensitivity = scores[3]
     final_specificity = scores[4]
 
-    dir_path = os.path.join(dir_path, "results_iter{}".format(iter))
+    dir_path = os.path.join(dir_path, "{}_results_iter{}".format(mode, iter))
     if not os.path.isdir(dir_path):
         try:
             os.mkdir(dir_path, 0o777)
@@ -1060,7 +1069,7 @@ def main():
 
     config_params = dict(args=args, config=cfg)
     wandb.init(project="CVPR2022_BRATS", config=config_params)
-    Pgs_train_val(dataset, cfg.n_epochs, cfg.wmh_threshold, args.output_dir, cfg.lr, args, cfg, cfg.seed)
+    Pgs_train_val(dataset, cfg.n_epochs, cfg.wmh_threshold, args.output_dir, args, cfg, cfg.seed)
 
 
 if __name__ == '__main__':
