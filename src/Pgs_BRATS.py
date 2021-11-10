@@ -329,16 +329,15 @@ def trainPgs_semi_alternate2(train_sup_loader, train_unsup_loader, model, optimi
         optimizer[1].zero_grad()
         model.train()
 
-        # b_unsup = batch_unsup['data']
-        # b_unsup = b_unsup.to(device)
-        uLoss = 0
-        weight_unsup = 0
-        # teacher_outputs, student_outputs = model(b_unsup, is_supervised=False)
-        # uLoss = compute_loss(student_outputs, teacher_outputs, loss_functions, is_supervised=False, cfg=cfg)
-        # weight_unsup = cons_w_unsup(epochid, batch_idx)
-        # total_loss = uLoss * weight_unsup
-        # total_loss.backward()
-        # optimizer[1].step()
+        b_unsup = batch_unsup['data']
+        b_unsup = b_unsup.to(device)
+
+        teacher_outputs, student_outputs = model(b_unsup, is_supervised=False)
+        uLoss = compute_loss(student_outputs, teacher_outputs, loss_functions, is_supervised=False, cfg=cfg)
+        weight_unsup = cons_w_unsup(epochid, batch_idx)
+        total_loss = uLoss * weight_unsup
+        total_loss.backward()
+        optimizer[1].step()
 
         print("**************** UNSUP LOSSS  : {} ****************".format(uLoss))
         print("**************** SUP LOSSS  : {} ****************".format(sLoss))
