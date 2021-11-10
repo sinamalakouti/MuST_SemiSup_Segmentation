@@ -276,7 +276,7 @@ class Perturbator(nn.Module):
             x_transform, y_transform = self.uni_decoder(x, y)
         elif random_selector == 3:
             x_transform, y_transform = self.gaussian_decoder(x, y)
-        elif random_selector == 5:
+        elif random_selector == 4:
             x_transform, y_transform = x, y
         return x_transform, y_transform
 
@@ -287,9 +287,11 @@ class Perturbator(nn.Module):
                 cascade=False):  # mode = F (feature_space), G (geometrical), M (mix)
         if use_softmax or perturbation_mode == 'G':
             y = torch.nn.functional.softmax(y, dim=1)
-        if perturbation_mode == 'F':
+            assert False, "FUCK perturb softmax ( augment)"
+
+        if perturbation_mode == 'G':
             x_transform, y_transform = self.__fw_geometrical_aug(x, y)
-        elif perturbation_mode == 'G':
+        elif perturbation_mode == 'F':
             x_transform, y_transform = self.__fw_feature_space_aug(x, y)
         else:
             x_transform, y_transform = None, None
