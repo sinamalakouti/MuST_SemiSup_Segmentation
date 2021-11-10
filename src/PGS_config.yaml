@@ -1,7 +1,7 @@
 #trianing and test splits
 train_mode: "all_train2018_sup"
 val_mode: "test2019_new"
-test_mode: "test_2020_new"
+test_mode: "test2020_new"
 train_unsup_mode: "train2018_semi_unsup"
 train_sup_mode: "train2018_semi_sup"
 train_sup_rate: 3 #rate of labeled data
@@ -36,8 +36,8 @@ unsupervised_training:
   scheduler_step_size: 5
   consist_w_unsup:
     rampup: 'linear_rampup' #ramp_types = ['sigmoid_rampup', 'linear_rampup', 'cosine_rampup', 'log_rampup', 'exp_rampup']
-    final_w: 5
-    rampup_ends: 4
+    final_w: 10
+    rampup_ends: 20
 
 #hyper parameters
 experiment_mode: "semi_alternate"

@@ -761,10 +761,18 @@ def Pgs_train_val(dataset, n_epochs, wmh_threshold, output_dir, args, cfg, seed)
 
         # score, segmentations = evaluatePGS(pgsnet, dataset, device, wmh_threshold, cfg, cfg.val_mode)
         elif cfg.experiment_mode == 'partially_sup':
+            optimizer = torch.optim.SGD(pgsnet.parameters(), cfg.supervised_training.lr, momentum=0.9,
+                                        weight_decay=1e-4)
+            scheduler = lr_scheduler.StepLR(optimizer, step_size=cfg.supervised_training.scheduler_step_size,
+                                            gamma=cfg.supervised_training.lr_gamma)
             pgsnet, loss = trainPgs_sup(train_sup_loader, pgsnet, optimizer, device,
                                         (torch.nn.CrossEntropyLoss(), None),
                                         epoch, cfg)
         elif cfg.experiment_mode == 'fully_sup':
+            scheduler = lr_scheduler.StepLR(optimizer, step_size=cfg.supervised_training.scheduler_step_size,
+                                            gamma=cfg.supervised_training.lr_gamma)
+            optimizer = torch.optim.SGD(pgsnet.parameters(), cfg.supervised_training.lr, momentum=0.9,
+                                        weight_decay=1e-4)
             pgsnet, loss = trainPgs_sup(train_sup_loader, pgsnet, optimizer, device,
                                         (torch.nn.CrossEntropyLoss(), None),
                                         epoch, cfg)
@@ -819,33 +827,33 @@ def Pgs_train_val(dataset, n_epochs, wmh_threshold, output_dir, args, cfg, seed)
                        'val_WT_subject_wise_HD': val_final_hd['WT'],
                        'val_WT_subject_wise_PPV': val_final_PPV['WT'],
                        'val_WT_subject_wise_SENSITIVITY': val_final_sensitivity['WT'],
-                       'WT_subject_wise_val_SPECIFCITY': val_final_specificity['WT'],
+                       'val_WT_subject_wise_val_SPECIFCITY': val_final_specificity['WT'],
                        'val_ET_subject_wise_DSC': val_final_dice['ET'],
                        'val_ET_subject_wise_HD': val_final_hd['ET'],
                        'val_ET_subject_wise_PPV': val_final_PPV['ET'],
                        'val_ET_subject_wise_SENSITIVITY': val_final_sensitivity['ET'],
-                       'ET_subject_wise_val_SPECIFCITY': val_final_specificity['ET'],
+                       'val_ET_subject_wise_val_SPECIFCITY': val_final_specificity['ET'],
                        'val_TC_subject_wise_DSC': val_final_dice['TC'],
                        'val_TC_subject_wise_HD': val_final_hd['TC'],
                        'val_TC_subject_wise_PPV': val_final_PPV['TC'],
                        'val_TC_subject_wise_SENSITIVITY': val_final_sensitivity['TC'],
-                       'TC_subject_wise_val_SPECIFCITY': val_final_specificity['TC'],
+                       'val_TC_subject_wise_val_SPECIFCITY': val_final_specificity['TC'],
 
-                       'test_WT_subject_wis_DSC': val_final_dice['WT'],
-                       'test_WT_subject_wise_HD': val_final_hd['WT'],
-                       'test_WT_subject_wise_PPV': val_final_PPV['WT'],
-                       'test_WT_subject_wise_SENSITIVITY': val_final_sensitivity['WT'],
-                       # 'WT_subject_wise_val_SPECIFCITY': val_final_specificity['WT'],
-                       'test_ET_subject_wise_DSC': val_final_dice['ET'],
-                       'test_ET_subject_wise_HD': val_final_hd['ET'],
-                       'test_ET_subject_wise_PPV': val_final_PPV['ET'],
-                       'test_ET_subject_wise_SENSITIVITY': val_final_sensitivity['ET'],
-                       # 'ET_subject_wise_val_SPECIFCITY': val_final_specificity['ET'],
-                       'test_TC_subject_wise_DSC': val_final_dice['TC'],
-                       'test_TC_subject_wise_HD': val_final_hd['TC'],
-                       'test_TC_subject_wise_PPV': val_final_PPV['TC'],
-                       'test_TC_subject_wise_SENSITIVITY': val_final_sensitivity['TC'],
-                       # 'TC_subject_wise_val_SPECIFCITY': val_final_specificity['TC'],
+                       'test_WT_subject_wis_DSC': test_final_dice['WT'],
+                       'test_WT_subject_wise_HD': test_final_hd['WT'],
+                       'test_WT_subject_wise_PPV': test_final_PPV['WT'],
+                       'test_WT_subject_wise_SENSITIVITY': test_final_sensitivity['WT'],
+                       'test_WT_subject_wise_val_SPECIFCITY': test_final_specificity['WT'],
+                       'test_ET_subject_wise_DSC': test_final_dice['ET'],
+                       'test_ET_subject_wise_HD': test_final_hd['ET'],
+                       'test_ET_subject_wise_PPV': test_final_PPV['ET'],
+                       'test_ET_subject_wise_SENSITIVITY': test_final_sensitivity['ET'],
+                       'test_ET_subject_wise_val_SPECIFCITY': test_final_specificity['ET'],
+                       'test_TC_subject_wise_DSC': test_final_dice['TC'],
+                       'test_TC_subject_wise_HD': test_final_hd['TC'],
+                       'test_TC_subject_wise_PPV': test_final_PPV['TC'],
+                       'test_TC_subject_wise_SENSITIVITY': test_final_sensitivity['TC'],
+                       'test_TC_subject_wise_val_SPECIFCITY': test_final_specificity['TC'],
                        })
 
     if cfg.experiment_mode == 'semi_alternate':

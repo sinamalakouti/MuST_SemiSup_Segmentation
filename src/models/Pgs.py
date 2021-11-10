@@ -336,7 +336,6 @@ class PGS(nn.Module):
         teach_up1 = self.__fw_up(c5_teach, c4, self.up1,
                                  transformer=None) if self.config.information_passing_strategy == 'teacher' \
             else self.__fw_up(c5_stud, c4, self.up1, transformer=None)
-
         stud_up1 = self.__fw_up(c5_teach, c4, self.up1,
                                 transformer=self.transformer) if self.config.information_passing_strategy == 'teacher' \
             else self.__fw_up(c5_stud, c4, self.up1, transformer=self.transformer)
