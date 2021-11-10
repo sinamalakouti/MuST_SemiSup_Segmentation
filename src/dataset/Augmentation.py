@@ -262,8 +262,7 @@ class Perturbator(nn.Module):
             x_transform, y_transform = self.hflip_decoder(x, y)
         elif random_selector == 5:  # vflip
             x_transform, y_transform = self.vflip_decoder(x, y)
-        elif random_selector == 6:
-            x_transform, y_transform = x,y
+
         return x_transform, y_transform
 
     def __fw_feature_space_aug(self, x, y):
@@ -287,7 +286,6 @@ class Perturbator(nn.Module):
                 cascade=False):  # mode = F (feature_space), G (geometrical), M (mix)
         if use_softmax or perturbation_mode == 'G':
             y = torch.nn.functional.softmax(y, dim=1)
-            assert False, "FUCK perturb softmax ( augment)"
 
         if perturbation_mode == 'G':
             x_transform, y_transform = self.__fw_geometrical_aug(x, y)

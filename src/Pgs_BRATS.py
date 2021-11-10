@@ -83,8 +83,8 @@ def __fw_outputwise_unsup_loss(y_stud, y_teach, loss_functions, cfg):
             losses.append(
                 unsup_loss(stud_pred, teach_pred, i, use_softmax=True))
         elif cfg.unsupervised_training.consistency_loss == 'MSE':
-            teach_pred = torch.nn.functional.softmax(teach_pred, dim=1)
-            student_pred = torch.nn.functional.softmax(stud_pred, dim=1)
+            # teach_pred = torch.nn.functional.softmax(teach_pred, dim=1)
+            student_pred = torch.nn.functional.softmax(stud_pred, dim=1)    
             mse = torch.nn.MSELoss()
             loss = mse(teach_pred.detach(), student_pred)
             losses.append(loss)
@@ -317,17 +317,6 @@ def trainPgs_semi_alternate2(train_sup_loader, train_unsup_loader, model, optimi
     for batch_idx, (batch_sup, batch_unsup) in enumerate(semi_loader):
         optimizer[0].zero_grad()
         optimizer[1].zero_grad()
-        b_sup = batch_sup['data'].to(device)
-        target_sup = batch_sup['label'].to(device)
-
-        sup_outputs, _ = model(b_sup, is_supervised=True)
-        sLoss = compute_loss(sup_outputs, target_sup, loss_functions, is_supervised=True, cfg=cfg)
-        sLoss.backward()
-        optimizer[0].step()
-
-        optimizer[0].zero_grad()
-        optimizer[1].zero_grad()
-        model.train()
 
         b_unsup = batch_unsup['data']
         b_unsup = b_unsup.to(device)
@@ -338,6 +327,18 @@ def trainPgs_semi_alternate2(train_sup_loader, train_unsup_loader, model, optimi
         total_loss = uLoss * weight_unsup
         total_loss.backward()
         optimizer[1].step()
+
+        model.train()
+
+        b_sup = batch_sup['data'].to(device)
+        target_sup = batch_sup['label'].to(device)
+        sup_outputs, _ = model(b_sup, is_supervised=True)
+        sLoss = compute_loss(sup_outputs, target_sup, loss_functions, is_supervised=True, cfg=cfg)
+        sLoss.backward()
+        optimizer[0].step()
+
+        optimizer[0].zero_grad()
+        optimizer[1].zero_grad()
 
         print("**************** UNSUP LOSSS  : {} ****************".format(uLoss))
         print("**************** SUP LOSSS  : {} ****************".format(sLoss))
@@ -888,47 +889,6 @@ def Pgs_train_val(dataset, n_epochs, wmh_threshold, output_dir, args, cfg, seed)
                })
 
 
-    # final_dice, final_hd, final_PPV, final_sensitivity = eval_per_subjectPgs2(pgsnet, device, wmh_threshold,
-    #                                                                           cfg, cfg.val_mode)
-    #
-    # print("** (WT) SUBJECT WISE SCORE @ Iteration {} is DICE: {}, H95: {}, PPV:{}, Sensitivity:{} **".
-    #       format(cfg.n_epochs, final_dice['WT'], final_hd['WT'], final_PPV['WT'], final_sensitivity['WT']))
-    # print("** (ET) SUBJECT WISE SCORE @ Iteration {} is DICE: {}, H95: {}, PPV:{}, Sensitivity:{} **".
-    #       format(cfg.n_epochs, final_dice['ET'], final_hd['ET'], final_PPV['ET'], final_sensitivity['ET']))
-    # print("** (TC) SUBJECT WISE SCORE @ Iteration {} is DICE: {}, H95: PPV{}, PPV:{}, Sensitivity:{} **".
-    #       format(cfg.n_epochs, final_dice['TC'], final_hd['TC'], final_PPV['TC'], final_sensitivity['TC']))
-    #
-    #
-    #
-    # #
-    # save_score_all(output_image_dir, (final_dice, final_hd, final_PPV, final_sensitivity), cfg.n_epochs)
-    # wandb.log({'epoch_id': cfg.n_epochs,
-    #            'WT_subject_wise_val_DSC': final_dice['WT'], 'WT_subject_wise_val_H95': final_hd['WT'],
-    #            'WT_subject_wise_val_PPV': final_PPV['WT'],
-    #            'WT_subject_wise_val_SENSITIVITY': final_sensitivity['WT'],
-    #            'ET_subject_wise_val_DSC': final_dice['ET'], 'ET_subject_wise_val_H95': final_hd['ET'],
-    #            'ET_subject_wise_val_PPV': final_PPV['ET'],
-    #            'ET_subject_wise_val_SENSITIVITY': final_sensitivity['ET'],
-    #            'TC_subject_wise_val_DSC': final_dice['TC'], 'TC_subject_wise_val_H95': final_hd['TC'],
-    #            'TC_subject_wise_val_PPV': final_PPV['TC'],
-    #            'TC_subject_wise_val_SENSITIVITY': final_sensitivity['TC']
-    #            })
-    #
-    # # save_score_all(output_image_dir, (final_dice, final_specificity, final_PPV, final_sensitivity), 39)
-    # # wandb.log({'epoch_id': cfg.n_epochs,
-    # #            'WT_subject_wise_val_DSC': final_dice['WT'],
-    # #            'WT_subject_wise_val_PPV': final_PPV['WT'],
-    # #            'WT_subject_wise_val_SENSITIVITY': final_sensitivity['WT'],
-    # #            'WT_subject_wise_specificity': final_specificity['WT'],
-    # #            'ET_subject_wise_val_DSC': final_dice['ET'],
-    # #            'ET_subject_wise_val_PPV': final_PPV['ET'],
-    # #            'ET_subject_wise_val_SENSITIVITY': final_sensitivity['ET'],
-    # #            'ET_subject_wise_specificity': final_specificity['ET'],
-    # #            'TC_subject_wise_val_DSC': final_dice['TC'],
-    # #            'TC_subject_wise_val_PPV': final_PPV['TC'],
-    # #            'TC_subject_wise_val_SENSITIVITY': final_sensitivity['TC'],
-    # #            'TC_subject_wise_specificity': final_specificity['TC'],
-    # #            })
 
 
 def save_score(dir_path, score, iter):
