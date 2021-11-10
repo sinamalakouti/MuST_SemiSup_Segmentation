@@ -84,9 +84,9 @@ def __fw_outputwise_unsup_loss(y_stud, y_teach, loss_functions, cfg):
                 unsup_loss(stud_pred, teach_pred, i, use_softmax=True))
         elif cfg.unsupervised_training.consistency_loss == 'MSE':
             # teach_pred = torch.nn.functional.softmax(teach_pred, dim=1)
-            student_pred = torch.nn.functional.softmax(stud_pred / 0.5, dim=1)
+            stud_pred = torch.nn.functional.softmax(stud_pred / 0.5, dim=1)
             mse = torch.nn.MSELoss()
-            loss = mse(teach_pred.detach(), student_pred)
+            loss = mse(stud_pred, teach_pred.detach())
             losses.append(loss)
     total_loss = sum(losses)
     return total_loss
@@ -265,7 +265,7 @@ def trainPgs_semi_alternate2(train_sup_loader, train_unsup_loader, model, optimi
 
         optimizer[0].zero_grad()
         optimizer[1].zero_grad()
-        model.train()
+        modelrain()
 
         b_sup = batch_sup['data'].to(device)
         target_sup = batch_sup['label'].to(device)
@@ -737,17 +737,17 @@ def Pgs_train_val(dataset, n_epochs, wmh_threshold, output_dir, args, cfg, seed)
                        'val_WT_subject_wise_HD': val_final_hd['WT'],
                        'val_WT_subject_wise_PPV': val_final_PPV['WT'],
                        'val_WT_subject_wise_SENSITIVITY': val_final_sensitivity['WT'],
-                       'val_WT_subject_wise_val_SPECIFCITY': val_final_specificity['WT'],
+                       'val_WT_subject_wise_SPECIFCITY': val_final_specificity['WT'],
                        'val_ET_subject_wise_DSC': val_final_dice['ET'],
                        'val_ET_subject_wise_HD': val_final_hd['ET'],
                        'val_ET_subject_wise_PPV': val_final_PPV['ET'],
                        'val_ET_subject_wise_SENSITIVITY': val_final_sensitivity['ET'],
-                       'val_ET_subject_wise_val_SPECIFCITY': val_final_specificity['ET'],
+                       'val_ET_subject_wise_SPECIFCITY': val_final_specificity['ET'],
                        'val_TC_subject_wise_DSC': val_final_dice['TC'],
                        'val_TC_subject_wise_HD': val_final_hd['TC'],
                        'val_TC_subject_wise_PPV': val_final_PPV['TC'],
                        'val_TC_subject_wise_SENSITIVITY': val_final_sensitivity['TC'],
-                       'val_TC_subject_wise_val_SPECIFCITY': val_final_specificity['TC'],
+                       'val_TC_subject_wise_SPECIFCITY': val_final_specificity['TC'],
                        })
 
         if cfg.experiment_mode == 'semi_alternate':
@@ -776,21 +776,21 @@ def Pgs_train_val(dataset, n_epochs, wmh_threshold, output_dir, args, cfg, seed)
     save_score_all(output_image_dir, (final_dice, final_hd, final_PPV, final_sensitivity, final_specificity),
                    cfg.n_epochs, mode=cfg.val_mode)
     wandb.log({'epoch_id': cfg.n_epochs,
-               'val_WT_subject_wise_val_DSC': final_dice['WT'],
-               'val_WT_subject_wise_val_HD': final_hd['WT'],
-               'val_WT_subject_wise_val_PPV': final_PPV['WT'],
-               'val_WT_subject_wise_val_SENSITIVITY': final_sensitivity['WT'],
-               'val_WT_subject_wise_val_SPECIFCITY': final_specificity['WT'],
-               'val_ET_subject_wise_val_DSC': final_dice['ET'],
-               'val_ET_subject_wise_val_HD': final_hd['ET'],
-               'val_ET_subject_wise_val_PPV': final_PPV['ET'],
-               'val_ET_subject_wise_val_SENSITIVITY': final_sensitivity['ET'],
-               'val_ET_subject_wise_val_SPECIFCITY': final_specificity['ET'],
-               'val_TC_subject_wise_val_DSC': final_dice['TC'],
-               'val_TC_subject_wise_val_HD': final_hd['TC'],
-               'val_TC_subject_wise_val_PPV': final_PPV['TC'],
-               'val_TC_subject_wise_val_SENSITIVITY': final_sensitivity['TC'],
-               'val_TC_subject_wise_val_SPECIFCITY': final_specificity['TC'],
+               'val_WT_subject_wise_DSC': final_dice['WT'],
+               'val_WT_subject_wise_HD': final_hd['WT'],
+               'val_WT_subject_wise_PPV': final_PPV['WT'],
+               'val_WT_subject_wise_SENSITIVITY': final_sensitivity['WT'],
+               'val_WT_subject_wise_SPECIFCITY': final_specificity['WT'],
+               'val_ET_subject_wise_DSC': final_dice['ET'],
+               'val_ET_subject_wise_HD': final_hd['ET'],
+               'val_ET_subject_wise_PPV': final_PPV['ET'],
+               'val_ET_subject_wise_SENSITIVITY': final_sensitivity['ET'],
+               'val_ET_subject_wise_SPECIFCITY': final_specificity['ET'],
+               'val_TC_subject_wise_DSC': final_dice['TC'],
+               'val_TC_subject_wise_HD': final_hd['TC'],
+               'val_TC_subject_wise_PPV': final_PPV['TC'],
+               'val_TC_subject_wise_SENSITIVITY': final_sensitivity['TC'],
+               'val_TC_subject_wise_SPECIFCITY': final_specificity['TC'],
                })
 
     test_final_dice, test_final_PPV, test_final_sensitivity, test_final_specificity, test_final_hd = eval_per_subjectPgs(
