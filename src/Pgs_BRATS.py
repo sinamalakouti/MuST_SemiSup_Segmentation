@@ -317,25 +317,28 @@ def trainPgs_semi_alternate2(train_sup_loader, train_unsup_loader, model, optimi
     for batch_idx, (batch_sup, batch_unsup) in enumerate(semi_loader):
         optimizer[0].zero_grad()
         optimizer[1].zero_grad()
-        b_unsup = batch_unsup['data']
-        b_unsup = b_unsup.to(device)
-
-        teacher_outputs, student_outputs = model(b_unsup, is_supervised=False)
-        uLoss = compute_loss(student_outputs, teacher_outputs, loss_functions, is_supervised=False, cfg=cfg)
-        weight_unsup = cons_w_unsup(epochid, batch_idx)
-        total_loss = uLoss * weight_unsup
-        total_loss.backward()
-        optimizer[1].step()
-
-        optimizer[0].zero_grad()
-        optimizer[1].zero_grad()
-
         b_sup = batch_sup['data'].to(device)
         target_sup = batch_sup['label'].to(device)
+
         sup_outputs, _ = model(b_sup, is_supervised=True)
         sLoss = compute_loss(sup_outputs, target_sup, loss_functions, is_supervised=True, cfg=cfg)
         sLoss.backward()
         optimizer[0].step()
+
+        optimizer[0].zero_grad()
+        optimizer[1].zero_grad()
+        model.train()
+
+        # b_unsup = batch_unsup['data']
+        # b_unsup = b_unsup.to(device)
+        uLoss = 0
+        weight_unsup = 0
+        # teacher_outputs, student_outputs = model(b_unsup, is_supervised=False)
+        # uLoss = compute_loss(student_outputs, teacher_outputs, loss_functions, is_supervised=False, cfg=cfg)
+        # weight_unsup = cons_w_unsup(epochid, batch_idx)
+        # total_loss = uLoss * weight_unsup
+        # total_loss.backward()
+        # optimizer[1].step()
 
         print("**************** UNSUP LOSSS  : {} ****************".format(uLoss))
         print("**************** SUP LOSSS  : {} ****************".format(sLoss))
@@ -752,7 +755,7 @@ def Pgs_train_val(dataset, n_epochs, wmh_threshold, output_dir, args, cfg, seed)
                                               ramp_type=cfg['unsupervised_training']['consist_w_unsup']['rampup'])
 
             pgsnet, loss = trainPgs_semi_alternate2(train_sup_loader, train_unsup_loader, pgsnet,
-                                                    [optimizer_sup, optimizer_unsup], device,
+                                                    (optimizer_sup, optimizer_unsup), device,
                                                     (torch.nn.CrossEntropyLoss(), cons_loss_fn),
                                                     cons_w_unsup,
                                                     epoch, cfg)

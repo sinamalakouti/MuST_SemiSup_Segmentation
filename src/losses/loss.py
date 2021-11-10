@@ -10,7 +10,7 @@ class Consistency_CE:
         self.centers = [None for i in range(0, n_cls)]
         self.center_momentum = 0.9
 
-    @torch.no_grad
+    @torch.no_grad()
     def update_center(self, center_id, teacher_output):
         batch_center = torch.sum(teacher_output, dim=0, keepdim=True)
         batch_center = batch_center / (len(teacher_output))
