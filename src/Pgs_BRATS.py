@@ -84,7 +84,7 @@ def __fw_outputwise_unsup_loss(y_stud, y_teach, loss_functions, cfg):
                 unsup_loss(stud_pred, teach_pred, i, use_softmax=True))
         elif cfg.unsupervised_training.consistency_loss == 'MSE':
             # teach_pred = torch.nn.functional.softmax(teach_pred, dim=1)
-            student_pred = torch.nn.functional.softmax(stud_pred, dim=1)    
+            student_pred = torch.nn.functional.softmax(stud_pred / 0.5, dim=1)
             mse = torch.nn.MSELoss()
             loss = mse(teach_pred.detach(), student_pred)
             losses.append(loss)
@@ -240,71 +240,6 @@ def trainPgs_semi_downSample(train_sup_loader, train_unsup_loader, model, optimi
     return model, total_loss
 
 
-def trainPgs_semi_alternate(train_sup_loader, train_unsup_loader, model, optimizer, device, loss_functions,
-                            cons_w_unsup, epochid,
-                            cfg):
-    total_loss = 0
-    model.train()
-
-    train_sup_iterator = iter(train_sup_loader)
-    sup_step = 0
-    has_sup = True
-    for unsup_step, batch_unsup in enumerate(train_unsup_loader):
-        optimizer.zero_grad()
-        b_unsup = batch_unsup['data']
-        b_unsup = b_unsup.to(device)
-
-        if has_sup:
-            try:
-                batch_sup = next(train_sup_iterator)
-                b_sup = batch_sup['data'].to(device)
-                target_sup = batch_sup['label'].to(device)
-
-                sup_outputs, _ = model(b_sup, is_supervised=True)
-                sLoss = compute_loss(sup_outputs, target_sup, loss_functions, is_supervised=True, cfg=cfg)
-
-            except StopIteration:
-                has_sup = False
-                sLoss = 0
-        else:
-            sLoss = 0
-
-        teacher_outputs, student_outputs = model(b_unsup, is_supervised=False)
-        uLoss = compute_loss(student_outputs, teacher_outputs, loss_functions, is_supervised=False, cfg=cfg)
-
-        print("**************** UNSUP LOSSS  : {} ****************".format(uLoss))
-        print("**************** SUP LOSSS  : {} ****************".format(sLoss))
-        weight_unsup = cons_w_unsup(epochid, unsup_step)
-        total_loss = sLoss + uLoss
-        total_loss.backward()
-        optimizer.step()
-        if has_sup:
-            with torch.no_grad():
-                sf = torch.nn.Softmax2d()
-                target_sup[target_sup >= 1] = 1
-                target_sup = target_sup
-                y_pred = sf(sup_outputs[-1])
-                y_WT = seg2WT(y_pred, 0.5, cfg.oneHot)
-                dice_score = dice_coef(target_sup.reshape(y_WT.shape), y_WT)
-                wandb.log(
-                    {"sup_batch_id": sup_step + epochid * len(train_unsup_loader),
-                     "sup loss": sLoss,
-                     "unsup_batch_id": unsup_step + epochid * len(train_unsup_loader),
-                     "unsup loss": uLoss,
-                     "batch_score_WT": dice_score,
-                     'weight unsup': weight_unsup
-                     })
-
-            sup_step += 1
-        else:
-            wandb.log(
-                {
-                    "unsup_batch_id": unsup_step + epochid * len(train_unsup_loader),
-                    "unsup loss": uLoss,
-                    'weight unsup': weight_unsup
-                })
-    return model, total_loss
-
 
 def trainPgs_semi_alternate2(train_sup_loader, train_unsup_loader, model, optimizer, device, loss_functions,
                              cons_w_unsup, epochid,
@@ -328,6 +263,8 @@ def trainPgs_semi_alternate2(train_sup_loader, train_unsup_loader, model, optimi
         total_loss.backward()
         optimizer[1].step()
 
+        optimizer[0].zero_grad()
+        optimizer[1].zero_grad()
         model.train()
 
         b_sup = batch_sup['data'].to(device)
@@ -336,9 +273,6 @@ def trainPgs_semi_alternate2(train_sup_loader, train_unsup_loader, model, optimi
         sLoss = compute_loss(sup_outputs, target_sup, loss_functions, is_supervised=True, cfg=cfg)
         sLoss.backward()
         optimizer[0].step()
-
-        optimizer[0].zero_grad()
-        optimizer[1].zero_grad()
 
         print("**************** UNSUP LOSSS  : {} ****************".format(uLoss))
         print("**************** SUP LOSSS  : {} ****************".format(sLoss))
@@ -759,7 +693,6 @@ def Pgs_train_val(dataset, n_epochs, wmh_threshold, output_dir, args, cfg, seed)
                 cfg,
                 cfg.val_mode)
 
-
             if val_final_dice['WT'] > best_score:
                 print("****************** BEST SCORE @ ITERATION {} is {} ******************".format(epoch,
                                                                                                      val_final_dice[
@@ -798,7 +731,6 @@ def Pgs_train_val(dataset, n_epochs, wmh_threshold, output_dir, args, cfg, seed)
             save_score_all(output_image_dir,
                            (val_final_dice, val_final_hd, val_final_PPV, val_final_sensitivity, val_final_specificity),
                            epoch, mode=cfg.val_mode)
-
 
             wandb.log({'epoch_id': epoch,
                        'val_WT_subject_wise_DSC': val_final_dice['WT'],
@@ -842,7 +774,7 @@ def Pgs_train_val(dataset, n_epochs, wmh_threshold, output_dir, args, cfg, seed)
                    final_specificity['TC']))
 
     save_score_all(output_image_dir, (final_dice, final_hd, final_PPV, final_sensitivity, final_specificity),
-                   cfg.n_epochs)
+                   cfg.n_epochs, mode=cfg.val_mode)
     wandb.log({'epoch_id': cfg.n_epochs,
                'val_WT_subject_wise_val_DSC': final_dice['WT'],
                'val_WT_subject_wise_val_HD': final_hd['WT'],
@@ -887,8 +819,6 @@ def Pgs_train_val(dataset, n_epochs, wmh_threshold, output_dir, args, cfg, seed)
                'test_TC_subject_wise_SENSITIVITY': test_final_sensitivity['TC'],
                'test_TC_subject_wise_val_SPECIFCITY': test_final_specificity['TC'],
                })
-
-
 
 
 def save_score(dir_path, score, iter):
