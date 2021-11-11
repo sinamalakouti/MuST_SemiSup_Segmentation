@@ -84,7 +84,7 @@ def __fw_outputwise_unsup_loss(y_stud, y_teach, loss_functions, cfg):
                 unsup_loss(stud_pred, teach_pred, i, use_softmax=True))
         elif cfg.unsupervised_training.consistency_loss == 'MSE':
             # teach_pred = torch.nn.functional.softmax(teach_pred, dim=1)
-            stud_pred = torch.nn.functional.softmax(stud_pred / 0.5, dim=1)
+            stud_pred = torch.nn.functional.softmax(stud_pred , dim=1)
             mse = torch.nn.MSELoss()
             loss = mse(stud_pred, teach_pred.detach())
             losses.append(loss)
@@ -265,7 +265,7 @@ def trainPgs_semi_alternate2(train_sup_loader, train_unsup_loader, model, optimi
 
         optimizer[0].zero_grad()
         optimizer[1].zero_grad()
-        modelrain()
+        model.train()
 
         b_sup = batch_sup['data'].to(device)
         target_sup = batch_sup['label'].to(device)

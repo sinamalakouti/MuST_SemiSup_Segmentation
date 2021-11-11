@@ -280,17 +280,36 @@ class Perturbator(nn.Module):
         return x_transform, y_transform
 
     def __fw_mix(self, x, y):
-        None
+        random_selector = np.random.randint(9)
+        if random_selector == 0:  # scale
+            x_transform, y_transform = self.scale_decoder(x, y)
+        elif random_selector == 1:  # rotate
+            x_transform, y_transform = self.rotation_decoder(x, y)
+        elif random_selector == 2:  # hflip
+            x_transform, y_transform = self.hflip_decoder(x, y)
+        elif random_selector == 3:  # vflip
+            x_transform, y_transform = self.vflip_decoder(x, y)
+        elif random_selector == 4:  # feature drop out
+            x_transform, y_transform = self.feature_dropout(x, y)
+        elif random_selector == 5:  # spatial drop out
+            x_transform, y_transform = self.spatial_dropout(x, y)
+        elif random_selector == 6:  # uniform dist
+            x_transform, y_transform = self.uni_decoder(x, y)
+        elif random_selector == 7:  # guassian noise
+            x_transform, y_transform = self.gaussian_decoder(x, y)
+        elif random_selector == 8:  # identity
+            x_transform, y_transform = x, y
+        return x_transform, y_transform
 
     def forward(self, x, y, perturbation_mode='F', use_softmax=False,
                 cascade=False):  # mode = F (feature_space), G (geometrical), M (mix)
-        if use_softmax or perturbation_mode == 'G':
-            y = torch.nn.functional.softmax(y, dim=1)
+        if use_softmax or perturbation_mode == 'G' or perturbation_mode == 'M':
+            y = torch.nn.functional.softmax(y / 0.85, dim=1)
 
         if perturbation_mode == 'G':
             x_transform, y_transform = self.__fw_geometrical_aug(x, y)
         elif perturbation_mode == 'F':
             x_transform, y_transform = self.__fw_feature_space_aug(x, y)
-        else:
-            x_transform, y_transform = None, None
+        elif perturbation_mode == 'M':
+            x_transform, y_transform = self.__fw_mix(x, y)
         return x_transform, y_transform
