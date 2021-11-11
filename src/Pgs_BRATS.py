@@ -620,7 +620,7 @@ def Pgs_train_val(dataset, n_epochs, wmh_threshold, output_dir, args, cfg, seed)
     print("labeled subjects  ", train_sup_loader.dataset.subjects_name)
 
     if cfg.experiment_mode == 'semi' or cfg.experiment_mode == 'partially_sup_upSample' or cfg.experiment_mode == 'semi_downSample' or cfg.experiment_mode == 'semi_alternate':
-        train_unsup_loader = utils.get_trainset(dataset, batch_size=32, intensity_rescale=cfg.intensity_rescale,
+        train_unsup_loader = utils.get_trainset(dataset, batch_size=cfg.batch_size, intensity_rescale=cfg.intensity_rescale,
                                                 mixup_threshold=cfg.mixup_threshold,
                                                 mode=cfg.train_unsup_mode, t1=cfg.t1, t2=cfg.t2, t1ce=cfg.t1ce,
                                                 augment=cfg.augment, seed=cfg.seed)
@@ -701,32 +701,32 @@ def Pgs_train_val(dataset, n_epochs, wmh_threshold, output_dir, args, cfg, seed)
                 path = os.path.join(output_model_dir, 'pgsnet_best.model')
                 with open(path, 'wb') as f:
                     torch.save(pgsnet, f)
-                test_final_dice, test_final_PPV, test_final_sensitivity, test_final_specificity, test_final_hd = eval_per_subjectPgs(
-                    pgsnet, device,
-                    wmh_threshold,
-                    cfg,
-                    cfg.test_mode)
-                save_score_all(output_image_dir,
-                               (test_final_dice, test_final_hd, test_final_PPV, test_final_sensitivity,
-                                test_final_specificity),
-                               epoch, mode=cfg.test_mode)
-                wandb.log({'epoch_id': epoch,
-                           'test_WT_subject_wis_DSC': test_final_dice['WT'],
-                           'test_WT_subject_wise_HD': test_final_hd['WT'],
-                           'test_WT_subject_wise_PPV': test_final_PPV['WT'],
-                           'test_WT_subject_wise_SENSITIVITY': test_final_sensitivity['WT'],
-                           'test_WT_subject_wise_val_SPECIFCITY': test_final_specificity['WT'],
-                           'test_ET_subject_wise_DSC': test_final_dice['ET'],
-                           'test_ET_subject_wise_HD': test_final_hd['ET'],
-                           'test_ET_subject_wise_PPV': test_final_PPV['ET'],
-                           'test_ET_subject_wise_SENSITIVITY': test_final_sensitivity['ET'],
-                           'test_ET_subject_wise_val_SPECIFCITY': test_final_specificity['ET'],
-                           'test_TC_subject_wise_DSC': test_final_dice['TC'],
-                           'test_TC_subject_wise_HD': test_final_hd['TC'],
-                           'test_TC_subject_wise_PPV': test_final_PPV['TC'],
-                           'test_TC_subject_wise_SENSITIVITY': test_final_sensitivity['TC'],
-                           'test_TC_subject_wise_val_SPECIFCITY': test_final_specificity['TC'],
-                           })
+            test_final_dice, test_final_PPV, test_final_sensitivity, test_final_specificity, test_final_hd = eval_per_subjectPgs(
+                pgsnet, device,
+                wmh_threshold,
+                cfg,
+                cfg.test_mode)
+            save_score_all(output_image_dir,
+                           (test_final_dice, test_final_hd, test_final_PPV, test_final_sensitivity,
+                            test_final_specificity),
+                           epoch, mode=cfg.test_mode)
+            wandb.log({'epoch_id': epoch,
+                       'test_WT_subject_wis_DSC': test_final_dice['WT'],
+                       'test_WT_subject_wise_HD': test_final_hd['WT'],
+                       'test_WT_subject_wise_PPV': test_final_PPV['WT'],
+                       'test_WT_subject_wise_SENSITIVITY': test_final_sensitivity['WT'],
+                       'test_WT_subject_wise_val_SPECIFCITY': test_final_specificity['WT'],
+                       'test_ET_subject_wise_DSC': test_final_dice['ET'],
+                       'test_ET_subject_wise_HD': test_final_hd['ET'],
+                       'test_ET_subject_wise_PPV': test_final_PPV['ET'],
+                       'test_ET_subject_wise_SENSITIVITY': test_final_sensitivity['ET'],
+                       'test_ET_subject_wise_val_SPECIFCITY': test_final_specificity['ET'],
+                       'test_TC_subject_wise_DSC': test_final_dice['TC'],
+                       'test_TC_subject_wise_HD': test_final_hd['TC'],
+                       'test_TC_subject_wise_PPV': test_final_PPV['TC'],
+                       'test_TC_subject_wise_SENSITIVITY': test_final_sensitivity['TC'],
+                       'test_TC_subject_wise_val_SPECIFCITY': test_final_specificity['TC'],
+                       })
 
             save_score_all(output_image_dir,
                            (val_final_dice, val_final_hd, val_final_PPV, val_final_sensitivity, val_final_specificity),
@@ -940,8 +940,8 @@ def main():
         cfg = edict(yaml.safe_load(f))
 
     torch.manual_seed(cfg.seed)
-    np.random.seed(cfg.seed)
     torch.cuda.manual_seed(cfg.seed)
+    np.random.seed(cfg.seed)
     random.seed(cfg.seed)
     os.environ['CUDA_VISIBLE_DEVICES'] = cfg.cuda
 
