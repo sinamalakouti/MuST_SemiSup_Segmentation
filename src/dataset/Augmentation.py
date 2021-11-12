@@ -258,10 +258,7 @@ class Perturbator(nn.Module):
             x_transform, y_transform = self.uni_decoder(x, y)
         elif random_selector == 3:
             x_transform, y_transform = x, y
-        elif random_selector == 4:  # hflip
-            x_transform, y_transform = self.hflip_decoder(x, y)
-        elif random_selector == 5:  # vflip
-            x_transform, y_transform = self.vflip_decoder(x, y)
+
 
         return x_transform, y_transform
 
@@ -285,19 +282,15 @@ class Perturbator(nn.Module):
             x_transform, y_transform = self.scale_decoder(x, y)
         elif random_selector == 1:  # rotate
             x_transform, y_transform = self.rotation_decoder(x, y)
-        elif random_selector == 2:  # hflip
-            x_transform, y_transform = self.hflip_decoder(x, y)
-        elif random_selector == 3:  # vflip
-            x_transform, y_transform = self.vflip_decoder(x, y)
-        elif random_selector == 4:  # feature drop out
+        elif random_selector == 2:  # feature drop out
             x_transform, y_transform = self.feature_dropout(x, y)
-        elif random_selector == 5:  # spatial drop out
+        elif random_selector == 3:  # spatial drop out
             x_transform, y_transform = self.spatial_dropout(x, y)
-        elif random_selector == 6:  # uniform dist
+        elif random_selector == 4:  # uniform dist
             x_transform, y_transform = self.uni_decoder(x, y)
-        elif random_selector == 7:  # guassian noise
+        elif random_selector == 5:  # guassian noise
             x_transform, y_transform = self.gaussian_decoder(x, y)
-        elif random_selector == 8:  # identity
+        elif random_selector == 6:  # identity
             x_transform, y_transform = x, y
         return x_transform, y_transform
 
