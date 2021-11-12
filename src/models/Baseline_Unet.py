@@ -99,6 +99,7 @@ class Unet(nn.Module):
         self.dim_outputs = dim_outputs
         self.kernel_sizes = kernel_sizes
         self.strides = strides
+        self.config = cfg
         self.transformer = Perturbator(cfg)
         self.__build_net()
 
