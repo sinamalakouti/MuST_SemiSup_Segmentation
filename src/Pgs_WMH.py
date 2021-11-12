@@ -254,8 +254,9 @@ def eval_per_subjectPgs(model, device, threshold, cfg, data_mode, val_loader):
 
             first = first + step
             yhat_subject, _ = model(x_subject, True)
-
-
+            x_subject = x_subject.to('cpu')
+            y_subject = y_all_test[first:last, :, :, :].to('cpu')
+            y_subject = y_all_test[first:last, :, :, :].to('cpu')
             loss_val = compute_loss(yhat_subject, y_subject, (sup_loss, None), is_supervised=True, cfg=cfg)
             print("############# LOSS for subject is {} ##############".format( loss_val.item()))
 
@@ -395,7 +396,7 @@ def Pgs_train_val(dataset, n_epochs, wmh_threshold, output_dir, args, cfg, seed)
     device = torch.device(device)
     pgsnet.to(device)
     # todo
-    cfg.experiment_mode = 'partially_sup'
+
     splits, num_domains = get_splits(
         'WMH_SEG',  # get data of different domains
         T1=cfg.t1,
@@ -454,12 +455,7 @@ def Pgs_train_val(dataset, n_epochs, wmh_threshold, output_dir, args, cfg, seed)
                                              num_workers=4,
                                              shuffle=False)
 
-    val_final_dice, val_final_PPV, val_final_sensitivity, val_final_specificity, val_final_hd = eval_per_subjectPgs(
-        pgsnet, device,
-        wmh_threshold,
-        cfg,
-        cfg.val_mode,
-        val_loader)
+
 
     optimizer_unsup = torch.optim.SGD(pgsnet.parameters(), cfg.unsupervised_training.lr, momentum=0.9,
                                       weight_decay=1e-4)
@@ -529,8 +525,8 @@ def Pgs_train_val(dataset, n_epochs, wmh_threshold, output_dir, args, cfg, seed)
                        'val_WMH_subject_wise_DSC': val_final_dice['WMH'],
                        'val_WMH_subject_wise_HD': val_final_hd['WMH'],
                        'val_WMH_subject_wise_PPV': val_final_PPV['WMH'],
-                       'val_WMH_subject_wise_SENSITIVITY': val_final_sensitivity['v'],
-                       'val_WMHT_subject_wise_SPECIFCITY': val_final_specificity['WMH'],
+                       'val_WMH_subject_wise_SENSITIVITY': val_final_sensitivity['WMH'],
+                       'val_WMH_subject_wise_SPECIFCITY': val_final_specificity['WMH'],
                        })
 
         if cfg.experiment_mode == 'semi_alternate':

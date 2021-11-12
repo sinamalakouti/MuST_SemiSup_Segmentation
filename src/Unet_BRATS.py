@@ -1,26 +1,22 @@
-import os
-import sys
-import torch
-import torch.nn as nn
-from torch.optim import lr_scheduler
-
-from utils import utils, eval_utils
-from utils import model_utils
-
-from evaluation_metrics import dice_coef, get_dice_coef_per_subject, get_confusionMatrix_metrics, do_eval
-from dataset.Brat20 import Brat20Test, seg2WT, seg2TC, seg2ET, semi_sup_split
-
-from models.Baseline_Unet import Unet
-import matplotlib.pyplot as plt
-import torch.nn.functional as F
-import numpy as np
-import random
 import argparse
+import os
+import random
+import sys
+
+import matplotlib.pyplot as plt
+import numpy as np
+import torch
+import torch.nn.functional as F
 import yaml
 from easydict import EasyDict as edict
-from losses.loss import  consistency_weight, softmax_ce_consistency_loss, softmax_kl_loss
+from torch.optim import lr_scheduler
 
 import wandb
+from dataset.Brat20 import Brat20Test, seg2WT, seg2TC, seg2ET
+from evaluation_metrics import dice_coef, do_eval
+from losses.loss import consistency_weight, softmax_kl_loss
+from models.Baseline_Unet import Unet
+from utils import utils
 
 sys.path.append('src')
 sys.path.append('src/utils/Constants')
@@ -28,37 +24,51 @@ sys.path.append('srs/utils')
 
 for p in sys.path:
     print("path  ", p)
-# random_seeds = [41, 42, 43]
+
 
 utils.Constants.USE_CUDA = True
 parser = argparse.ArgumentParser()
 
 
-def __fw_outputwise_unsup_loss(y_stud, y_teach, loss_functions):
+def __fw_outputwise_unsup_loss(y_stud, y_teach, loss_functions, cfg):
     (_, unsup_loss) = loss_functions
-    total_loss = 0
+
     assert len(y_teach) == len(y_stud), "Error! unsup_preds and sup_preds have to have same length"
     num_preds = len(y_teach)
     losses = []
+
     for i in range(num_preds):
         teach_pred = y_teach[i]
 
         stud_pred = y_stud[i]
         assert teach_pred.shape == stud_pred.shape, "Error! for preds number {}, supervised and unsupervised" \
                                                     " prediction shape is not similar!".format(i)
-        mse_loss = torch.nn.MSELoss()
-        # total_loss +=  mse_loss(stud_pred, teach_pred)
-        losses.append(- torch.mean(
-            torch.sum(teach_pred
-                      * torch.nn.functional.log_softmax(stud_pred, dim=1), dim=1)))
+        if cfg.unsupervised_training.consistency_loss == 'CE':
 
+            teach_pred = torch.nn.functional.softmax(teach_pred, dim=1)  # todo
+            losses.append(- torch.mean(
+                torch.sum(teach_pred.detach()
+                          * torch.nn.functional.log_softmax(stud_pred, dim=1), dim=1)))
+        elif cfg.unsupervised_training.consistency_loss == 'KL':
+            losses.append(
+                softmax_kl_loss(stud_pred, teach_pred.detach(), conf_mask=False, threshold=None, use_softmax=True))
+        elif cfg.unsupervised_training.consistency_loss == 'balanced_CE':
+            losses.append(
+                unsup_loss(stud_pred, teach_pred, i, use_softmax=True))
+        elif cfg.unsupervised_training.consistency_loss == 'MSE':
+
+            teach_pred = torch.nn.functional.softmax(teach_pred / 0.85, dim=1)
+            stud_pred = torch.nn.functional.softmax(stud_pred, dim=1)
+            mse = torch.nn.MSELoss()
+            loss = mse(stud_pred, teach_pred.detach())
+            losses.append(loss)
     total_loss = sum(losses)
     return total_loss
 
 
-def compute_loss(y_preds, y_true, loss_functions, is_supervised):
+def compute_loss(y_preds, y_true, loss_functions, is_supervised, cfg):
     if is_supervised:
-        if y_true.shape[1 ]== 1:
+        if y_true.shape[1] == 1:
             y_true = y_true.reshape((y_true.shape[0], y_true.shape[2], y_true.shape[3]))
 
         total_loss = loss_functions[0](y_preds, y_true.type(torch.LongTensor).to(y_preds.device))
@@ -68,12 +78,68 @@ def compute_loss(y_preds, y_true, loss_functions, is_supervised):
         '''
 
     else:
-        total_loss = __fw_outputwise_unsup_loss(y_preds, y_true, loss_functions)
+        total_loss = __fw_outputwise_unsup_loss(y_preds, y_true, loss_functions, cfg)
 
     return total_loss
 
 
-def trainUnet_semi(train_sup_loader, train_unsup_loader, model, optimizer, device, loss_functions, epochid, cfg, cons_w_unsup):
+def trainUnet_semi_alternate(train_sup_loader, train_unsup_loader, model, optimizer, device, loss_functions,
+                             cons_w_unsup, epochid,
+                             cfg):
+    total_loss = 0
+    model.train()
+
+    semi_loader = zip(train_sup_loader, train_unsup_loader)
+
+    for batch_idx, (batch_sup, batch_unsup) in enumerate(semi_loader):
+        optimizer[0].zero_grad()
+        optimizer[1].zero_grad()
+
+        b_unsup = batch_unsup['data']
+        b_unsup = b_unsup.to(device)
+
+        teacher_outputs, student_outputs = model(b_unsup, is_supervised=False)
+        uLoss = compute_loss(student_outputs, teacher_outputs, loss_functions, is_supervised=False, cfg=cfg)
+        weight_unsup = cons_w_unsup(epochid, batch_idx)
+        total_loss = uLoss * weight_unsup
+        total_loss.backward()
+        optimizer[1].step()
+
+        optimizer[0].zero_grad()
+        optimizer[1].zero_grad()
+        model.train()
+
+        b_sup = batch_sup['data'].to(device)
+        target_sup = batch_sup['label'].to(device)
+        sup_outputs, _ = model(b_sup, is_supervised=True)
+        sLoss = compute_loss(sup_outputs, target_sup, loss_functions, is_supervised=True, cfg=cfg)
+        sLoss.backward()
+        optimizer[0].step()
+
+        print("**************** UNSUP LOSSS  : {} ****************".format(uLoss))
+        print("**************** SUP LOSSS  : {} ****************".format(sLoss))
+
+        with torch.no_grad():
+            sf = torch.nn.Softmax2d()
+            target_sup[target_sup >= 1] = 1
+            target_sup = target_sup
+            y_pred = sf(sup_outputs)
+            y_WT = seg2WT(y_pred, 0.5, cfg.oneHot)
+            dice_score = dice_coef(target_sup.reshape(y_WT.shape), y_WT)
+            wandb.log(
+                {"sup_batch_id": batch_idx + epochid * len(train_sup_loader),
+                 "sup loss": sLoss,
+                 "unsup_batch_id": batch_idx + epochid * len(train_sup_loader),
+                 "unsup loss": uLoss,
+                 "batch_score_WT": dice_score,
+                 'weight unsup': weight_unsup
+                 })
+
+    return model, total_loss
+
+
+def trainUnet_semi(train_sup_loader, train_unsup_loader, model, optimizer, device, loss_functions, epochid, cfg,
+                   cons_w_unsup):
     total_loss = 0
     model.train()
 
@@ -97,10 +163,10 @@ def trainUnet_semi(train_sup_loader, train_unsup_loader, model, optimizer, devic
         del batch_unsup
         torch.cuda.empty_cache()
         sup_outputs, _ = model(b_sup, is_supervised=True)
-        sLoss = compute_loss(sup_outputs, target_sup, loss_functions, is_supervised=True)
+        sLoss = compute_loss(sup_outputs, target_sup, loss_functions, is_supervised=True, cfg=cfg)
 
         teacher_outputs, student_outputs = model(b_unsup, is_supervised=False)
-        uLoss = compute_loss(student_outputs, teacher_outputs, loss_functions, is_supervised=False)
+        uLoss = compute_loss(student_outputs, teacher_outputs, loss_functions, is_supervised=False, cfg=cfg)
 
         print("**************** UNSUP LOSSS  : {} ****************".format(uLoss))
         print("**************** SUP LOSSS  : {} ****************".format(sLoss))
@@ -138,7 +204,7 @@ def trainUnet_sup(train_sup_loader, model, optimizer, device, loss_functions, ep
 
         print("subject is : ", batch_sup['subject'])
         sup_outputs, _ = model(b_sup, is_supervised=True)
-        total_loss = compute_loss(sup_outputs, target_sup, (sup_loss, None), is_supervised=True)
+        total_loss = compute_loss(sup_outputs, target_sup, (sup_loss, None), is_supervised=True, cfg=cfg)
 
         # wandb.log({"batch_id": step + epochid * len(train_sup_loader), "loss": total_loss})
         print("**************** LOSSS  : {} ****************".format(total_loss))
@@ -209,7 +275,7 @@ def eval_per_subjectUnet(model, device, threshold, cfg, data_mode):
                 sf = torch.nn.Softmax2d()
                 outputs = sf(outputs)
 
-            loss_val = compute_loss(outputs, target, (sup_loss, None), is_supervised=True)
+            loss_val = compute_loss(outputs, target, (sup_loss, None), is_supervised=True, cfg=cfg)
             print("############# LOSS for subject {} is {} ##############".format(subjects[0], loss_val.item()))
             if cfg.oneHot:
                 target[target >= 1] = 1
@@ -230,16 +296,6 @@ def eval_per_subjectUnet(model, device, threshold, cfg, data_mode):
             y_WT = seg2WT(y_pred, threshold, oneHot=cfg.oneHot)
             y_ET = seg2ET(y_pred, threshold)
             y_TC = seg2TC(y_pred, threshold)
-
-            # dice_scoreWT = dice_coef(targetWT.reshape(y_WT.shape), y_WT)
-            # dice_scoreET = dice_coef(targetET, y_ET)
-            # dice_scoreTC = dice_coef(targetTC.reshape(y_TC.shape), y_TC)
-            #
-            # PPV_scoreWT, sensitivity_WT, specificity_WT = get_confusionMatrix_metrics(targetWT.reshape(y_WT.shape),
-            #                                                                           y_WT)
-            # PPV_scoreET, sensitivity_ET, specificity_ET = get_confusionMatrix_metrics(targetET, y_ET)
-            # PPV_scoreTC, sensitivity_TC, specificity_TC = get_confusionMatrix_metrics(targetTC.reshape(y_TC.shape),
-            #                                                                           y_TC)
 
             metrics_WT = do_eval(targetWT.reshape(y_WT.shape), y_WT)
             metrics_ET = do_eval(targetET.reshape(y_ET.shape), y_ET)
@@ -291,217 +347,6 @@ def eval_per_subjectUnet(model, device, threshold, cfg, data_mode):
     final_hd = {'WT': np.mean(hd_arrWT), 'ET': np.mean(hd_arrET),
                 'TC': np.mean(hd_arrTC)}
     return final_dice, final_PPV, final_sensitivity, final_specificity, final_hd
-    # return np.mean(np.array(dice_arrWT)), np.mean(np.array(dice_arrET)), np.mean(np.array(dice_arrTC))
-
-
-''' other evaluating functions: commented bellow:'''
-
-
-# other evaluating functions : ( commented)
-
-# other evaluating fucntions
-# def eval_per_subjectPgs3(model, device, threshold, cfg, data_mode):
-#     print("******************** EVALUATING {}********************".format(data_mode))
-#
-#     testset = Brat20Test(f'data/brats20', data_mode, 10, 155,
-#                          augment=False, center_cropping=True, t1=cfg.t1, t2=cfg.t2, t1ce=cfg.t1ce, oneHot=cfg.oneHot)
-#
-#     model.eval()
-#     dice_arrWT = []
-#     dice_arrTC = []
-#     dice_arrET = []
-#
-#     paths = testset.paths
-#     sup_loss = torch.nn.CrossEntropyLoss()
-#     with torch.no_grad():
-#         for path in paths:
-#             batch = testset.get_subject(path)
-#             b = batch['data']
-#             target = batch['label'].to(device)
-#             subjects = batch['subjects']
-#             assert len(np.unique(subjects)) == 1, print("More than one subject at a time")
-#             b = b.to(device)
-#             outputs, _ = model(b, True)
-#
-#             if cfg.oneHot:
-#                 sf = torch.nn.Softmax2d()
-#                 outputs = sf(outputs[-1])
-#
-#             loss_val = compute_loss(outputs, target, (sup_loss, None), is_supervised=True)
-#             print("############# LOSS for subject {} is {} ##############".format(subjects[0], loss_val.item()))
-#             if cfg.oneHot:
-#                 target[target >= 1] = 1
-#                 target_WT = seg2WT(target, 1, oneHot=cfg.oneHot)
-#                 y_pred = outputs
-#             else:
-#                 sf = torch.nn.Softmax2d()
-#                 targetWT = target.clone()
-#                 targetET = target.clone()
-#                 targetTC = target.clone()
-#                 targetWT[targetWT >= 1] = 1
-#                 targetET[~ (targetET == 3)] = 0
-#                 targetET[(targetET == 3)] = 1
-#                 targetTC[~ ((targetTC == 3) | (targetTC == 1))] = 0
-#                 targetTC[(targetTC == 3) | (targetTC == 1)] = 1
-#                 y_pred = sf(outputs[-1])
-#
-#             y_WT = seg2WT(y_pred, threshold, oneHot=cfg.oneHot)
-#             y_ET = seg2ET(y_pred, threshold)
-#             y_TC = seg2TC(y_pred, threshold)
-#
-#             dice_scoreWT = dice_coef(targetWT.reshape(y_WT.shape), y_WT)
-#             dice_scoreET = dice_coef(targetET, y_ET)
-#             dice_scoreTC = dice_coef(targetTC.reshape(y_TC.shape), y_TC)
-#
-#             print("*** EVALUATION METRICS FOR SUBJECT {} IS: ".format(subjects[0]))
-#             print("(WT) :  DICE SCORE   {}".format(dice_scoreWT))
-#             print("(ET) :  DICE SCORE   {}".format(dice_scoreET))
-#             print("(TC) :  DICE SCORE   {}".format(dice_scoreTC))
-#
-#             dice_arrWT.append(dice_scoreWT.detach().item())
-#             dice_arrET.append(dice_scoreET.detach().item())
-#             dice_arrTC.append(dice_scoreTC.detach().item())
-#
-#     final_dice = {'WT': np.mean(dice_arrWT), 'ET': np.mean(dice_arrET), 'TC': np.mean(dice_arrTC)}
-#
-#     return final_dice
-#     # return np.mean(np.array(dice_arrWT)), np.mean(np.array(dice_arrET)), np.mean(np.array(dice_arrTC))
-
-#
-# def eval_per_subjectPgs2(model, device, threshold, cfg, data_mode):
-#     print("******************** EVALUATING {}********************".format(data_mode))
-#
-#     testset = Brat20Test(f'data/brats20', data_mode, 10, 155,
-#                          augment=False, center_cropping=True, t1=cfg.t1, t2=cfg.t2, t1ce=cfg.t1ce, oneHot=cfg.oneHot)
-#
-#     model.eval()
-#     # dice_arrWT = []
-#     # dice_arrTC = []
-#     # dice_arrET = []
-#     running_dice = {'WT': [], 'TC': [], 'ET': []}
-#     running_hd = {'WT': [], 'TC': [], 'ET': []}
-#     running_PPV = {'WT': [], 'TC': [], 'ET': []}
-#     running_sensitivity = {'WT': [], 'TC': [], 'ET': []}
-#
-#     paths = testset.paths
-#     sup_loss = torch.nn.CrossEntropyLoss()
-#
-#     with torch.no_grad():
-#         for path in paths:
-#             batch = testset.get_subject(path)
-#             b = batch['data']
-#             target = batch['label'].to(device)
-#             subjects = batch['subjects']
-#             assert len(np.unique(subjects)) == 1, print("More than one subject at a time")
-#             b = b.to(device)
-#
-#             outputs, _ = model(b, True)
-#
-#             if cfg.oneHot:
-#                 sf = torch.nn.Softmax2d()
-#                 outputs = sf(outputs[-1])
-#
-#             loss_val = compute_loss(outputs, target, (sup_loss, None), is_supervised=True)
-#             print("############# LOSS for subject {} is {} ##############".format(subjects[0], loss_val.item()))
-#             if cfg.oneHot:
-#                 target[target >= 1] = 1
-#                 target_WT = seg2WT(target, 1, oneHot=cfg.oneHot)
-#                 y_pred = outputs
-#             else:
-#                 sf = torch.nn.Softmax2d()
-#                 targetWT = target.clone()
-#                 targetET = target.clone()
-#                 targetTC = target.clone()
-#                 targetWT[targetWT >= 1] = 1
-#                 targetET[~ (targetET == 3)] = 0
-#                 targetET[(targetET == 3)] = 1
-#                 targetTC[~ ((targetTC == 3) | (targetTC == 1))] = 0
-#                 targetTC[(targetTC == 3) | (targetTC == 1)] = 1
-#                 y_pred = sf(outputs[-1])
-#
-#             y_WT = seg2WT(y_pred, threshold, oneHot=cfg.oneHot)
-#             y_ET = seg2ET(y_pred, threshold)
-#             y_TC = seg2TC(y_pred, threshold)
-#
-#             metrics_WT, _, _ = eval_utils.do_eval(targetWT.reshape(y_WT.shape).cpu(), y_WT.cpu())
-#             metrics_ET, _, _ = eval_utils.do_eval(targetET.cpu(), y_ET.cpu())
-#             metrics_TC, _, _ = eval_utils.do_eval(targetTC.reshape(y_TC.shape).cpu(), y_TC.cpu())
-#
-#             running_dice['WT'].append(metrics_WT['dsc'])
-#             running_dice['ET'].append(metrics_ET['dsc'])
-#             running_dice['TC'].append(metrics_TC['dsc'])
-#
-#             running_hd['WT'].append(metrics_WT['h95'])
-#             running_hd['ET'].append(metrics_ET['h95'])
-#             running_hd['TC'].append(metrics_TC['h95'])
-#
-#             running_PPV['WT'].append(metrics_WT['PPV'])
-#             running_PPV['ET'].append(metrics_ET['PPV'])
-#             running_PPV['TC'].append(metrics_TC['PPV'])
-#
-#             running_sensitivity['WT'].append(metrics_WT['sensitivity'])
-#             running_sensitivity['ET'].append(metrics_ET['sensitivity'])
-#             running_sensitivity['TC'].append(metrics_TC['sensitivity'])
-#
-#     final_dice = {'WT': np.mean(running_dice['WT']), 'ET': np.mean(running_dice['ET']),
-#                   'TC': np.mean(running_dice['TC'])}
-#     final_hd = {'WT': np.mean(running_hd['WT']), 'ET': np.mean(running_hd['ET']), 'TC': np.mean(running_hd['TC'])}
-#     final_PPV = {'WT': np.mean(running_PPV['WT']), 'ET': np.mean(running_PPV['ET']), 'TC': np.mean(running_PPV['TC'])}
-#     final_sensitivity = {'WT': np.mean(running_sensitivity['WT']), 'ET': np.mean(running_sensitivity['ET']),
-#                          'TC': np.mean(running_sensitivity['TC'])}
-#     return final_dice, final_hd, final_PPV, final_sensitivity
-
-
-# def evaluatePGS(model, dataset, device, threshold, cfg, training_mode):
-#     print("******************** EVALUATING  : {} ********************".format(training_mode))
-#
-#     testset = utils.get_testset(dataset, cfg.batch_size, intensity_rescale=cfg.intensity_rescale,
-#                                 mixup_threshold=cfg.mixup_threshold, mode=training_mode,
-#                                 t1=cfg.t1, t2=cfg.t2, t1ce=cfg.t1ce, augment=False)
-#
-#     model.eval()
-#
-#     dice_arr = []
-#     segmentation_outputs = []
-#     all_preds = None
-#     all_targets = None
-#     all_subjects = None
-#
-#     with torch.no_grad():
-#         for batch_id, batch in enumerate(testset):
-#             b = batch['data']
-#             b = b.to(device)
-#             target = batch['label'].to(device)
-#             predictions, _ = model(b, True)
-#             # apply softmax
-#             sf = torch.nn.Softmax2d()
-#             y_pred = sf(predictions[-1])
-#
-#             if batch_id == 0:
-#                 all_preds = y_pred
-#                 all_subjects = batch['subject']
-#                 all_targets = target
-#             else:
-#                 all_preds = torch.cat((all_preds, y_pred), dim=0)
-#                 all_subjects = torch.cat((all_subjects, batch['subject']), dim=0)
-#                 all_targets = torch.cat((all_targets, target), dim=0)
-#
-#             y_WT = seg2WT(y_pred, threshold)
-#             target[target >= 1] = 1
-#             target_WT = target
-#             dice_score = dice_coef(target_WT.reshape(y_WT.shape), y_WT)
-#             dice_arr.append(dice_score.detach().item())
-#             outputs = predictions[-1].reshape(predictions[-1].shape[0], predictions[-1].shape[1],
-#                                               predictions[-1].shape[2],
-#                                               predictions[-1].shape[3])
-#             for output in outputs:
-#                 segmentation_outputs.append(output)
-#
-#     all_targets[all_targets >= 1] = 1
-#     all_preds = seg2WT(all_preds, threshold)
-#     subject_wise_DSC = get_dice_coef_per_subject(all_targets.reshape(all_preds.shape), all_preds, all_subjects)
-#
-#     return np.mean(np.array(dice_arr)), subject_wise_DSC, segmentation_outputs
 
 
 def Unet_train_val(dataset, n_epochs, wmh_threshold, output_dir, learning_rate, args, cfg, seed):
@@ -511,7 +356,7 @@ def Unet_train_val(dataset, n_epochs, wmh_threshold, output_dir, learning_rate, 
     strides = [1, 1, 1, 1, 1, 1, 1, 1, 1]
 
     wandb.run.name = "{}_UNET_{}_{}_supRate{}_seed{}_".format(cfg.experiment_mode, "trainALL2018", "valNew2019",
-                                                             cfg.train_sup_rate, seed)
+                                                              cfg.train_sup_rate, seed)
     dataroot_dir = f'data/brats20'
 
     print("learning_rate is    ", learning_rate)
@@ -528,7 +373,7 @@ def Unet_train_val(dataset, n_epochs, wmh_threshold, output_dir, learning_rate, 
             os.mkdir(output_dir, 0o777)
         except OSError:
             print("Creation of the directory %s failed" % output_dir)
-    if cfg.experiment_mode == 'semi':
+    if cfg.experiment_mode == 'semi' or cfg.experiment_mode == 'semi_alterate':
         output_dir = os.path.join(output_dir, "sup_ratio_{}".format(cfg.train_sup_rate))
         if not os.path.isdir(output_dir):
             try:
@@ -581,7 +426,7 @@ def Unet_train_val(dataset, n_epochs, wmh_threshold, output_dir, learning_rate, 
         except OSError:
             print("Creation of the directory %s failed" % output_image_dir)
 
-    unet = Unet(inputs_dim, outputs_dim, kernels, strides)
+    unet = Unet(inputs_dim, outputs_dim, kernels, strides, cfg)
 
     if torch.cuda.is_available():
         if type(unet) is not torch.nn.DataParallel and cfg.parallel and cfg.parallel:
@@ -592,130 +437,138 @@ def Unet_train_val(dataset, n_epochs, wmh_threshold, output_dir, learning_rate, 
 
     device = torch.device(device)
     unet.to(device)
-    optimizer = torch.optim.SGD(unet.parameters(), learning_rate, momentum=0.9, weight_decay=1e-4)
-    # optimizer = torch.optim.Adam(pgsnet.parameters(), lr=1e-2)
-    scheduler = lr_scheduler.StepLR(optimizer, step_size=cfg.scheduler_step_size, gamma=cfg.lr_gamma)  # don't use it
-    # final_dice, final_PPV, final_sensitivity, final_specificity, final_hd = eval_per_subjectPgs(pgsnet, device,
-    #                                                                                             wmh_threshold,
-    #                                                                                             cfg,
-    #                                                                                             cfg.val_mode)
     train_sup_loader = utils.get_trainset(dataset, batch_size=cfg.batch_size, intensity_rescale=cfg.intensity_rescale,
                                           mixup_threshold=cfg.mixup_threshold, mode=cfg.train_sup_mode, t1=cfg.t1,
                                           t2=cfg.t2, t1ce=cfg.t1ce, augment=cfg.augment, seed=cfg.seed)
 
     print('size of labeled training set: number of subjects:    ', len(train_sup_loader.dataset.subjects_name))
     print("labeled subjects  ", train_sup_loader.dataset.subjects_name)
-    if cfg.experiment_mode == 'semi':
-        train_unsup_loader = utils.get_trainset(dataset, batch_size=32, intensity_rescale=cfg.intensity_rescale,
+    if cfg.experiment_mode == 'semi' or cfg.experiment_mode == 'partially_sup_upSample' or cfg.experiment_mode == 'semi_downSample' or cfg.experiment_mode == 'semi_alternate':
+        train_unsup_loader = utils.get_trainset(dataset, batch_size=cfg.batch_size,
+                                                intensity_rescale=cfg.intensity_rescale,
                                                 mixup_threshold=cfg.mixup_threshold,
                                                 mode=cfg.train_unsup_mode, t1=cfg.t1, t2=cfg.t2, t1ce=cfg.t1ce,
                                                 augment=cfg.augment, seed=cfg.seed)
+
         print('size of unlabeled training set: number of subjects:    ', len(train_unsup_loader.dataset.subjects_name))
         print("un labeled subjects  ", train_unsup_loader.dataset.subjects_name)
+
+    optimizer_unsup = torch.optim.SGD(unet.parameters(), cfg.unsupervised_training.lr, momentum=0.9,
+                                      weight_decay=1e-4)
+    optimizer_sup = torch.optim.SGD(unet.parameters(), cfg.supervised_training.lr, momentum=0.9,
+                                    weight_decay=1e-4)
+
+    scheduler_unsup = lr_scheduler.StepLR(optimizer_unsup,
+                                          step_size=cfg.unsupervised_training.scheduler_step_size,
+                                          gamma=cfg.unsupervised_training.lr_gamma)
+    scheduler_sup = lr_scheduler.StepLR(optimizer_sup, step_size=cfg.supervised_training.scheduler_step_size,
+                                        gamma=cfg.supervised_training.lr_gamma)
+
+    cons_w_unsup = consistency_weight(final_w=cfg['unsupervised_training']['consist_w_unsup']['final_w'],
+                                      iters_per_epoch=len(train_sup_loader),
+                                      rampup_ends=cfg['unsupervised_training']['consist_w_unsup'][
+                                          'rampup_ends'],
+                                      ramp_type=cfg['unsupervised_training']['consist_w_unsup']['rampup'])
+
     for epoch in range(start_epoch, n_epochs):
         print("iteration:  ", epoch)
 
-        # pgsnet, loss = trainPGS(train_loader, pgsnet, optimizer, device, epoch)
         if cfg.experiment_mode == 'semi':
             cons_w_unsup = consistency_weight(final_w=10,
                                               iters_per_epoch=len(train_sup_loader),
                                               rampup_ends=20,
                                               ramp_type='linear_rampup')
-            unet, loss = trainUnet_semi(train_sup_loader, train_unsup_loader, unet, optimizer, device,
-                                        (torch.nn.CrossEntropyLoss(), torch.nn.CrossEntropyLoss()), epoch, cfg, cons_w_unsup)
-        # score, segmentations = evaluatePGS(pgsnet, dataset, device, wmh_threshold, cfg, cfg.val_mode)
+            unet, loss = trainUnet_semi(train_sup_loader, train_unsup_loader, unet, optimizer_sup, device,
+                                        (torch.nn.CrossEntropyLoss(), torch.nn.CrossEntropyLoss()), epoch, cfg,
+                                        cons_w_unsup)
+        elif cfg.experiment_mode == 'semi_alternate':
+
+            unet, loss = trainUnet_semi_alternate(train_sup_loader, train_unsup_loader, unet,
+                                                  (optimizer_sup, optimizer_unsup), device,
+                                                  (torch.nn.CrossEntropyLoss(), None),
+                                                  cons_w_unsup,
+                                                  epoch, cfg)
         elif cfg.experiment_mode == 'partially_sup':
-            unet, loss = trainUnet_sup(train_sup_loader, unet, optimizer, device,
+
+            unet, loss = trainUnet_sup(train_sup_loader, unet, optimizer_sup, device,
                                        (torch.nn.CrossEntropyLoss(), None),
                                        epoch, cfg)
         elif cfg.experiment_mode == 'fully_sup':
-            unet, loss = trainUnet_sup(train_sup_loader, unet, optimizer, device,
+            unet, loss = trainUnet_sup(train_sup_loader, unet, optimizer_sup, device,
                                        (torch.nn.CrossEntropyLoss(), None),
                                        epoch, cfg)
 
         if epoch % 2 == 0:
-            final_dice, final_PPV, final_sensitivity, final_specificity, final_hd = eval_per_subjectUnet(unet, device,
-                                                                                                         wmh_threshold,
-                                                                                                         cfg,
-                                                                                                         cfg.val_mode)
-            print(
-                "** (WT) SUBJECT WISE SCORE @ Iteration {} is DICE: {}, HD: {}, PPV:{}, Sensitivity: {}, Specificity: {}  **".
-                    format(epoch, final_dice['WT'], final_hd['WT'], final_PPV['WT'], final_sensitivity['WT'],
-                           final_specificity['WT']))
-            print(
-                "** (ET) SUBJECT WISE SCORE @ Iteration {} is DICE: {}, HD: {}, :{}, Sensitivity:{}, Specificity: {}  **".
-                    format(epoch, final_dice['ET'], final_hd['ET'], final_PPV['ET'], final_sensitivity['ET'],
-                           final_specificity['ET']))
-            print(
-                "** (TC) SUBJECT WISE SCORE @ Iteration {} is DICE: {}, HD: {}, PPV:{}, Sensitivity:{}, Specificity: {}  **".
-                    format(epoch, final_dice['TC'], final_hd['TC'], final_PPV['TC'], final_sensitivity['TC'],
-                           final_specificity['TC']))
 
-            if final_dice['WT'] > best_score:
+            val_final_dice, val_final_PPV, val_final_sensitivity, val_final_specificity, val_final_hd = eval_per_subjectUnet(
+                unet, device,
+                wmh_threshold,
+                cfg,
+                cfg.val_mode)
+
+            if val_final_dice['WT'] > best_score:
                 print("****************** BEST SCORE @ ITERATION {} is {} ******************".format(epoch,
-                                                                                                     final_dice['WT']))
-                best_score = final_dice['WT']
-                path = os.path.join(output_model_dir, 'unet_best_lr{}.model'.format(learning_rate))
+                                                                                                     val_final_dice[
+                                                                                                         'WT']))
+                best_score = val_final_dice['WT']
+                path = os.path.join(output_model_dir, 'pgsnet_best.model')
                 with open(path, 'wb') as f:
                     torch.save(unet, f)
-            save_score_all(output_image_dir, (final_dice, final_hd, final_PPV, final_sensitivity, final_specificity),
-                           epoch)
+
+            test_final_dice, test_final_PPV, test_final_sensitivity, test_final_specificity, test_final_hd = eval_per_subjectUnet(
+                unet, device,
+                wmh_threshold,
+                cfg,
+                cfg.test_mode)
+            save_score_all(output_image_dir,
+                           (test_final_dice, test_final_hd, test_final_PPV, test_final_sensitivity,
+                            test_final_specificity),
+                           epoch, mode=cfg.test_mode)
             wandb.log({'epoch_id': epoch,
-                       'WT_subject_wise_val_DSC': final_dice['WT'],
-                       'WT_subject_wise_val_HD': final_hd['WT'],
-                       'WT_subject_wise_val_PPV': final_PPV['WT'],
-                       'WT_subject_wise_val_SENSITIVITY': final_sensitivity['WT'],
-                       'WT_subject_wise_val_SPECIFCITY': final_specificity['WT'],
-                       'ET_subject_wise_val_DSC': final_dice['ET'],
-                       'ET_subject_wise_val_HD': final_hd['ET'],
-                       'ET_subject_wise_val_PPV': final_PPV['ET'],
-                       'ET_subject_wise_val_SENSITIVITY': final_sensitivity['ET'],
-                       'ET_subject_wise_val_SPECIFCITY': final_specificity['ET'],
-                       'TC_subject_wise_val_DSC': final_dice['TC'],
-                       'TC_subject_wise_val_HD': final_hd['TC'],
-                       'TC_subject_wise_val_PPV': final_PPV['TC'],
-                       'TC_subject_wise_val_SENSITIVITY': final_sensitivity['TC'],
-                       'TC_subject_wise_val_SPECIFCITY': final_specificity['TC'],
+                       'test_WT_subject_wis_DSC': test_final_dice['WT'],
+                       'test_WT_subject_wise_HD': test_final_hd['WT'],
+                       'test_WT_subject_wise_PPV': test_final_PPV['WT'],
+                       'test_WT_subject_wise_SENSITIVITY': test_final_sensitivity['WT'],
+                       'test_WT_subject_wise_val_SPECIFCITY': test_final_specificity['WT'],
+                       'test_ET_subject_wise_DSC': test_final_dice['ET'],
+                       'test_ET_subject_wise_HD': test_final_hd['ET'],
+                       'test_ET_subject_wise_PPV': test_final_PPV['ET'],
+                       'test_ET_subject_wise_SENSITIVITY': test_final_sensitivity['ET'],
+                       'test_ET_subject_wise_val_SPECIFCITY': test_final_specificity['ET'],
+                       'test_TC_subject_wise_DSC': test_final_dice['TC'],
+                       'test_TC_subject_wise_HD': test_final_hd['TC'],
+                       'test_TC_subject_wise_PPV': test_final_PPV['TC'],
+                       'test_TC_subject_wise_SENSITIVITY': test_final_sensitivity['TC'],
+                       'test_TC_subject_wise_val_SPECIFCITY': test_final_specificity['TC'],
                        })
 
-            # final_dice, final_hd, final_PPV, final_sensitivity = eval_per_subjectPgs2(pgsnet, device, wmh_threshold,
-            #                                                                           cfg, cfg.val_mode)
-            #
-            # print("** (WT) SUBJECT WISE SCORE @ Iteration {} is DICE: {}, H95: {}, PPV:{}, Sensitivity:{} **".
-            #       format(epoch, final_dice['WT'], final_hd['WT'], final_PPV['WT'], final_sensitivity['WT']))
-            # print("** (ET) SUBJECT WISE SCORE @ Iteration {} is DICE: {}, H95: {}, PPV:{}, Sensitivity:{} **".
-            #       format(epoch, final_dice['ET'], final_hd['ET'], final_PPV['ET'], final_sensitivity['ET']))
-            # print("** (TC) SUBJECT WISE SCORE @ Iteration {} is DICE: {}, H95: PPV{}, PPV:{}, Sensitivity:{} **".
-            #       format(epoch, final_dice['TC'], final_hd['TC'], final_PPV['TC'], final_sensitivity['TC']))
-            #
-            #
-            # if final_dice['WT'] > best_score:
-            #     print("****************** BEST SCORE @ ITERATION {} is {} ******************".format(epoch,
-            #                                                                                          final_dice['WT']))
-            #     best_score = final_dice['WT']
-            #     path = os.path.join(output_model_dir, 'pgsnet_best_lr{}.model'.format(learning_rate))
-            #     with open(path, 'wb') as f:
-            #         torch.save(pgsnet, f)
-            #     # batch_wise_test_DSC, subject_wise_test_DSC, _ = evaluatePGS(pgsnet, dataset, device, wmh_threshold,
-            #     #                                                             cfg, cfg.test_mode)
-            #     # subject_wise_test_DSC = eval_per_subjectPgs(pgsnet, device, wmh_threshold, cfg, cfg.test_mode)
-            #     #
-            #     # wandb.log({"epoch_id": epoch, "subject_wise_test_DSC": subject_wise_test_DSC})
-            # save_score_all(output_image_dir, (final_dice, final_hd, final_PPV, final_sensitivity), epoch)
-            # wandb.log({'epoch_id': epoch,
-            #            'WT_subject_wise_val_DSC': final_dice['WT'], 'WT_subject_wise_val_H95': final_hd['WT'],
-            #            'WT_subject_wise_val_PPV': final_PPV['WT'],
-            #            'WT_subject_wise_val_SENSITIVITY': final_sensitivity['WT'],
-            #            'ET_subject_wise_val_DSC': final_dice['ET'], 'ET_subject_wise_val_H95': final_hd['ET'],
-            #            'ET_subject_wise_val_PPV': final_PPV['ET'],
-            #            'ET_subject_wise_val_SENSITIVITY': final_sensitivity['ET'],
-            #            'TC_subject_wise_val_DSC': final_dice['TC'], 'TC_subject_wise_val_H95': final_hd['TC'],
-            #            'TC_subject_wise_val_PPV': final_PPV['TC'],
-            #            'TC_subject_wise_val_SENSITIVITY': final_sensitivity['TC']
-            #            })
+            save_score_all(output_image_dir,
+                           (val_final_dice, val_final_hd, val_final_PPV, val_final_sensitivity, val_final_specificity),
+                           epoch, mode=cfg.val_mode)
 
-        scheduler.step()
+            wandb.log({'epoch_id': epoch,
+                       'val_WT_subject_wise_DSC': val_final_dice['WT'],
+                       'val_WT_subject_wise_HD': val_final_hd['WT'],
+                       'val_WT_subject_wise_PPV': val_final_PPV['WT'],
+                       'val_WT_subject_wise_SENSITIVITY': val_final_sensitivity['WT'],
+                       'val_WT_subject_wise_SPECIFCITY': val_final_specificity['WT'],
+                       'val_ET_subject_wise_DSC': val_final_dice['ET'],
+                       'val_ET_subject_wise_HD': val_final_hd['ET'],
+                       'val_ET_subject_wise_PPV': val_final_PPV['ET'],
+                       'val_ET_subject_wise_SENSITIVITY': val_final_sensitivity['ET'],
+                       'val_ET_subject_wise_SPECIFCITY': val_final_specificity['ET'],
+                       'val_TC_subject_wise_DSC': val_final_dice['TC'],
+                       'val_TC_subject_wise_HD': val_final_hd['TC'],
+                       'val_TC_subject_wise_PPV': val_final_PPV['TC'],
+                       'val_TC_subject_wise_SENSITIVITY': val_final_sensitivity['TC'],
+                       'val_TC_subject_wise_SPECIFCITY': val_final_specificity['TC'],
+                       })
 
+        if cfg.experiment_mode == 'semi_alternate':
+            scheduler_sup.step()
+            scheduler_unsup.step()
+        else:
+            scheduler_sup.step()
     final_dice, final_PPV, final_sensitivity, final_specificity, final_hd = eval_per_subjectUnet(unet, device,
                                                                                                  wmh_threshold,
                                                                                                  cfg,
@@ -734,65 +587,51 @@ def Unet_train_val(dataset, n_epochs, wmh_threshold, output_dir, learning_rate, 
                    final_specificity['TC']))
 
     save_score_all(output_image_dir, (final_dice, final_hd, final_PPV, final_sensitivity, final_specificity),
-                   cfg.n_epochs)
+                   cfg.n_epochs, mode=cfg.val_mode)
     wandb.log({'epoch_id': cfg.n_epochs,
-               'WT_subject_wise_val_DSC': final_dice['WT'],
-               'WT_subject_wise_val_HD': final_hd['WT'],
-               'WT_subject_wise_val_PPV': final_PPV['WT'],
-               'WT_subject_wise_val_SENSITIVITY': final_sensitivity['WT'],
-               'WT_subject_wise_val_SPECIFCITY': final_specificity['WT'],
-               'ET_subject_wise_val_DSC': final_dice['ET'],
-               'ET_subject_wise_val_HD': final_hd['ET'],
-               'ET_subject_wise_val_PPV': final_PPV['ET'],
-               'ET_subject_wise_val_SENSITIVITY': final_sensitivity['ET'],
-               'ET_subject_wise_val_SPECIFCITY': final_specificity['ET'],
-               'TC_subject_wise_val_DSC': final_dice['TC'],
-               'TC_subject_wise_val_HD': final_hd['TC'],
-               'TC_subject_wise_val_PPV': final_PPV['TC'],
-               'TC_subject_wise_val_SENSITIVITY': final_sensitivity['TC'],
-               'TC_subject_wise_val_SPECIFCITY': final_specificity['TC'],
+               'val_WT_subject_wise_DSC': final_dice['WT'],
+               'val_WT_subject_wise_HD': final_hd['WT'],
+               'val_WT_subject_wise_PPV': final_PPV['WT'],
+               'val_WT_subject_wise_SENSITIVITY': final_sensitivity['WT'],
+               'val_WT_subject_wise_SPECIFCITY': final_specificity['WT'],
+               'val_ET_subject_wise_DSC': final_dice['ET'],
+               'val_ET_subject_wise_HD': final_hd['ET'],
+               'val_ET_subject_wise_PPV': final_PPV['ET'],
+               'val_ET_subject_wise_SENSITIVITY': final_sensitivity['ET'],
+               'val_ET_subject_wise_SPECIFCITY': final_specificity['ET'],
+               'val_TC_subject_wise_DSC': final_dice['TC'],
+               'val_TC_subject_wise_HD': final_hd['TC'],
+               'val_TC_subject_wise_PPV': final_PPV['TC'],
+               'val_TC_subject_wise_SENSITIVITY': final_sensitivity['TC'],
+               'val_TC_subject_wise_SPECIFCITY': final_specificity['TC'],
                })
-    # final_dice, final_hd, final_PPV, final_sensitivity = eval_per_subjectPgs2(unet, device, wmh_threshold,
-    #                                                                           cfg, cfg.val_mode)
-    #
-    # print("** (WT) SUBJECT WISE SCORE @ Iteration {} is DICE: {}, H95: {}, PPV:{}, Sensitivity:{} **".
-    #       format(cfg.n_epochs, final_dice['WT'], final_hd['WT'], final_PPV['WT'], final_sensitivity['WT']))
-    # print("** (ET) SUBJECT WISE SCORE @ Iteration {} is DICE: {}, H95: {}, PPV:{}, Sensitivity:{} **".
-    #       format(cfg.n_epochs, final_dice['ET'], final_hd['ET'], final_PPV['ET'], final_sensitivity['ET']))
-    # print("** (TC) SUBJECT WISE SCORE @ Iteration {} is DICE: {}, H95: PPV{}, PPV:{}, Sensitivity:{} **".
-    #       format(cfg.n_epochs, final_dice['TC'], final_hd['TC'], final_PPV['TC'], final_sensitivity['TC']))
-    #
-    #
-    #
-    # #
-    # save_score_all(output_image_dir, (final_dice, final_hd, final_PPV, final_sensitivity), cfg.n_epochs)
-    # wandb.log({'epoch_id': cfg.n_epochs,
-    #            'WT_subject_wise_val_DSC': final_dice['WT'], 'WT_subject_wise_val_H95': final_hd['WT'],
-    #            'WT_subject_wise_val_PPV': final_PPV['WT'],
-    #            'WT_subject_wise_val_SENSITIVITY': final_sensitivity['WT'],
-    #            'ET_subject_wise_val_DSC': final_dice['ET'], 'ET_subject_wise_val_H95': final_hd['ET'],
-    #            'ET_subject_wise_val_PPV': final_PPV['ET'],
-    #            'ET_subject_wise_val_SENSITIVITY': final_sensitivity['ET'],
-    #            'TC_subject_wise_val_DSC': final_dice['TC'], 'TC_subject_wise_val_H95': final_hd['TC'],
-    #            'TC_subject_wise_val_PPV': final_PPV['TC'],
-    #            'TC_subject_wise_val_SENSITIVITY': final_sensitivity['TC']
-    #            })
-    #
-    # # save_score_all(output_image_dir, (final_dice, final_specificity, final_PPV, final_sensitivity), 39)
-    # # wandb.log({'epoch_id': cfg.n_epochs,
-    # #            'WT_subject_wise_val_DSC': final_dice['WT'],
-    # #            'WT_subject_wise_val_PPV': final_PPV['WT'],
-    # #            'WT_subject_wise_val_SENSITIVITY': final_sensitivity['WT'],
-    # #            'WT_subject_wise_specificity': final_specificity['WT'],
-    # #            'ET_subject_wise_val_DSC': final_dice['ET'],
-    # #            'ET_subject_wise_val_PPV': final_PPV['ET'],
-    # #            'ET_subject_wise_val_SENSITIVITY': final_sensitivity['ET'],
-    # #            'ET_subject_wise_specificity': final_specificity['ET'],
-    # #            'TC_subject_wise_val_DSC': final_dice['TC'],
-    # #            'TC_subject_wise_val_PPV': final_PPV['TC'],
-    # #            'TC_subject_wise_val_SENSITIVITY': final_sensitivity['TC'],
-    # #            'TC_subject_wise_specificity': final_specificity['TC'],
-    # #            })
+
+    test_final_dice, test_final_PPV, test_final_sensitivity, test_final_specificity, test_final_hd = eval_per_subjectUnet(
+        unet, device,
+        wmh_threshold,
+        cfg,
+        cfg.test_mode)
+    save_score_all(output_image_dir,
+                   (test_final_dice, test_final_hd, test_final_PPV, test_final_sensitivity,
+                    test_final_specificity),
+                   epoch, mode=cfg.test_mode)
+    wandb.log({'epoch_id': epoch,
+               'test_WT_subject_wis_DSC': test_final_dice['WT'],
+               'test_WT_subject_wise_HD': test_final_hd['WT'],
+               'test_WT_subject_wise_PPV': test_final_PPV['WT'],
+               'test_WT_subject_wise_SENSITIVITY': test_final_sensitivity['WT'],
+               'test_WT_subject_wise_val_SPECIFCITY': test_final_specificity['WT'],
+               'test_ET_subject_wise_DSC': test_final_dice['ET'],
+               'test_ET_subject_wise_HD': test_final_hd['ET'],
+               'test_ET_subject_wise_PPV': test_final_PPV['ET'],
+               'test_ET_subject_wise_SENSITIVITY': test_final_sensitivity['ET'],
+               'test_ET_subject_wise_val_SPECIFCITY': test_final_specificity['ET'],
+               'test_TC_subject_wise_DSC': test_final_dice['TC'],
+               'test_TC_subject_wise_HD': test_final_hd['TC'],
+               'test_TC_subject_wise_PPV': test_final_PPV['TC'],
+               'test_TC_subject_wise_SENSITIVITY': test_final_sensitivity['TC'],
+               'test_TC_subject_wise_val_SPECIFCITY': test_final_specificity['TC'],
+               })
 
 
 def save_score(dir_path, score, iter):
@@ -833,30 +672,6 @@ def save_score_all(dir_path, scores, iter):
             iter, final_dice['WT'], final_PPV['WT'], final_sensitivity['WT'], final_hd['WT'], final_specificity['WT'],
             final_dice['ET'], final_PPV['ET'], final_sensitivity['ET'], final_hd['ET'], final_specificity['ET'],
             final_dice['TC'], final_PPV['TC'], final_sensitivity['TC'], final_hd['TC'], final_specificity['TC']))
-
-
-def save_score_all2(dir_path, scores, iter):
-    final_dice = scores[0]
-    final_hd = scores[1]
-    final_PPV = scores[2]
-    final_sensitivity = scores[3]
-
-    dir_path = os.path.join(dir_path, "results_iter{}".format(iter))
-    if not os.path.isdir(dir_path):
-        try:
-            os.mkdir(dir_path, 0o777)
-        except OSError:
-            print("Creation of the directory %s failed" % dir_path)
-
-    output_score_path = os.path.join(dir_path, "result.txt")
-    with open(output_score_path, "w") as f:
-        f.write("AVG SCORES PER  SUBJECTS AT ITERATION {}:\n"
-                " **WT**  DICE: {}, PPV:{}, Sensitivity: {}, h95: {}\n"
-                " **ET**  DICE: {}, PPV:{}, Sensitivity: {}, h95: {}\n"
-                " **TC**  DICE: {}, PPV:{}, Sensitivity: {}, h95: {}\n".format(
-            iter, final_dice['WT'], final_PPV['WT'], final_sensitivity['WT'], final_hd['WT'],
-            final_dice['ET'], final_PPV['ET'], final_sensitivity['ET'], final_hd['ET'],
-            final_dice['TC'], final_PPV['TC'], final_sensitivity['TC'], final_hd['TC']))
 
 
 def save_predictions(y_pred, threshold, dir_path, score, iter):
@@ -914,12 +729,12 @@ def main():
         cfg = edict(yaml.safe_load(f))
 
     torch.manual_seed(cfg.seed)
-    np.random.seed(cfg.seed)
     torch.cuda.manual_seed(cfg.seed)
+    np.random.seed(cfg.seed)
     random.seed(cfg.seed)
     os.environ['CUDA_VISIBLE_DEVICES'] = cfg.cuda
 
-    if cfg.experiment_mode == 'semi':
+    if cfg.experiment_mode == 'semi' or cfg.experiment_mode == 'semi_alternate':
         cfg.train_sup_mode = 'train2018_semi_sup' + str(cfg.train_sup_rate)
         cfg.train_unsup_mode = 'train2018_semi_unsup' + str(cfg.train_sup_rate)
     elif cfg.experiment_mode == 'partially_sup':
@@ -929,7 +744,7 @@ def main():
         cfg.train_sup_mode = 'all_train2018_sup'
         cfg.train_unsup_mode = None
     config_params = dict(args=args, config=cfg)
-    wandb.init(project="fully_sup_brats", config=config_params)
+    wandb.init(project="CVPR2022_BRATS", config=config_params)
     Unet_train_val(dataset, cfg.n_epochs, cfg.wmh_threshold, args.output_dir, cfg.lr, args, cfg, cfg.seed)
 
 
