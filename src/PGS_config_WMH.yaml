@@ -19,20 +19,20 @@ supervised_training:
   sup_loss: 'CE' # CE, DSC, FOCAL, CE_DSC, CE_FOCAL, DSC_FOCAL, CE_FOCAL_DSC
   lr: 0.01
   lr_gamma: 0.5
-  scheduler_step_size: 5
+  scheduler_step_size: 20
 #unsupervised training
 unsupervised_training:
   consistency_loss: 'MSE' # CE, KL, MSE, DSC
   lr: 0.001
   lr_gamma: 0.5
-  scheduler_step_size: 5
+  scheduler_step_size: 30
   consist_w_unsup:
     rampup: 'linear_rampup' #ramp_types = ['sigmoid_rampup', 'linear_rampup', 'cosine_rampup', 'log_rampup', 'exp_rampup']
     final_w: 10
     rampup_ends: 20
 #hyper parameters
-experiment_mode: "semi_alternate"
-n_epochs: 70
+experiment_mode: "partially_sup"
+n_epochs: 80
 batch_size: 16
 parallel: False
 cuda: "0"

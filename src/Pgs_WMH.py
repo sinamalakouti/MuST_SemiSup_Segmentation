@@ -463,8 +463,12 @@ def Pgs_train_val(dataset, n_epochs, wmh_threshold, output_dir, args, cfg, seed)
 
     optimizer_unsup = torch.optim.SGD(pgsnet.parameters(), cfg.unsupervised_training.lr, momentum=0.9,
                                       weight_decay=1e-4)
-    optimizer_sup = torch.optim.SGD(pgsnet.parameters(), cfg.supervised_training.lr, momentum=0.9,
-                                    weight_decay=1e-4)
+    # optimizer_sup = torch.optim.SGD(pgsnet.parameters(), cfg.supervised_training.lr, momentum=0.9,
+    #                                 weight_decay=1e-4)
+
+    optimizer_sup = torch.optim.Adam(pgsnet.parameters(), cfg.supervised_training.lr, weight_decay=5e-4)
+    optimizer_unsup = torch.optim.SGD(pgsnet.parameters(), cfg.unsupervised_training.lr, momentum=0.9,
+                                      weight_decay=1e-4)
 
     scheduler_unsup = lr_scheduler.StepLR(optimizer_unsup,
                                           step_size=cfg.unsupervised_training.scheduler_step_size,
