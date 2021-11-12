@@ -648,14 +648,14 @@ def save_score(dir_path, score, iter):
                 "average TC dice score per subject    {}\n".format(iter, score['WT'], score['ET'], score['TC']))
 
 
-def save_score_all(dir_path, scores, iter):
+def save_score_all(dir_path, scores, iter, mode):  # mode = 2020 test or 2019 test
     final_dice = scores[0]
     final_hd = scores[1]
     final_PPV = scores[2]
     final_sensitivity = scores[3]
     final_specificity = scores[4]
 
-    dir_path = os.path.join(dir_path, "results_iter{}".format(iter))
+    dir_path = os.path.join(dir_path, "{}_results_iter{}".format(mode, iter))
     if not os.path.isdir(dir_path):
         try:
             os.mkdir(dir_path, 0o777)
@@ -671,6 +671,8 @@ def save_score_all(dir_path, scores, iter):
             iter, final_dice['WT'], final_PPV['WT'], final_sensitivity['WT'], final_hd['WT'], final_specificity['WT'],
             final_dice['ET'], final_PPV['ET'], final_sensitivity['ET'], final_hd['ET'], final_specificity['ET'],
             final_dice['TC'], final_PPV['TC'], final_sensitivity['TC'], final_hd['TC'], final_specificity['TC']))
+
+
 
 
 def save_predictions(y_pred, threshold, dir_path, score, iter):
