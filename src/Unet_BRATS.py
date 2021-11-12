@@ -236,7 +236,6 @@ def eval_per_subjectUnet(model, device, threshold, cfg, data_mode):
 
     testset = Brat20Test(f'data/brats20', data_mode, 10, 155,
                          augment=False, center_cropping=True, t1=cfg.t1, t2=cfg.t2, t1ce=cfg.t1ce, oneHot=cfg.oneHot)
-
     model.eval()
     dice_arrWT = []
     dice_arrTC = []
@@ -349,7 +348,7 @@ def eval_per_subjectUnet(model, device, threshold, cfg, data_mode):
     return final_dice, final_PPV, final_sensitivity, final_specificity, final_hd
 
 
-def Unet_train_val(dataset, n_epochs, wmh_threshold, output_dir, learning_rate, args, cfg, seed):
+def Unet_train_val(dataset, n_epochs, wmh_threshold, output_dir, args, cfg, seed):
     inputs_dim = [4, 64, 96, 128, 256, 768, 384, 224, 160]
     outputs_dim = [64, 96, 128, 256, 512, 256, 128, 96, 64, 4]
     kernels = [5, 3, 3, 3, 3, 3, 3, 3, 3]
@@ -359,9 +358,8 @@ def Unet_train_val(dataset, n_epochs, wmh_threshold, output_dir, learning_rate, 
                                                               cfg.train_sup_rate, seed)
     dataroot_dir = f'data/brats20'
 
-    print("learning_rate is    ", learning_rate)
-    step_size = cfg.scheduler_step_size
-    print("scheduler step size is :   ", step_size)
+
+
     best_score = 0
     start_epoch = 0
 
@@ -427,6 +425,7 @@ def Unet_train_val(dataset, n_epochs, wmh_threshold, output_dir, learning_rate, 
             print("Creation of the directory %s failed" % output_image_dir)
 
     unet = Unet(inputs_dim, outputs_dim, kernels, strides, cfg)
+
 
     if torch.cuda.is_available():
         if type(unet) is not torch.nn.DataParallel and cfg.parallel and cfg.parallel:
@@ -614,7 +613,7 @@ def Unet_train_val(dataset, n_epochs, wmh_threshold, output_dir, learning_rate, 
     save_score_all(output_image_dir,
                    (test_final_dice, test_final_hd, test_final_PPV, test_final_sensitivity,
                     test_final_specificity),
-                   epoch, mode=cfg.test_mode)
+                   cfg.n_epochs, mode=cfg.test_mode)
     wandb.log({'epoch_id': epoch,
                'test_WT_subject_wis_DSC': test_final_dice['WT'],
                'test_WT_subject_wise_HD': test_final_hd['WT'],
@@ -745,7 +744,7 @@ def main():
         cfg.train_unsup_mode = None
     config_params = dict(args=args, config=cfg)
     wandb.init(project="CVPR2022_BRATS", config=config_params)
-    Unet_train_val(dataset, cfg.n_epochs, cfg.wmh_threshold, args.output_dir, cfg.lr, args, cfg, cfg.seed)
+    Unet_train_val(dataset, cfg.n_epochs, cfg.wmh_threshold, args.output_dir, args, cfg, cfg.seed)
 
 
 if __name__ == '__main__':
