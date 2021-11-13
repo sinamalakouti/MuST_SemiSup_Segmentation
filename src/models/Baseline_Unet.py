@@ -192,6 +192,88 @@ class Unet(nn.Module):
             unsup_outputs = self.__fw_unsupervised(X)
 
             return sup_outputs, unsup_outputs
+    def __fw_unsupervised_layerwise3(self, X):  # only_feature space aug
+        cascade = False
+        # contracting path
+        c1, d1, c2, d2, c3, d3, c4, d4 = self.__fw_contracting_path(X)
+
+        # bottleneck
+        c5_teach = self.__fw_bottleneck(d4)
+        with torch.no_grad():
+            aug_output5_teach = self.cls5(c5_teach).detach()
+
+        d4_stud, _ = self.transformer(d4, None, perturbation_mode='F', cascade=cascade)
+        c5_stud = self.__fw_bottleneck(d4_stud)
+        output5_stud = self.cls5(c5_stud)
+
+        # expanding path
+        teach_up1 = self.__fw_up(c5_teach, c4, self.up1,
+                                 transformer=None) if self.config.information_passing_strategy == 'teacher' \
+            else self.__fw_up(c5_stud, c4, self.up1, transformer=None)
+
+        stud_up1 = self.__fw_up(c5_teach, c4, self.up1,
+                                transformer=self.transformer) if self.config.information_passing_strategy == 'teacher' \
+            else self.__fw_up(c5_stud, c4, self.up1, transformer=self.transformer)
+
+        c6_teach = self.__fw_expand_4layer(teach_up1)
+        with torch.no_grad():
+            aug_output6_teach = self.cls6(c6_teach).detach()
+
+        c6_stud = self.__fw_expand_4layer(stud_up1)
+        output6_stud = self.cls6(c6_stud)
+        ######
+        teach_up2 = self.__fw_up(c6_teach, c3, self.up2,
+                                 transformer=None) if self.config.information_passing_strategy == 'teacher' \
+            else self.__fw_up(c6_stud, c3, self.up2, transformer=None)
+
+        stud_up2 = self.__fw_up(c6_teach, c3, self.up2,
+                                transformer=self.transformer) if self.config.information_passing_strategy == 'teacher' \
+            else self.__fw_up(c6_stud, c3, self.up2, transformer=self.transformer)
+
+        c7_teach = self.__fw_expand_3layer(teach_up2)
+        with torch.no_grad():
+            aug_output7_teach = self.cls7(c7_teach).detach()
+
+        c7_stud = self.__fw_expand_3layer(stud_up2)
+        output7_stud = self.cls7(c7_stud)
+
+        #####
+        teach_up3 = self.__fw_up(c7_teach, c2, self.up3,
+                                 transformer=None) if self.config.information_passing_strategy == 'teacher' \
+            else self.__fw_up(c7_stud, c2, self.up3, transformer=None)
+
+        stud_up3 = self.__fw_up(c7_teach, c2, self.up3,
+                                transformer=self.transformer) if self.config.information_passing_strategy == 'teacher' \
+            else self.__fw_up(c7_stud, c2, self.up3, transformer=self.transformer)
+
+        c8_teach = self.__fw_expand_2layer(teach_up3)
+        with torch.no_grad():
+            aug_output8_teach = self.cls8(c8_teach).detach()
+
+        c8_stud = self.__fw_expand_2layer(stud_up3)
+        output8_stud = self.cls8(c8_stud)
+
+        ####
+        teach_up4 = self.__fw_up(c8_teach, c1, self.up4,
+                                 transformer=None) if self.config.information_passing_strategy == 'teacher' \
+            else self.__fw_up(c8_stud, c1, self.up4, transformer=None)
+
+        stud_up4 = self.__fw_up(c8_teach, c1, self.up4,
+                                transformer=self.transformer) if self.config.information_passing_strategy == 'teacher' \
+            else self.__fw_up(c8_stud, c1, self.up4, transformer=self.transformer)
+
+        c9_teach = self.__fw_expand_1layer(teach_up4)
+        with torch.no_grad():
+            # output9 is the main output of the network
+            aug_output9_teach = self.cls9(c9_teach).detach()
+
+        c9_stud = self.__fw_expand_1layer(stud_up4)
+        output9_stud = self.cls9(c9_stud)
+
+        supervised_outputs = aug_output5_teach, aug_output6_teach, aug_output7_teach, aug_output8_teach, aug_output9_teach
+        unsupervised_outputs = output5_stud, output6_stud, output7_stud, output8_stud, output9_stud
+        return supervised_outputs, unsupervised_outputs
+
 
     def __fw_unsupervised_layerwise2(self, X):  # only_feature space aug
         cascade = False
