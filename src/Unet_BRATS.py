@@ -17,7 +17,7 @@ from evaluation_metrics import dice_coef, do_eval
 from losses.loss import consistency_weight, softmax_kl_loss
 from models.Baseline_Unet import Unet
 from utils import utils
-
+import datetime
 sys.path.append('src')
 sys.path.append('src/utils/Constants')
 sys.path.append('srs/utils')
@@ -56,8 +56,8 @@ def __fw_outputwise_unsup_loss(y_stud, y_teach, loss_functions, cfg):
             losses.append(
                 unsup_loss(stud_pred, teach_pred, i, use_softmax=True))
         elif cfg.unsupervised_training.consistency_loss == 'MSE':
-
-            teach_pred = torch.nn.functional.softmax(teach_pred / 0.85, dim=1)
+            if cfg.layerwise != 'layerwiseG':
+                teach_pred = torch.nn.functional.softmax(teach_pred / cfg.temp, dim=1)
             stud_pred = torch.nn.functional.softmax(stud_pred, dim=1)
             mse = torch.nn.MSELoss()
             loss = mse(stud_pred, teach_pred.detach())
@@ -394,6 +394,13 @@ def Unet_train_val(dataset, n_epochs, wmh_threshold, output_dir, args, cfg, seed
                 print("Creation of the directory %s failed" % output_dir)
 
     output_dir = os.path.join(output_dir, "seed_{}".format(seed))
+    if not os.path.isdir(output_dir):
+        try:
+            os.mkdir(output_dir, 0o777)
+        except OSError:
+            print("Creation of the directory %s failed" % output_dir)
+    now = str(datetime.datetime.now())
+    output_dir = os.path.join(output_dir, "{}".format(now))
     if not os.path.isdir(output_dir):
         try:
             os.mkdir(output_dir, 0o777)
