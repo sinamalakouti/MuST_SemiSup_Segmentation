@@ -275,19 +275,17 @@ def eval_per_subjectPgs(model, device, threshold, cfg, data_mode, val_loader):
             brain_mask = b_all_test[first:last, :, :, :]
             #first = first + step
             yhat_subject, _ = model(x_subject, True)
-<<<<<<< HEAD
-
             x_subject = x_subject.to('cpu')
          #   y_subject = y_all_test[first:last, :, :, :].to('cpu')
          #   y_subject = y_all_test[first:last, :, :, :].to('cpu')
         
             brain_mask = brain_mask.to('cpu')
             y_subject = y_subject.to(device)
-=======
+
             x_subject = x_subject.to('cpu')
             y_subject = y_all_test[first:last, :, :, :].to('cpu')
             y_subject = y_all_test[first:last, :, :, :].to('cpu')
->>>>>>> 608e686a84ebc9a30aa48737d34799ae71b41288
+
             loss_val = compute_loss(yhat_subject, y_subject, (sup_loss, None), is_supervised=True, cfg=cfg)
             first = first + step
             print("############# LOSS for subject is {} ##############".format( loss_val.item()))
@@ -444,12 +442,7 @@ def Pgs_train_val(dataset, n_epochs, wmh_threshold, output_dir, args, cfg, seed)
 
     device = torch.device(device)
     pgsnet.to(device)
-    # todo
-<<<<<<< HEAD
-  #  cfg.experiment_mode = 'partially_sup'
-=======
 
->>>>>>> 608e686a84ebc9a30aa48737d34799ae71b41288
     splits, num_domains = get_splits(
         'WMH_SEG',  # get data of different domains
         T1=cfg.t1,
@@ -508,16 +501,6 @@ def Pgs_train_val(dataset, n_epochs, wmh_threshold, output_dir, args, cfg, seed)
                                              num_workers=4,
                                              shuffle=False)
 
-<<<<<<< HEAD
-   # val_final_dice, val_final_PPV, val_final_sensitivity, val_final_specificity, val_final_hd = eval_per_subjectPgs(
-    #    pgsnet, device,
-     #   wmh_threshold,
-      #  cfg,
-       # cfg.val_mode,
-       # val_loader)
-=======
-
->>>>>>> 608e686a84ebc9a30aa48737d34799ae71b41288
 
     optimizer_unsup = torch.optim.SGD(pgsnet.parameters(), cfg.unsupervised_training.lr, momentum=0.9,
                                       weight_decay=1e-4)
