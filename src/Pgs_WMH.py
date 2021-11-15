@@ -73,7 +73,7 @@ def __fw_outputwise_unsup_loss(y_stud, y_teach, loss_functions, cfg, cur_epoch):
             print("hereee22222")
             print(teach_pred.shape)
             print(stud_pred.shape)
-          #  cur_temp = temp_rampDown(cfg.temp.start, cfg.temp.min, cfg.temp.end,cfg.temp.max, cur_epoch)
+          #  cur_temp = temp_rampDown(cfg.temp.start, cfg.temp.min, cfg.tedafsfmp.end,cfg.temp.max, cur_epoch)
             teach_pred = torch.nn.functional.softmax(teach_pred / cfg.temp, dim=1)
             stud_pred = torch.nn.functional.softmax(stud_pred, dim=1)
             mse = torch.nn.MSELoss()
