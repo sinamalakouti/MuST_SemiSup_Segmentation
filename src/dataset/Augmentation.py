@@ -297,7 +297,7 @@ class Perturbator(nn.Module):
     def forward(self, x, y, perturbation_mode='F', use_softmax=False,
                 cascade=False):  # mode = F (feature_space), G (geometrical), M (mix)
         if use_softmax or perturbation_mode == 'G' or perturbation_mode == 'M':
-            y = torch.nn.functional.softmax(y / 0.85, dim=1)
+            y = torch.nn.functional.softmax(y / self.cfg.temp, dim=1) #0.85 for pgs for brats
 
         if perturbation_mode == 'G':
             x_transform, y_transform = self.__fw_geometrical_aug(x, y)
