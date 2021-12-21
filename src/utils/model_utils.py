@@ -44,3 +44,14 @@ def load_state_dict(model, path):
 def save_state_dict(model, path):
     with open(path, 'wb') as f:
         torch.save(model.state_dict(), f)
+
+@torch.no_grad()
+def temp_rampDown(x_s, y_s, x_e, y_e, cur_x):
+
+    if cur_x >= x_e :
+        return y_e
+    r = (y_e-y_s)/(x_e-x_s)
+    cur_y = r * cur_x + y_s
+    return cur_y
+
+
