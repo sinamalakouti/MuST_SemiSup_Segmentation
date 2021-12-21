@@ -4,9 +4,7 @@ from dataset.Brat20 import *
 import matplotlib.pyplot as plt
 import os
 import torch
-from evaluation_metrics import dice_coef
-
-import numpy as np
+from losses.evaluation_metrics import dice_coef
 
 
 # class Utils:
@@ -86,6 +84,38 @@ def get_trainset(dataset, batch_size, intensity_rescale, mixup_threshold=None,
             shuffle=True,
             pin_memory=mem_pin
         )
+    elif dataset is Datasets.WmhChallenge:
+        batch_sz = batch_size
+
+        splits, num_domains = get_splits(
+            'WMH_SEG',  # get data of different domains
+            T1=True,
+            whitestripe=False,
+            experiment_mode='semi',
+            isSupervised=False,
+            test_on_local=False)
+
+        train = torch.utils.data.DataLoader(
+            Brat20(
+                dataroot_dir=f'data/brats20',
+                mode=mode,
+                min_slice_index=10,
+                max_slice_index=155,
+                center_cropping=True,
+                t1=t1,
+                t2=t2,
+                t1ce=t1ce,
+                augment=augment,
+                oneHot=oneHot,
+                seed=seed
+            ),
+            batch_size=batch_sz,
+            drop_last=True,
+            num_workers=0,
+            shuffle=True,
+            pin_memory=mem_pin
+        )
+
 
     return train
 

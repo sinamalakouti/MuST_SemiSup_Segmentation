@@ -3,11 +3,8 @@ import numpy as np
 import torch.nn as nn
 import torch.nn.functional as F
 
-from torch.distributions.uniform import Uniform
-from dataset.Augmentation import Perturbator
+from models.Perturbations import Perturbator
 from utils import model_utils
-
-import random
 
 
 class ConvBlock(nn.Module):
@@ -282,7 +279,7 @@ class PGS_MT(nn.Module):
         teach_up2 = self.__fw_up(c6_teach, c3, self.up2, None) if self.config.information_passing_strategy == 'teacher' \
             else self.__fw_up(c6_stud, c3, self.up2, None)
 
-        stud_up2 = self.__fw_up(c6_teach, c3, self.up2, self.tranformer) if self.config.information_passing_strategy == 'teacher' \
+        stud_up2 = self.__fw_up(c6_teach, c3, self.up2, self.transformer) if self.config.information_passing_strategy == 'teacher' \
             else self.__fw_up(c6_stud, c3, self.up2, self.transformer)
 
         with torch.no_grad():

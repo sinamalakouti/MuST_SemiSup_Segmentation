@@ -1,6 +1,6 @@
 import torch
 from utils import utils
-from evaluation_metrics import dice_coef
+from losses.evaluation_metrics import dice_coef
 import numpy as np
 from models import Wnet
 

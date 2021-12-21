@@ -4,12 +4,11 @@ import torch
 import torch.nn as nn
 from torch.optim import lr_scheduler
 
-from utils import utils, eval_utils
-from utils import model_utils
+from utils import utils
 from losses.loss import consistency_weight, softmax_kl_loss, Consistency_CE
 
-from evaluation_metrics import dice_coef, get_dice_coef_per_subject, get_confusionMatrix_metrics, do_eval
-from dataset.Brat20 import Brat20Test, seg2WT, seg2TC, seg2ET, semi_sup_split
+from losses.evaluation_metrics import dice_coef, get_dice_coef_per_subject, do_eval
+from dataset.Brat20 import Brat20Test, seg2WT, seg2TC, seg2ET
 
 from models import Pgs_MT
 import matplotlib.pyplot as plt
@@ -248,7 +247,7 @@ def trainPgs_sup(train_sup_loader, model, optimizer, device, loss_functions, epo
 def eval_per_subjectPgs(model, device, threshold, cfg, data_mode, model_for_sup):
     print("******************** EVALUATING {}********************".format(data_mode))
 
-    testset = Brat20Test(f'data/brats20', data_mode, 10, 155,
+    testset = Brat20Test(f'../data/brats20', data_mode, 10, 155,
                          augment=False, center_cropping=True, t1=cfg.t1, t2=cfg.t2, t1ce=cfg.t1ce, oneHot=cfg.oneHot)
 
     model.eval()
@@ -435,7 +434,7 @@ def Pgs_train_val(dataset, n_epochs, wmh_threshold, output_dir, learning_rate, a
     wandb.run.name = "{}_PGSMT_{}_{}_supRate{}_seed{}_".format(cfg.experiment_mode, "trainALL2018", "valNew2019",
                                                                cfg.train_sup_rate, seed)
 
-    dataroot_dir = f'data/brats20'
+    dataroot_dir = f'../data/brats20'
     all_train_csv = os.path.join(dataroot_dir, 'trainset/brats2018.csv')
     supdir_path = os.path.join(dataroot_dir, 'trainset')
 

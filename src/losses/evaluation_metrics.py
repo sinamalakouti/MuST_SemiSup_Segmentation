@@ -23,19 +23,8 @@ def do_eval(y_true, y_pred):
 
 
 def getHausdorff(y_true, y_pred):
-    if len(np.unique(y_pred)) == 1:
-        return 40
     return metric.hd(y_pred, y_true)
 
-
-# def dice_coef(y_true, y_pred, smooth=1):
-#   intersection = torch.mul(y_true, y_pred)
-#   n_intersection = torch.sum(intersection,(1,2))
-#   n_y_true = torch.sum(y_true,(1,2))
-#   n_y_pred = torch.sum(y_pred,(1,2))
-#   union = n_y_true + n_y_pred
-#   dice = ( 2. *  n_intersection + smooth) / (union + smooth)
-#   return dice
 
 def getPPV(y_true, y_pred):
     y_pred = y_pred.float().view(-1, 1)

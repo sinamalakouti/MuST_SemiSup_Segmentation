@@ -112,6 +112,8 @@ class Brat20Test(torch.utils.data.Dataset):
 
         elif mode == "test2019_new":
             ids_path = os.path.join(dataroot_dir, 'valset/brats2019_new.csv')
+        elif mode == "test2020_new":
+            ids_path = os.path.join(dataroot_dir, 'valset/brats20_new.csv')
 
         subjects_root_dir = os.path.join(dataroot_dir, 'MICCAI_BraTS2020_TrainingData')
         self.subjects_name = np.asarray(pd.read_csv(ids_path, header=None)).reshape(-1)
@@ -276,9 +278,10 @@ class Brat20(torch.utils.data.Dataset):
             ids_path = os.path.join(dataroot_dir, 'trainset/train18_sup_ids50_seed{}.csv'.format(self.seed))
         elif mode == "train2018_semi_unsup50":
             ids_path = os.path.join(dataroot_dir, 'trainset/train18_unsup_ids50_seed{}.csv'.format(self.seed))
-
         elif mode == "test2019_new":
             ids_path = os.path.join(dataroot_dir, 'valset/brats2019_new.csv')
+        elif mode == "test2020_new":
+            ids_path = os.path.join(dataroot_dir, 'valset/brats20_new.csv')
 
         subjects_root_dir = os.path.join(dataroot_dir, 'MICCAI_BraTS2020_TrainingData')
         self.subjects_name = np.asarray(pd.read_csv(ids_path, header=None)).reshape(-1)
@@ -498,7 +501,7 @@ def center_crop(x, x_t1, x_t2, x_t1ce, y, size=200):
     x_t1ce_cropped = cropper(x_t1ce).reshape((size, size)) if x_t1ce is not None else None
     y_cropped = cropper(y).reshape((size, size))
 
-    assert y.sum() == y_cropped.sum(), "cropped label part!!!!"
+    assert y.sum() - y_cropped.sum() <10, "cropped label part!!!!"
     return x_cropped, x_t1_cropped, x_t2_cropped, x_t1ce_cropped, y_cropped
 
 

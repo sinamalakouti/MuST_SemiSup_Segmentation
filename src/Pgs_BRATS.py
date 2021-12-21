@@ -4,12 +4,11 @@ import torch
 import torch.nn as nn
 from torch.optim import lr_scheduler
 
-from utils import utils, eval_utils
-from utils import model_utils
+from utils import utils
 from losses.loss import consistency_weight, Consistency_CE, softmax_kl_loss
 
-from evaluation_metrics import dice_coef, get_dice_coef_per_subject, get_confusionMatrix_metrics, do_eval
-from dataset.Brat20 import Brat20Test, seg2WT, seg2TC, seg2ET, semi_sup_split
+from losses.evaluation_metrics import dice_coef, do_eval
+from dataset.Brat20 import Brat20Test, seg2WT, seg2TC, seg2ET
 
 from models import Pgs
 import matplotlib.pyplot as plt
@@ -83,7 +82,7 @@ def __fw_outputwise_unsup_loss(y_stud, y_teach, loss_functions, cfg):
             losses.append(
                 unsup_loss(stud_pred, teach_pred, i, use_softmax=True))
         elif cfg.unsupervised_training.consistency_loss == 'MSE':
-            # teach_pred = torch.nn.functional.softmax(teach_pred, dim=1)
+            teach_pred = torch.nn.functional.softmax(teach_pred /0.85, dim=1)
             stud_pred = torch.nn.functional.softmax(stud_pred , dim=1)
             mse = torch.nn.MSELoss()
             loss = mse(stud_pred, teach_pred.detach())
@@ -448,15 +447,6 @@ def eval_per_subjectPgs(model, device, threshold, cfg, data_mode):
             y_ET = seg2ET(y_pred, threshold)
             y_TC = seg2TC(y_pred, threshold)
 
-            # dice_scoreWT = dice_coef(targetWT.reshape(y_WT.shape), y_WT)
-            # dice_scoreET = dice_coef(targetET, y_ET)
-            # dice_scoreTC = dice_coef(targetTC.reshape(y_TC.shape), y_TC)
-            #
-            # PPV_scoreWT, sensitivity_WT, specificity_WT = get_confusionMatrix_metrics(targetWT.reshape(y_WT.shape),
-            #                                                                           y_WT)
-            # PPV_scoreET, sensitivity_ET, specificity_ET = get_confusionMatrix_metrics(targetET, y_ET)
-            # PPV_scoreTC, sensitivity_TC, specificity_TC = get_confusionMatrix_metrics(targetTC.reshape(y_TC.shape),
-            #                                                                           y_TC)
 
             metrics_WT = do_eval(targetWT.reshape(y_WT.shape), y_WT)
             metrics_ET = do_eval(targetET.reshape(y_ET.shape), y_ET)

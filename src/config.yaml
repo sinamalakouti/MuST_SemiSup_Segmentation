@@ -1,7 +1,10 @@
+
+# THIS IS FOR UNET MODEL
 #previous configs:
 #lr: 0.001
 #scheduler_step_size: 3
 #lr_gamma: 0.1
+
 
 #trianing and test splits
 train_mode: "all_train2018_sup"
@@ -9,7 +12,7 @@ val_mode: "test2019_new"
 test_mode: "test2020_new"
 train_unsup_mode: "train2018_semi_unsup"
 train_sup_mode: "train2018_semi_sup"
-train_sup_rate: 5 #rate of labeled data
+train_sup_rate: 10 #rate of labeled data
 #data loader and pre-processing
 t1: True
 t2: True
@@ -19,7 +22,7 @@ wmh_threshold: 0.5
 mixup_threshold: None
 intensity_rescale: True
 #model
-model: "PGS" #PGS,PGSMT, UNET
+model: "UNET" #PGS,PGSMT, UNET
 semi_mode: "shared"   # shared, MT
 gradient_stop_strategy: "stop_feature" #stop_feature, stop_output
 information_passing_strategy: "teacher" #student, teacher

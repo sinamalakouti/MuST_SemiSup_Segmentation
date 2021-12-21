@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from dataset.Augmentation import Perturbator
+from models.Perturbations import Perturbator
 
 
 class ConvBlock(nn.Module):
@@ -41,9 +41,7 @@ class CLS(nn.Module):
         self.net = self.__build_module()
 
     def __build_module(self):
-        return nn.Sequential(
-            nn.Conv2d(self.dim_in, self.dim_out, 1),
-        )
+        return nn.Sequential(nn.Conv2d(self.dim_in, self.dim_out, 1))
 
     def forward(self, X):
         return self.net(X)
@@ -66,13 +64,13 @@ class Up(torch.nn.Module):
             self.up = torch.nn.ConvTranspose2d(ic, oc,
                                                kernel_size=3, stride=2, padding=1, output_padding=1)
 
-    def forward(self, X, transformer):
+    def forward(self, X, transformer, perturbation_mode='F'):
         x1, x2 = X
         if transformer is None:
             x1 = self.up(x1)
         else:
-            x1 = self.up(transformer(x1, None, perturbation_mode='F')[0])
-            x2 = transformer(x2, None, perturbation_mode='F')[0]
+            x1 = self.up(transformer(x1, None, perturbation_mode=perturbation_mode)[0])
+            x2 = transformer(x2, None, perturbation_mode=perturbation_mode)[0]
         # bxcxhxw
         h_diff = x2.size()[2] - x1.size()[2]
         w_diff = x2.size()[3] - x1.size()[3]
@@ -138,62 +136,15 @@ class Unet(nn.Module):
         self.cls8 = CLS(self.dim_outputs[7], self.dim_outputs[-1])
         self.cls9 = CLS(self.dim_outputs[8], self.dim_outputs[-1])  # main classifier
 
-    def get_expanding_layers_outputs(self, X):
-
-        c1, d1, c2, d2, c3, d3, c4, d4 = self.__fw_contracting_path(X)
-        interm_inputs = []
-        # bottleneck
-
-        c5 = self.__fw_bottleneck(d4)
-        output5 = self.cls5(c5)
-        # expanding path
-        # 4th expanding layer
-
-        up1 = self.__fw_up(c5, c4, self.up1)
-        c6 = self.__fw_expand_4layer(up1)
-        output6 = self.cls6(c6)
-        # 3rd expanding layer
-
-        up2 = self.__fw_up(c6, c3, self.up2)
-        c7 = self.__fw_expand_3layer(up2)
-        output7 = self.cls7(c7)
-        # 2nd expanding layer
-
-        up3 = self.__fw_up(c7, c2, self.up3)
-        c8 = self.__fw_expand_2layer(up3)
-        output8 = self.cls8(c8)
-
-        # 1st expanding layer
-
-        up4 = self.__fw_up(c8, c1, self.up4)
-        c9 = self.__fw_expand_1layer(up4)
-        output9 = self.cls9(c9)
-
     def forward(self, X, is_supervised):
-        type_unsup = 'layerwise'
         if is_supervised:
             sup_outputs = self.__fw_supervised(X)
             return sup_outputs, None
 
-        elif type_unsup == 'layerwise':
-            if self.cfg.layerwise == 'layerwiseG':
-                return self.__fw_unsupervised_layerwiseG()
-            return self.__fw_unsupervised_layerwise2(X)
-
-        else:
-
-            # get supervised outputs
-
-            self.training = False
-            # with torch.no_grad():
-            sup_outputs = self.__fw_supervised(X)
-
-            # get unsupervised outputs
-
-            self.training = True
-            unsup_outputs = self.__fw_unsupervised(X)
-
-            return sup_outputs, unsup_outputs
+        if self.cfg.layerwise == 'layerwiseG':
+            return self.__fw_unsupervised_Gaug()
+        elif self.cfg.layerwise == 'layerwiseF':
+            return self.__fw_unsupervised_Faug(X)
 
     def __fw_unsupervised_layerwise3(self, X):  # only_feature space aug + detach Teach_output
         cascade = False
@@ -277,7 +228,7 @@ class Unet(nn.Module):
         unsupervised_outputs = output5_stud, output6_stud, output7_stud, output8_stud, output9_stud
         return supervised_outputs, unsupervised_outputs
 
-    def __fw_unsupervised_layerwiseG(self, X):  # only geometrical aug
+    def __fw_unsupervised_Gaug(self, X):  # only geometrical aug
         cascade = False
         # contracting path
         c1, d1, c2, d2, c3, d3, c4, d4 = self.__fw_contracting_path(X)
@@ -344,7 +295,7 @@ class Unet(nn.Module):
         unsupervised_outputs = output5_stud, output6_stud, output7_stud, output8_stud, output9_stud
         return supervised_outputs, unsupervised_outputs
 
-    def __fw_unsupervised_layerwise2(self, X):  # only_feature space aug
+    def __fw_unsupervised_Faug(self, X):  # only_feature space aug
         cascade = False
         # contracting path
         c1, d1, c2, d2, c3, d3, c4, d4 = self.__fw_contracting_path(X)
@@ -426,65 +377,6 @@ class Unet(nn.Module):
         supervised_outputs = aug_output5_teach, aug_output6_teach, aug_output7_teach, aug_output8_teach, aug_output9_teach
         unsupervised_outputs = output5_stud, output6_stud, output7_stud, output8_stud, output9_stud
         return supervised_outputs, unsupervised_outputs
-
-    # def __fw_unsupervised_layerwise(self, X):
-    #     cascade = False
-    #     # contracting path
-    #     c1, d1, c2, d2, c3, d3, c4, d4 = self.__fw_contracting_path(X)
-    #
-    #     # bottleneck
-    #     with torch.no_grad():
-    #         c5_sup = self.__fw_bottleneck(d4).detach()
-    #         output5_sup = self.cls5(c5_sup).detach()
-    #
-    #     d4_unsup, aug_output5_sup = transformer(d4, output5_sup, cascade=cascade)
-    #     c5_unsup = self.__fw_bottleneck(d4_unsup)
-    #     output5_unsup = self.cls5(c5_unsup)
-    #
-    #     # expanding path
-    #
-    #     up1 = self.__fw_up(c5_sup, c4, self.up1)
-    #     with torch.no_grad():
-    #         c6 = self.__fw_expand_4layer(up1).detach()
-    #         output6_sup = self.cls6(c6).detach()
-    #
-    #     aug_up1, aug_output6_sup = transformer(up1, output6_sup, cascade=cascade)
-    #     c6_unsup = self.__fw_expand_4layer(aug_up1)
-    #     output6_unsup = self.cls6(c6_unsup)
-    #     ######
-    #     up2 = self.__fw_up(c6, c3, self.up2)
-    #     with torch.no_grad():
-    #         c7 = self.__fw_expand_3layer(up2).detach()
-    #         output7_sup = self.cls7(c7).detach()
-    #
-    #     aug_up2, aug_output7_sup = transformer(up2, output7_sup, cascade=cascade)
-    #     c7_unsup = self.__fw_expand_3layer(aug_up2)
-    #     output7_unsup = self.cls7(c7_unsup)
-    #
-    #     #####
-    #     up3 = self.__fw_up(c7, c2, self.up3)
-    #     with torch.no_grad():
-    #         c8 = self.__fw_expand_2layer(up3).detach()
-    #         output8_sup = self.cls8(c8).detach()
-    #
-    #     aug_up3, aug_output8_sup = transformer(up3, output8_sup, cascade=cascade)
-    #     c8_unsup = self.__fw_expand_2layer(aug_up3)
-    #     output8_unsup = self.cls8(c8_unsup)
-    #
-    #     ####
-    #
-    #     up4 = self.__fw_up(c8, c1, self.up4)
-    #     with torch.no_grad():
-    #         c9 = self.__fw_expand_1layer(up4).detach()  # output9 is the main output of the network
-    #         output9_sup = self.cls9(c9).detach()
-    #
-    #     aug_up4, aug_output9_sup = transformer(up4, output9_sup, cascade=True)
-    #     c9_unsup = self.__fw_expand_1layer(aug_up4)
-    #     output9_unsup = self.cls9(c9_unsup)
-    #
-    #     supervised_outputs = aug_output5_sup, aug_output6_sup, aug_output7_sup, aug_output8_sup, aug_output9_sup
-    #     unsupervised_outputs = output5_unsup, output6_unsup, output7_unsup, output8_unsup, output9_unsup
-    #     return supervised_outputs, unsupervised_outputs
 
     def __fw_supervised(self, X):
 

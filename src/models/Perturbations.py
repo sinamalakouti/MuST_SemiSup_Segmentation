@@ -249,7 +249,6 @@ class Perturbator(nn.Module):
 
     def __fw_geometrical_aug(self, x, y):
         random_selector = np.random.randint(4)
-
         if random_selector == 0:  # scale
             x_transform, y_transform = self.scale_decoder(x, y)
         elif random_selector == 1:  # rotate
@@ -258,25 +257,23 @@ class Perturbator(nn.Module):
             x_transform, y_transform = self.uni_decoder(x, y)
         elif random_selector == 3:
             x_transform, y_transform = x, y
-
-
         return x_transform, y_transform
 
     def __fw_feature_space_aug(self, x, y):
-        random_selector = np.random.randint(5)
+        random_selector = np.random.randint(4)
         if random_selector == 0:  # feature drop out
             x_transform, y_transform = self.feature_dropout(x, y)
         elif random_selector == 1:  # spatial drop out
             x_transform, y_transform = self.spatial_dropout(x, y)
         elif random_selector == 2:  # uniform dist
             x_transform, y_transform = self.uni_decoder(x, y)
-        elif random_selector == 3:
+        elif random_selector == 3:  # gaussion noise
             x_transform, y_transform = self.gaussian_decoder(x, y)
-        elif random_selector == 4:
+        elif random_selector == 4:  # identity
             x_transform, y_transform = x, y
         return x_transform, y_transform
 
-    def __fw_mix(self, x, y):
+    def __fw_mix(self, x, y):  # mix of feature perturbation and geometrical augmentaiton
         random_selector = np.random.randint(9)
         if random_selector == 0:  # scale
             x_transform, y_transform = self.scale_decoder(x, y)
@@ -294,11 +291,9 @@ class Perturbator(nn.Module):
             x_transform, y_transform = x, y
         return x_transform, y_transform
 
-    def forward(self, x, y, perturbation_mode='F', use_softmax=False,
-                cascade=False):  # mode = F (feature_space), G (geometrical), M (mix)
+    def forward(self, x, y, perturbation_mode='F', use_softmax=False):  # mode = F (feature_space), G (geometrical), M (mix)
         if use_softmax or perturbation_mode == 'G' or perturbation_mode == 'M':
-            y = torch.nn.functional.softmax(y / self.cfg.temp, dim=1) #0.85 for pgs for brats
-
+            y = torch.nn.functional.softmax(y / self.cfg.temp, dim=1)  # 0.85 for pgs for brats
         if perturbation_mode == 'G':
             x_transform, y_transform = self.__fw_geometrical_aug(x, y)
         elif perturbation_mode == 'F':

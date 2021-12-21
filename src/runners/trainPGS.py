@@ -5,7 +5,7 @@ import torch.nn as nn
 from torch.optim import lr_scheduler
 
 from utils import utils, model_utils
-from evaluation_metrics import dice_coef
+from losses.evaluation_metrics import dice_coef
 from models import Pgs
 import matplotlib.pyplot as plt
 import torchvision.transforms.functional as augmentor

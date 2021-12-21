@@ -5,9 +5,8 @@ import torch.nn as nn
 from torch.optim import lr_scheduler
 
 from utils import utils
-from utils import model_utils
 
-from evaluation_metrics import dice_coef, get_dice_coef_per_subject
+from losses.evaluation_metrics import dice_coef, get_dice_coef_per_subject
 from dataset.Brat20 import Brat20Test
 from models import Pgs, Unet
 import matplotlib.pyplot as plt
@@ -17,7 +16,6 @@ import numpy as np
 import argparse
 import yaml
 from easydict import EasyDict as edict
-from losses.loss import dice_coef_loss, soft_dice_loss
 
 import wandb
 
@@ -276,7 +274,7 @@ def evaluateUnet(model, dataset, device, threshold, cfg, data_mode):
 
 def eval_per_subjectUnet(model, device, threshold, cfg, data_mode):
     print("******************** EVALUATING {}********************".format(data_mode))
-    testset = Brat20Test(f'data/brats20', data_mode, 10, 155,
+    testset = Brat20Test(f'../data/brats20', data_mode, 10, 155,
                          augment=False, center_cropping=True, t1=cfg.t1, t2=cfg.t2, t1ce=cfg.t1ce, oneHot=cfg.oneHot)
     model.eval()
     dice_arr = []
@@ -319,7 +317,7 @@ def eval_per_subjectUnet(model, device, threshold, cfg, data_mode):
 def eval_per_subjectPgs(model, device, threshold, cfg, data_mode):
     print("******************** EVALUATING {}********************".format(data_mode))
 
-    testset = Brat20Test(f'data/brats20', data_mode, 10, 155,
+    testset = Brat20Test(f'../data/brats20', data_mode, 10, 155,
                          augment=False, center_cropping=True, t1=cfg.t1, t2=cfg.t2, t1ce=cfg.t1ce)
 
     model.eval()
