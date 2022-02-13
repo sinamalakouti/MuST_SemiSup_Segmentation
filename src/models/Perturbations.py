@@ -290,27 +290,27 @@ def fw_input_geo_aug(X, Y):
 
         y5_transform = F.affine(y5,
                                 angle=angle, translate=(0, 0), shear=shear, scale=scale)
-        mask5 = y5_transform != 0
+        mask5 = (y5_transform != 0.0)
         y5_transform = y5_transform * mask5
 
         y6_transform = F.affine(y6,
                                 angle=angle, translate=(0, 0), shear=shear, scale=scale)
-        mask6 = y6_transform != 0
+        mask6 = (y6_transform != 0.0)
         y6_transform = y6_transform * mask6
 
         y7_transform = F.affine(y7,
                                 angle=angle, translate=(0, 0), shear=shear, scale=scale)
-        mask7 = y7_transform != 0
+        mask7 = (y7_transform != 0.0)
         y7_transform = y7_transform * mask7
 
         y8_transform = F.affine(y8,
                                 angle=angle, translate=(0, 0), shear=shear, scale=scale)
-        mask8 = y8_transform != 0
+        mask8 = (y8_transform != 0.0)
         y8_transform = y8_transform * mask8
 
         y9_transform = F.affine(y9,
                                 angle=angle, translate=(0, 0), shear=shear, scale=scale)
-        mask9 = y9_transform != 0
+        mask9 = (y9_transform != 0.0)
         y9_transform = y9_transform * mask9
 
         x1_transform = augmentor.to_tensor(x1_transform)
