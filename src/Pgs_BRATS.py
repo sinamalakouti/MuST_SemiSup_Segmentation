@@ -9,7 +9,7 @@ from losses.loss import consistency_weight, Consistency_CE, softmax_kl_loss
 
 from losses.evaluation_metrics import dice_coef, do_eval
 from dataset.Brat20 import Brat20Test, seg2WT, seg2TC, seg2ET
-
+from models import Perturbations
 from models import Pgs
 import matplotlib.pyplot as plt
 import torch.nn.functional as F
@@ -18,7 +18,7 @@ import random
 import argparse
 import yaml
 from easydict import EasyDict as edict
-
+import datetime
 import wandb
 
 sys.path.append('src')
@@ -27,34 +27,6 @@ sys.path.append('srs/utils')
 
 for p in sys.path:
     print("path  ", p)
-# random_seeds = [41, 42, 43]
-
-utils.Constants.USE_CUDA = True
-parser = argparse.ArgumentParser()
-
-
-# def __fw_cross_consistency_loss(y_logits, loss_functions, cfg):
-#     (_, unsup_loss) = loss_functions
-#     losses = []
-#     for teach_ind in range(len(y_logits) - 2, len(y_logits)):
-#         teach_logits = y_logits[teach_ind]
-#
-#         for stud_ind in range(0, teach_ind):
-#             stud_logit = y_logits[stud_ind]
-#             # upsample?
-#             if cfg.consistency_loss == 'CE':
-#                 teach_pred = torch.nn.functional.softmax(teach_logits, dim=1)
-#                 loss = - torch.mean(
-#                     torch.sum(teach_pred.detach()
-#                               * torch.nn.functional.log_softmax(stud_logit, dim=1), dim=1))
-#             elif cfg.consistency_loss == 'KL':
-#                 loss = None  # compute loss
-#             elif cfg.consistency_loss == 'balanced_CE':
-#                 loss = None  # compute loss
-#             losses.append(loss)
-#     return sum(losses)
-#
-#     # top two layers are teachers. Each time others are studens ( bottom layers)
 
 
 def __fw_outputwise_unsup_loss(y_stud, y_teach, loss_functions, cfg):
@@ -82,8 +54,8 @@ def __fw_outputwise_unsup_loss(y_stud, y_teach, loss_functions, cfg):
             losses.append(
                 unsup_loss(stud_pred, teach_pred, i, use_softmax=True))
         elif cfg.unsupervised_training.consistency_loss == 'MSE':
-            teach_pred = torch.nn.functional.softmax(teach_pred /0.85, dim=1)
-            stud_pred = torch.nn.functional.softmax(stud_pred , dim=1)
+            teach_pred = torch.nn.functional.softmax(teach_pred / 0.85, dim=1)
+            stud_pred = torch.nn.functional.softmax(stud_pred, dim=1)
             mse = torch.nn.MSELoss()
             loss = mse(stud_pred, teach_pred.detach())
             losses.append(loss)
@@ -92,25 +64,30 @@ def __fw_outputwise_unsup_loss(y_stud, y_teach, loss_functions, cfg):
 
 
 def __fw_sup_loss(y_preds, y_true, sup_loss):
-    total_loss = 0
     # iterate over all level's output
     losses = []
-    for output in y_preds:
-        ratio = int(np.round(y_true.shape[2] / output.shape[2]))
-        maxpool = nn.MaxPool2d(kernel_size=2, stride=ratio, padding=0)
-        target = maxpool(y_true)
+    target_fg = y_true
+    target_bg = 1 - target_fg
+    n_outputs = len(y_preds)
+    maxpool = nn.MaxPool2d(kernel_size=2, stride=2, padding=0)
+    for i in range(n_outputs - 1, -1, -1):
+        # ratio = int(np.round(y_true.shape[2] / output.shape[2]))
+        output = y_preds[i]
+        if i != n_outputs - 1:
+            target_fg = maxpool(target_fg)
+            if target_fg.shape[-1] != output.shape[-1] or target_fg.shape[-2] != output.shape[-2]:
+                h_diff = output.size()[-2] - target_fg.size()[-2]
+                w_diff = output.size()[-1] - target_fg.size()[-1]
+                #
+                target_fg = F.pad(target_fg, (w_diff // 2, w_diff - w_diff // 2,
+                                        h_diff // 2, h_diff - h_diff // 2))
 
-        if target.shape[-1] != output.shape[-1] or target.shape[-2] != output.shape[-2]:
-            h_diff = output.size()[-2] - target.size()[-2]
-            w_diff = output.size()[-1] - target.size()[-1]
-            #
-            target = F.pad(target, (w_diff // 2, w_diff - w_diff // 2,
-                                    h_diff // 2, h_diff - h_diff // 2))
+            assert output.shape[-2:] == target_fg.shape[-2:], "output and target shape is not similar!!"
+        if output.shape[1] != target_fg.shape[1] and type(sup_loss) == torch.nn.CrossEntropyLoss and len(
+                target_fg.shape) > 3:
+            target_fg = target_fg.reshape((target_fg.shape[0], target_fg.shape[2], target_fg.shape[3]))
 
-        assert output.shape[-2:] == target.shape[-2:], "output and target shape is not similar!!"
-        if output.shape[1] != target.shape[1] and type(sup_loss) == torch.nn.CrossEntropyLoss and len(target.shape) > 3:
-            target = target.reshape((target.shape[0], target.shape[2], target.shape[3])).type(torch.LongTensor)
-        losses.append(sup_loss(output, target.type(torch.LongTensor).to(output.device)))
+        losses.append(sup_loss(output, target_fg.type(torch.LongTensor).to(output.device)))
     total_loss = sum(losses)
     return total_loss
 
@@ -180,7 +157,7 @@ def trainPgs_semi(train_sup_loader, train_unsup_loader, model, optimizer, device
                  'weight unsup': weight_unsup
                  })
         sup_step += 1
-    return model, total_loss
+    return model
 
 
 def trainPgs_semi_downSample(train_sup_loader, train_unsup_loader, model, optimizer, device, loss_functions,
@@ -236,16 +213,14 @@ def trainPgs_semi_downSample(train_sup_loader, train_unsup_loader, model, optimi
                  'weight unsup': weight_unsup
                  })
 
-    return model, total_loss
+    return model
 
 
-
-def trainPgs_semi_alternate2(train_sup_loader, train_unsup_loader, model, optimizer, device, loss_functions,
-                             cons_w_unsup, epochid,
-                             cfg):
-    total_loss = 0
+def trainPgs_semi_alternate(train_sup_loader, train_unsup_loader, model, optimizer, device, loss_functions,
+                            cons_w_unsup, epochid,
+                            cfg):
     model.train()
-
+    # semi_loader -> size of smaller set (supervised loader)
     semi_loader = zip(train_sup_loader, train_unsup_loader)
 
     for batch_idx, (batch_sup, batch_unsup) in enumerate(semi_loader):
@@ -255,25 +230,32 @@ def trainPgs_semi_alternate2(train_sup_loader, train_unsup_loader, model, optimi
         b_unsup = batch_unsup['data']
         b_unsup = b_unsup.to(device)
 
+        # unsupervised training - forward
         teacher_outputs, student_outputs = model(b_unsup, is_supervised=False)
         uLoss = compute_loss(student_outputs, teacher_outputs, loss_functions, is_supervised=False, cfg=cfg)
+        # unsupervised training - backward
         weight_unsup = cons_w_unsup(epochid, batch_idx)
-        total_loss = uLoss * weight_unsup
-        total_loss.backward()
+        uloss = uLoss * weight_unsup
+        uloss.backward()
         optimizer[1].step()
 
+        # todo:  delete unsupervised data from GPU
+        # supervised training
         optimizer[0].zero_grad()
         optimizer[1].zero_grad()
-        model.train()
 
         b_sup = batch_sup['data'].to(device)
         target_sup = batch_sup['label'].to(device)
+
+        # supervised training - forward
         sup_outputs, _ = model(b_sup, is_supervised=True)
         sLoss = compute_loss(sup_outputs, target_sup, loss_functions, is_supervised=True, cfg=cfg)
+
+        # supervised training - backward
         sLoss.backward()
         optimizer[0].step()
 
-        print("**************** UNSUP LOSSS  : {} ****************".format(uLoss))
+        print("**************** UNSUP LOSSS ( weighted) : {} ****************".format(uLoss))
         print("**************** SUP LOSSS  : {} ****************".format(sLoss))
 
         with torch.no_grad():
@@ -281,7 +263,7 @@ def trainPgs_semi_alternate2(train_sup_loader, train_unsup_loader, model, optimi
             target_sup[target_sup >= 1] = 1
             target_sup = target_sup
             y_pred = sf(sup_outputs[-1])
-            y_WT = seg2WT(y_pred, 0.5, cfg.oneHot)
+            y_WT = seg2WT(y_pred, 0.5, cfg.oneHot)  # I can identify the threshold! -> more confidence!
             dice_score = dice_coef(target_sup.reshape(y_WT.shape), y_WT)
             wandb.log(
                 {"sup_batch_id": batch_idx + epochid * len(train_sup_loader),
@@ -292,7 +274,70 @@ def trainPgs_semi_alternate2(train_sup_loader, train_unsup_loader, model, optimi
                  'weight unsup': weight_unsup
                  })
 
-    return model, total_loss
+    return model
+
+
+def trainPgs_semi_alternate_I_and_F_aug(train_sup_loader, train_unsup_loader, model, optimizer, device, loss_functions,
+                                        cons_w_unsup, epochid,
+                                        cfg):
+    model.train()
+    # semi_loader -> size of smaller set (supervised loader)
+    semi_loader = zip(train_sup_loader, train_unsup_loader)
+
+    for batch_idx, (batch_sup, batch_unsup) in enumerate(semi_loader):
+        optimizer[0].zero_grad()
+        optimizer[1].zero_grad()
+        b_usnup_orig = batch_unsup['data']  # data original
+        # b_unsup = b_unsup.to(device)
+
+        # unsupervised training - forward
+        teacher_outputs, _ = model(b_usnup_orig.to(device), is_supervised=True)
+        b_unsup_aug, teacher_outputs = Perturbations.fw_input_geo_aug(b_usnup_orig, teacher_outputs)
+        _, student_outputs = model(b_unsup_aug.to(device), is_supervised=False)
+
+        uLoss = compute_loss(student_outputs, teacher_outputs, loss_functions, is_supervised=False, cfg=cfg)
+        # unsupervised training - backward
+        weight_unsup = cons_w_unsup(epochid, batch_idx)
+        uloss = uLoss * weight_unsup
+        uloss.backward()
+        optimizer[1].step()
+
+        # todo:  delete unsupervised data from GPU
+        # supervised training
+        optimizer[0].zero_grad()
+        optimizer[1].zero_grad()
+
+        b_sup = batch_sup['data'].to(device)
+        target_sup = batch_sup['label'].to(device)
+
+        # supervised training - forward
+        sup_outputs, _ = model(b_sup, is_supervised=True)
+        sLoss = compute_loss(sup_outputs, target_sup, loss_functions, is_supervised=True, cfg=cfg)
+
+        # supervised training - backward
+        sLoss.backward()
+        optimizer[0].step()
+
+        print("**************** UNSUP LOSSS (weighted) : {} ****************".format(uLoss))
+        print("**************** SUP LOSSS  : {} ****************".format(sLoss))
+
+        with torch.no_grad():
+            sf = torch.nn.Softmax2d()
+            target_sup[target_sup >= 1] = 1
+            target_sup = target_sup
+            y_pred = sf(sup_outputs[-1])
+            y_WT = seg2WT(y_pred, 0.5, cfg.oneHot)  # I can identify the threshold! -> more confidence!
+            dice_score = dice_coef(target_sup.reshape(y_WT.shape), y_WT)
+            wandb.log(
+                {"sup_batch_id": batch_idx + epochid * len(train_sup_loader),
+                 "sup loss": sLoss,
+                 "unsup_batch_id": batch_idx + epochid * len(train_sup_loader),
+                 "unsup loss": uLoss,
+                 "batch_score_WT": dice_score,
+                 'weight unsup': weight_unsup
+                 })
+
+    return model
 
 
 def trainPgs_sup_upSample(train_sup_loader, train_unsup_loader, model, optimizer, device, loss_functions, cons_w_unsup,
@@ -339,7 +384,7 @@ def trainPgs_sup_upSample(train_sup_loader, train_unsup_loader, model, optimizer
                     "batch_score_WT": dice_score,
                 })
         sup_step += 1
-    return model, total_loss
+    return model
 
 
 def trainPgs_sup(train_sup_loader, model, optimizer, device, loss_functions, epochid, cfg):
@@ -378,9 +423,10 @@ def trainPgs_sup(train_sup_loader, model, optimizer, device, loss_functions, epo
                 {"sup_batch_id": step + epochid * len(train_sup_loader), "sup_loss": total_loss,
                  "batch_score": dice_score})
 
-    return model, total_loss
+    return model
 
 
+@torch.no_grad()
 def eval_per_subjectPgs(model, device, threshold, cfg, data_mode):
     print("******************** EVALUATING {}********************".format(data_mode))
 
@@ -447,7 +493,6 @@ def eval_per_subjectPgs(model, device, threshold, cfg, data_mode):
             y_ET = seg2ET(y_pred, threshold)
             y_TC = seg2TC(y_pred, threshold)
 
-
             metrics_WT = do_eval(targetWT.reshape(y_WT.shape), y_WT)
             metrics_ET = do_eval(targetET.reshape(y_ET.shape), y_ET)
             metrics_TC = do_eval(targetTC.reshape(y_TC.shape), y_TC)
@@ -501,33 +546,13 @@ def eval_per_subjectPgs(model, device, threshold, cfg, data_mode):
     # return np.mean(np.array(dice_arrWT)), np.mean(np.array(dice_arrET)), np.mean(np.array(dice_arrTC))
 
 
-def Pgs_train_val(dataset, n_epochs, wmh_threshold, output_dir, args, cfg, seed):
-    inputs_dim = [4, 64, 96, 128, 256, 768, 384, 224, 160]
-    outputs_dim = [64, 96, 128, 256, 512, 256, 128, 96, 64, 4]
-    kernels = [5, 3, 3, 3, 3, 3, 3, 3, 3]
-    strides = [1, 1, 1, 1, 1, 1, 1, 1, 1]
-
-    wandb.run.name = "{}_PGS_{}_{}_supRate{}_seed{}_".format(cfg.experiment_mode, "trainALL2018", cfg.val_mode,
-                                                             cfg.train_sup_rate, seed)
-
-    '''  uncomment this when you want to create a new split
-    dataroot_dir = f'data/brats20'
-    all_train_csv = os.path.join(dataroot_dir, 'trainset/brats2018.csv')
-    supdir_path = os.path.join(dataroot_dir, 'trainset')
-
-     semi_sup_split(all_train_csv=all_train_csv, sup_dir_path=supdir_path, unsup_dir_path=supdir_path,
-                    ratio=cfg.train_sup_rate / 100, seed=cfg.seed)
-    '''
-
-    best_score = 0
-    start_epoch = 0
-
+def initialize_directories(output_dir, seed, cfg):
     if not os.path.isdir(output_dir):
         try:
             os.mkdir(output_dir, 0o777)
         except OSError:
             print("Creation of the directory %s failed" % output_dir)
-    if cfg.experiment_mode == 'semi' or cfg.experiment_mode == 'partially_sup_upSample' or cfg.experiment_mode == 'semi_downSample' or cfg.experiment_mode == 'semi_alternate':
+    if cfg.experiment_mode == 'semi' or cfg.experiment_mode == 'semi_alternate' or cfg.experiment_mode == "semi_alternate_mix_F_G":
         output_dir = os.path.join(output_dir, "sup_ratio_{}".format(cfg.train_sup_rate))
         if not os.path.isdir(output_dir):
             try:
@@ -550,6 +575,13 @@ def Pgs_train_val(dataset, n_epochs, wmh_threshold, output_dir, args, cfg, seed)
                 print("Creation of the directory %s failed" % output_dir)
 
     output_dir = os.path.join(output_dir, "seed_{}".format(seed))
+    if not os.path.isdir(output_dir):
+        try:
+            os.mkdir(output_dir, 0o777)
+        except OSError:
+            print("Creation of the directory %s failed" % output_dir)
+    now = str(datetime.datetime.now())
+    output_dir = os.path.join(output_dir, "{}".format(now))
     if not os.path.isdir(output_dir):
         try:
             os.mkdir(output_dir, 0o777)
@@ -579,6 +611,120 @@ def Pgs_train_val(dataset, n_epochs, wmh_threshold, output_dir, args, cfg, seed)
             os.mkdir(output_image_dir, 0o777)
         except OSError:
             print("Creation of the directory %s failed" % output_image_dir)
+    return output_model_dir, output_image_dir
+
+
+def get_train_dataloaders(dataset, cfg):
+    train_unsup_loader = None
+    train_sup_loader = utils.get_trainset(dataset, batch_size=cfg.batch_size, intensity_rescale=cfg.intensity_rescale,
+                                          mixup_threshold=cfg.mixup_threshold, mode=cfg.train_sup_mode, t1=cfg.t1,
+                                          t2=cfg.t2, t1ce=cfg.t1ce, augment=cfg.augment, seed=cfg.seed)
+
+    print('size of labeled training set: number of subjects:    ', len(train_sup_loader.dataset.subjects_name))
+    print("labeled subjects  ", train_sup_loader.dataset.subjects_name)
+
+    if cfg.experiment_mode == 'semi' or cfg.experiment_mode == 'partially_sup_upSample' or cfg.experiment_mode == 'semi_downSample' \
+            or cfg.experiment_mode == 'semi_alternate':
+        train_unsup_loader = utils.get_trainset(dataset, batch_size=cfg.batch_size,
+                                                intensity_rescale=cfg.intensity_rescale,
+                                                mixup_threshold=cfg.mixup_threshold,
+                                                mode=cfg.train_unsup_mode, t1=cfg.t1, t2=cfg.t2, t1ce=cfg.t1ce,
+                                                augment=cfg.augment, seed=cfg.seed)
+    elif cfg.experiment_mode == 'semi_alternate_mix_F_G':
+        train_unsup_loader = utils.get_trainset(dataset, batch_size=cfg.batch_size,
+                                                intensity_rescale=cfg.intensity_rescale,
+                                                mixup_threshold=cfg.mixup_threshold,
+                                                mode=cfg.train_unsup_mode, t1=cfg.t1, t2=cfg.t2, t1ce=cfg.t1ce,
+                                                augment=False, seed=cfg.seed)
+
+        print('size of unlabeled training set: number of subjects:    ', len(train_unsup_loader.dataset.subjects_name))
+        print("un labeled subjects  ", train_unsup_loader.dataset.subjects_name)
+    return train_sup_loader, train_unsup_loader
+
+
+def Pgs_train_val(dataset, n_epochs, wmh_threshold, output_dir, args, cfg, seed):
+    inputs_dim = [4, 64, 96, 128, 256, 768, 384, 224, 160]
+    outputs_dim = [64, 96, 128, 256, 512, 256, 128, 96, 64, 4]
+    kernels = [5, 3, 3, 3, 3, 3, 3, 3, 3]
+    strides = [1, 1, 1, 1, 1, 1, 1, 1, 1]
+
+    wandb.run.name = "{}_PGS_{}_{}_supRate{}_seed{}_".format(cfg.experiment_mode, "trainALL2018", 'valNew2019',
+                                                             cfg.train_sup_rate, seed)
+
+    '''  uncomment this when you want to create a new split
+    dataroot_dir = f'data/brats20'
+    all_train_csv = os.path.join(dataroot_dir, 'trainset/brats2018.csv')
+    supdir_path = os.path.join(dataroot_dir, 'trainset')
+
+     semi_sup_split(all_train_csv=all_train_csv, sup_dir_path=supdir_path, unsup_dir_path=supdir_path,
+                    ratio=cfg.train_sup_rate / 100, seed=cfg.seed)
+    '''
+
+    best_score = 0
+    start_epoch = 0
+    print('-' * 50)
+    print("EXPERIMENT-   PGS on BRATS")
+    print('-' * 50)
+
+    output_model_dir, output_image_dir = initialize_directories(output_dir, seed, cfg)
+
+    # if not os.path.isdir(output_dir):
+    #     try:
+    #         os.mkdir(output_dir, 0o777)
+    #     except OSError:
+    #         print("Creation of the directory %s failed" % output_dir)
+    # if cfg.experiment_mode == 'semi' or cfg.experiment_mode == 'partially_sup_upSample' or cfg.experiment_mode == 'semi_downSample' or cfg.experiment_mode == 'semi_alternate':
+    #     output_dir = os.path.join(output_dir, "sup_ratio_{}".format(cfg.train_sup_rate))
+    #     if not os.path.isdir(output_dir):
+    #         try:
+    #             os.mkdir(output_dir, 0o777)
+    #         except OSError:
+    #             print("Creation of the directory %s failed" % output_dir)
+    # elif cfg.experiment_mode == 'partially_sup':
+    #     output_dir = os.path.join(output_dir, "partiallySup_ratio_{}".format(cfg.train_sup_rate))
+    #     if not os.path.isdir(output_dir):
+    #         try:
+    #             os.mkdir(output_dir, 0o777)
+    #         except OSError:
+    #             print("Creation of the directory %s failed" % output_dir)
+    # elif cfg.experiment_mode == 'fully_sup':
+    #     output_dir = os.path.join(output_dir, "fullySup_ratio_{}".format(cfg.train_sup_rate))
+    #     if not os.path.isdir(output_dir):
+    #         try:
+    #             os.mkdir(output_dir, 0o777)
+    #         except OSError:
+    #             print("Creation of the directory %s failed" % output_dir)
+    #
+    # output_dir = os.path.join(output_dir, "seed_{}".format(seed))
+    # if not os.path.isdir(output_dir):
+    #     try:
+    #         os.mkdir(output_dir, 0o777)
+    #     except OSError:
+    #         print("Creation of the directory %s failed" % output_dir)
+    #
+    # output_model_dir = os.path.join(output_dir, "best_model")
+    #
+    # print("output_model_dir is   ", output_model_dir)
+    #
+    # if not os.path.isdir(output_model_dir):
+    #     try:
+    #         os.mkdir(output_model_dir, 0o777)
+    #     except OSError:
+    #         print("Creation of the directory %s failed" % output_model_dir)
+    #
+    # if not os.path.isdir(os.path.join(output_dir, "runs")):
+    #     try:
+    #         os.mkdir(os.path.join(output_dir, "runs"), 0o777)
+    #     except OSError:
+    #         print("Creation of the directory %s failed" % os.path.join(output_dir, "runs"))
+    #
+    # output_image_dir = os.path.join(output_dir, "result_images/")
+    #
+    # if not os.path.isdir(output_image_dir):
+    #     try:
+    #         os.mkdir(output_image_dir, 0o777)
+    #     except OSError:
+    #         print("Creation of the directory %s failed" % output_image_dir)
 
     # log_file_path = os.path.join(output_dir, "log_{}.log".format(args.training_mode))
     # sys.stdout = open(log_file_path, "w")
@@ -587,9 +733,8 @@ def Pgs_train_val(dataset, n_epochs, wmh_threshold, output_dir, args, cfg, seed)
     print("******* TRAINING PGS ***********")
     print("sup learning_rate is    ", cfg.supervised_training.lr)
     print("unsup learning_rate is    ", cfg.unsupervised_training.lr)
-    # print("scheduler step size is :   ", step_size)
-    print("output_dir is    ", output_dir)
 
+    # load model
     pgsnet = Pgs.PGS(inputs_dim, outputs_dim, kernels, strides, cfg)
 
     if torch.cuda.is_available():
@@ -598,35 +743,18 @@ def Pgs_train_val(dataset, n_epochs, wmh_threshold, output_dir, args, cfg, seed)
         device = 'cuda'
     elif not torch.cuda.is_available():
         device = 'cpu'
-
     device = torch.device(device)
     pgsnet.to(device)
 
-    train_sup_loader = utils.get_trainset(dataset, batch_size=cfg.batch_size, intensity_rescale=cfg.intensity_rescale,
-                                          mixup_threshold=cfg.mixup_threshold, mode=cfg.train_sup_mode, t1=cfg.t1,
-                                          t2=cfg.t2, t1ce=cfg.t1ce, augment=cfg.augment, seed=cfg.seed)
+    # loading the datasets
+    train_sup_loader, train_unsup_loader = get_train_dataloaders(dataset, cfg)
 
-    print('size of labeled training set: number of subjects:    ', len(train_sup_loader.dataset.subjects_name))
-    print("labeled subjects  ", train_sup_loader.dataset.subjects_name)
-
-    if cfg.experiment_mode == 'semi' or cfg.experiment_mode == 'partially_sup_upSample' or cfg.experiment_mode == 'semi_downSample' or cfg.experiment_mode == 'semi_alternate':
-        train_unsup_loader = utils.get_trainset(dataset, batch_size=cfg.batch_size, intensity_rescale=cfg.intensity_rescale,
-                                                mixup_threshold=cfg.mixup_threshold,
-                                                mode=cfg.train_unsup_mode, t1=cfg.t1, t2=cfg.t2, t1ce=cfg.t1ce,
-                                                augment=cfg.augment, seed=cfg.seed)
-        print('size of unlabeled training set: number of subjects:    ', len(train_unsup_loader.dataset.subjects_name))
-        print("un labeled subjects  ", train_unsup_loader.dataset.subjects_name)
-
-    sup_loss_fn = torch.nn.CrossEntropyLoss()
-    if cfg.unsupervised_training.consistency_loss == 'balanced_CE':
-        cons_loss_fn = Consistency_CE(5)
-    else:
-        cons_loss_fn = None
-
+    # load optimizers
     optimizer_unsup = torch.optim.SGD(pgsnet.parameters(), cfg.unsupervised_training.lr, momentum=0.9,
                                       weight_decay=1e-4)
     optimizer_sup = torch.optim.SGD(pgsnet.parameters(), cfg.supervised_training.lr, momentum=0.9,
                                     weight_decay=1e-4)
+    # load schedulers
 
     scheduler_unsup = lr_scheduler.StepLR(optimizer_unsup,
                                           step_size=cfg.unsupervised_training.scheduler_step_size,
@@ -634,47 +762,60 @@ def Pgs_train_val(dataset, n_epochs, wmh_threshold, output_dir, args, cfg, seed)
     scheduler_sup = lr_scheduler.StepLR(optimizer_sup, step_size=cfg.supervised_training.scheduler_step_size,
                                         gamma=cfg.supervised_training.lr_gamma)
 
+    # consistency regularization weight
+
     cons_w_unsup = consistency_weight(final_w=cfg['unsupervised_training']['consist_w_unsup']['final_w'],
                                       iters_per_epoch=len(train_sup_loader),
                                       rampup_ends=cfg['unsupervised_training']['consist_w_unsup'][
                                           'rampup_ends'],
                                       ramp_type=cfg['unsupervised_training']['consist_w_unsup']['rampup'])
 
+    if cfg.unsupervised_training.consistency_loss == 'balanced_CE':
+        cons_loss_fn = Consistency_CE(5)
+    else:
+        cons_loss_fn = None
+
     for epoch in range(start_epoch, n_epochs):
         print("iteration:  ", epoch)
 
-        # pgsnet, loss = trainPGS(train_loader, pgsnet, optimizer, device, epoch)
         if cfg.experiment_mode == 'semi':
 
-            pgsnet, loss = trainPgs_semi(train_sup_loader, train_unsup_loader, pgsnet, optimizer_sup, device,
-                                         (torch.nn.CrossEntropyLoss(), cons_loss_fn), cons_w_unsup,
-                                         epoch, cfg)
+            trainPgs_semi(train_sup_loader, train_unsup_loader, pgsnet, optimizer_sup, device,
+                          (torch.nn.CrossEntropyLoss(), cons_loss_fn), cons_w_unsup,
+                          epoch, cfg)
         elif cfg.experiment_mode == 'semi_downSample':
 
-            pgsnet, loss = trainPgs_semi_downSample(train_sup_loader, train_unsup_loader, pgsnet, optimizer_sup, device,
-                                                    (torch.nn.CrossEntropyLoss(), cons_loss_fn),
-                                                    cons_w_unsup,
-                                                    epoch, cfg)
+            trainPgs_semi_downSample(train_sup_loader, train_unsup_loader, pgsnet, optimizer_sup, device,
+                                     (torch.nn.CrossEntropyLoss(), cons_loss_fn),
+                                     cons_w_unsup,
+                                     epoch, cfg)
         elif cfg.experiment_mode == 'semi_alternate':
 
-            pgsnet, loss = trainPgs_semi_alternate2(train_sup_loader, train_unsup_loader, pgsnet,
-                                                    (optimizer_sup, optimizer_unsup), device,
-                                                    (torch.nn.CrossEntropyLoss(), cons_loss_fn),
-                                                    cons_w_unsup,
-                                                    epoch, cfg)
+            trainPgs_semi_alternate(train_sup_loader, train_unsup_loader, pgsnet,
+                                    (optimizer_sup, optimizer_unsup), device,
+                                    (torch.nn.CrossEntropyLoss(), cons_loss_fn),
+                                    cons_w_unsup,
+                                    epoch, cfg)
+        elif cfg.experiment_mode == 'semi_alternate_mix_F_G':
+            trainPgs_semi_alternate_I_and_F_aug(train_sup_loader, train_unsup_loader, pgsnet,
+                                                (optimizer_sup, optimizer_unsup), device,
+                                                (torch.nn.CrossEntropyLoss(), cons_loss_fn),
+                                                cons_w_unsup,
+                                                epoch, cfg)
+
         elif cfg.experiment_mode == 'partially_sup':
 
-            pgsnet, loss = trainPgs_sup(train_sup_loader, pgsnet, optimizer_sup, device,
-                                        (torch.nn.CrossEntropyLoss(), None),
-                                        epoch, cfg)
+            trainPgs_sup(train_sup_loader, pgsnet, optimizer_sup, device,
+                         (torch.nn.CrossEntropyLoss(), None),
+                         epoch, cfg)
         elif cfg.experiment_mode == 'fully_sup':
-            pgsnet, loss = trainPgs_sup(train_sup_loader, pgsnet, optimizer_sup, device,
-                                        (torch.nn.CrossEntropyLoss(), None),
-                                        epoch, cfg)
+            trainPgs_sup(train_sup_loader, pgsnet, optimizer_sup, device,
+                         (torch.nn.CrossEntropyLoss(), None),
+                         epoch, cfg)
         elif cfg.experiment_mode == 'partially_sup_upSample':
-            pgsnet, loss = trainPgs_sup_upSample(train_sup_loader, train_unsup_loader, pgsnet, optimizer_sup, device,
-                                                 (torch.nn.CrossEntropyLoss(), torch.nn.CrossEntropyLoss()), None,
-                                                 epoch, cfg)
+            trainPgs_sup_upSample(train_sup_loader, train_unsup_loader, pgsnet, optimizer_sup, device,
+                                  (torch.nn.CrossEntropyLoss(), torch.nn.CrossEntropyLoss()), None,
+                                  epoch, cfg)
 
         if epoch % 2 == 0:
             val_final_dice, val_final_PPV, val_final_sensitivity, val_final_specificity, val_final_hd = eval_per_subjectPgs(
@@ -811,6 +952,7 @@ def Pgs_train_val(dataset, n_epochs, wmh_threshold, output_dir, args, cfg, seed)
                })
 
 
+@torch.no_grad()
 def save_score(dir_path, score, iter):
     dir_path = os.path.join(dir_path, "results_iter{}".format(iter))
     if not os.path.isdir(dir_path):
@@ -826,6 +968,7 @@ def save_score(dir_path, score, iter):
                 "average TC dice score per subject    {}\n".format(iter, score['WT'], score['ET'], score['TC']))
 
 
+@torch.no_grad()
 def save_score_all(dir_path, scores, iter, mode):  # mode = 2020 test or 2019 test
     final_dice = scores[0]
     final_hd = scores[1]
@@ -851,6 +994,7 @@ def save_score_all(dir_path, scores, iter, mode):  # mode = 2020 test or 2019 te
             final_dice['TC'], final_PPV['TC'], final_sensitivity['TC'], final_hd['TC'], final_specificity['TC']))
 
 
+@torch.no_grad()
 def save_score_all2(dir_path, scores, iter):
     final_dice = scores[0]
     final_hd = scores[1]
@@ -875,6 +1019,7 @@ def save_score_all2(dir_path, scores, iter):
             final_dice['TC'], final_PPV['TC'], final_sensitivity['TC'], final_hd['TC']))
 
 
+@torch.no_grad()
 def save_predictions(y_pred, threshold, dir_path, score, iter):
     dir_path = os.path.join(dir_path, "results_iter{}".format(iter))
     if not os.path.isdir(dir_path):
@@ -935,7 +1080,9 @@ def main():
     random.seed(cfg.seed)
     os.environ['CUDA_VISIBLE_DEVICES'] = cfg.cuda
 
-    if cfg.experiment_mode == 'semi' or cfg.experiment_mode == 'partially_sup_upSample' or cfg.experiment_mode == 'semi_downSample' or cfg.experiment_mode == 'semi_alternate':
+    if cfg.experiment_mode == 'semi' or cfg.experiment_mode == 'partially_sup_upSample' or \
+            cfg.experiment_mode == 'semi_downSample' or cfg.experiment_mode == 'semi_alternate' \
+            or 'semi' in cfg.experiment_mode:
         cfg.train_sup_mode = 'train2018_semi_sup' + str(cfg.train_sup_rate)
         cfg.train_unsup_mode = 'train2018_semi_unsup' + str(cfg.train_sup_rate)
     elif cfg.experiment_mode == 'partially_sup':

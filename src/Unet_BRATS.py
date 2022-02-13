@@ -491,7 +491,6 @@ def Unet_train_val(dataset, n_epochs, wmh_threshold, output_dir, cfg, seed):
                                         gamma=cfg.supervised_training.lr_gamma, verbose=True)
 
     # consistency weight scheduler
-
     cons_w_unsup = consistency_weight(final_w=cfg['unsupervised_training']['consist_w_unsup']['final_w'],
                                       iters_per_epoch=len(train_sup_loader),
                                       rampup_ends=cfg['unsupervised_training']['consist_w_unsup'][
@@ -524,7 +523,7 @@ def Unet_train_val(dataset, n_epochs, wmh_threshold, output_dir, cfg, seed):
         if epoch % 2 == 0:
             val_score = evaluate(unet, device, wmh_threshold, cfg, epoch, output_image_dir)
 
-            if  val_score > best_score:
+            if val_score > best_score:
                 print('*' * 50)
                 print("BEST VALIDATION SCORE @ ITERATION {} is {}".format(epoch, val_score))
                 best_score = val_score
@@ -535,7 +534,7 @@ def Unet_train_val(dataset, n_epochs, wmh_threshold, output_dir, cfg, seed):
         # updating modules
         updating_modules(cfg, scheduler_sup, scheduler_unsup)
 
-    val_score = evaluate(unet, device, wmh_threshold, cfg, cfg.n_epoch, output_image_dir )
+    val_score = evaluate(unet, device, wmh_threshold, cfg, cfg.n_epoch, output_image_dir)
     if val_score > best_score:
         print('*' * 50)
         print("BEST VALIDATION SCORE @ ITERATION {} is {}".format(cfg.n_epoch, val_score))
@@ -545,8 +544,7 @@ def Unet_train_val(dataset, n_epochs, wmh_threshold, output_dir, cfg, seed):
             torch.save(unet, f)
 
 
-
-def evaluate(unet, device, wmh_threshold, cfg, epoch, output_image_dir,):
+def evaluate(unet, device, wmh_threshold, cfg, epoch, output_image_dir, ):
     # Evaluate on Validation set
     val_final_dice, val_final_PPV, val_final_sensitivity, val_final_specificity, val_final_hd = eval_per_subjectUnet(
         unet, device,

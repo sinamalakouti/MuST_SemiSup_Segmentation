@@ -375,7 +375,6 @@ class Brat20(torch.utils.data.Dataset):
         y[y == 4] = 3  # for simplicity in training, substitute label = 3 with 4
         # rand = np.random.rand(1)
         if self.augment:  # and rand < 0.5:
-
             x, x_t1, x_t2, x_t1ce, y = augment(
                 x=x, y=y, t1=x_t1, t2=x_t2, t1ce=x_t1ce, intensity_aug=self.intensity_aug)
         else:

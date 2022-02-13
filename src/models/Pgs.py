@@ -139,13 +139,17 @@ class PGS(nn.Module):
         self.cls9 = CLS(self.dim_outputs[8], self.dim_outputs[-1])  # main classifier
 
     def forward(self, X, is_supervised):
-        type_unsup = 'layerwise'
+        # type_unsup = 'layerwise'
+        type_unsup = 'unsupervised'  # both feature_level (F) and input level (G) augmentation
         if is_supervised:
             sup_outputs = self.__fw_supervised(X)
             return sup_outputs, None
 
         elif type_unsup == 'layerwise':
             return self.__fw_unsupervised_layerwise2(X)
+
+        elif type_unsup == 'unsupervised':
+            return self.__fw_unsupervised_feautre_sapce(X)
 
         else:
 
@@ -163,7 +167,7 @@ class PGS(nn.Module):
             return sup_outputs, unsup_outputs
 
     def __fw_unsupervised_layerwise2(self, X):  # only_feature space aug
-        cascade = False
+
         # contracting path
         c1, d1, c2, d2, c3, d3, c4, d4 = self.__fw_contracting_path(X)
 
@@ -173,7 +177,7 @@ class PGS(nn.Module):
             c5_teach = self.__fw_bottleneck(d4).detach()
             aug_output5_teach = self.cls5(c5_teach).detach()
 
-        d4_stud, _ = self.transformer(d4, None, perturbation_mode='F', cascade=cascade)
+        d4_stud, _ = self.transformer(d4, None, perturbation_mode='F')
         c5_stud = self.__fw_bottleneck(d4_stud)
         output5_stud = self.cls5(c5_stud)
 
@@ -245,8 +249,78 @@ class PGS(nn.Module):
         unsupervised_outputs = output5_stud, output6_stud, output7_stud, output8_stud, output9_stud
         return supervised_outputs, unsupervised_outputs
 
+    def __fw_unsupervised_feautre_sapce(self, X):  # only_feature space aug
+
+        # contracting path
+        c1, d1, c2, d2, c3, d3, c4, d4 = self.__fw_contracting_path(X)
+
+        # bottleneck
+
+        c5_teach = self.__fw_bottleneck(d4)
+
+        d4_stud, _ = self.transformer(d4, None, perturbation_mode='F')
+        c5_stud = self.__fw_bottleneck(d4_stud)
+        output5_stud = self.cls5(c5_stud)
+
+        # expanding path
+        teach_up1 = self.__fw_up(c5_teach, c4, self.up1,
+                                 transformer=None) if self.config.information_passing_strategy == 'teacher' \
+            else self.__fw_up(c5_stud, c4, self.up1, transformer=None)
+
+        stud_up1 = self.__fw_up(c5_teach, c4, self.up1,
+                                transformer=self.transformer) if self.config.information_passing_strategy == 'teacher' \
+            else self.__fw_up(c5_stud, c4, self.up1, transformer=self.transformer)
+
+        c6_teach = self.__fw_expand_4layer(teach_up1)
+        c6_stud = self.__fw_expand_4layer(stud_up1)
+        output6_stud = self.cls6(c6_stud)
+        ######
+        teach_up2 = self.__fw_up(c6_teach, c3, self.up2,
+                                 transformer=None) if self.config.information_passing_strategy == 'teacher' \
+            else self.__fw_up(c6_stud, c3, self.up2, transformer=None)
+
+        stud_up2 = self.__fw_up(c6_teach, c3, self.up2,
+                                transformer=self.transformer) if self.config.information_passing_strategy == 'teacher' \
+            else self.__fw_up(c6_stud, c3, self.up2, transformer=self.transformer)
+
+        c7_teach = self.__fw_expand_3layer(teach_up2)
+
+        c7_stud = self.__fw_expand_3layer(stud_up2)
+        output7_stud = self.cls7(c7_stud)
+
+        #####
+        teach_up3 = self.__fw_up(c7_teach, c2, self.up3,
+                                 transformer=None) if self.config.information_passing_strategy == 'teacher' \
+            else self.__fw_up(c7_stud, c2, self.up3, transformer=None)
+
+        stud_up3 = self.__fw_up(c7_teach, c2, self.up3,
+                                transformer=self.transformer) if self.config.information_passing_strategy == 'teacher' \
+            else self.__fw_up(c7_stud, c2, self.up3, transformer=self.transformer)
+
+        c8_teach = self.__fw_expand_2layer(teach_up3)
+
+        c8_stud = self.__fw_expand_2layer(stud_up3)
+        output8_stud = self.cls8(c8_stud)
+
+        ####
+        # teach_up4 = self.__fw_up(c8_teach, c1, self.up4,
+        #                          transformer=None) if self.config.information_passing_strategy == 'teacher' \
+        #     else self.__fw_up(c8_stud, c1, self.up4, transformer=None)
+
+        stud_up4 = self.__fw_up(c8_teach, c1, self.up4,
+                                transformer=self.transformer) if self.config.information_passing_strategy == 'teacher' \
+            else self.__fw_up(c8_stud, c1, self.up4, transformer=self.transformer)
+
+        # output9 is the main output of the network
+        c9_stud = self.__fw_expand_1layer(stud_up4)
+        output9_stud = self.cls9(c9_stud)
+
+        supervised_outputs = None, None, None, None, None
+        unsupervised_outputs = output5_stud, output6_stud, output7_stud, output8_stud, output9_stud
+        return supervised_outputs, unsupervised_outputs
+
     def __fw_unsupervised_layerwise(self, X):  # only geometrical aug
-        cascade = False
+
         # contracting path
         c1, d1, c2, d2, c3, d3, c4, d4 = self.__fw_contracting_path(X)
 
@@ -256,7 +330,7 @@ class PGS(nn.Module):
             c5_teach = self.__fw_bottleneck(d4).detach()
             output5_teach = self.cls5(c5_teach).detach()
 
-        d4_stud, aug_output5_teach = self.transformer(d4, output5_teach, perturbation_mode='G', cascade=cascade)
+        d4_stud, aug_output5_teach = self.transformer(d4, output5_teach, perturbation_mode='G')
         c5_stud = self.__fw_bottleneck(d4_stud)
         output5_stud = self.cls5(c5_stud)
 
@@ -268,7 +342,7 @@ class PGS(nn.Module):
             c6_teach = self.__fw_expand_4layer(up1).detach()
             output6_teach = self.cls6(c6_teach).detach()
 
-        aug_up1, aug_output6_teach = self.transformer(up1, output6_teach, perturbation_mode='G', cascade=cascade)
+        aug_up1, aug_output6_teach = self.transformer(up1, output6_teach, perturbation_mode='G')
         c6_stud = self.__fw_expand_4layer(aug_up1)
         output6_stud = self.cls6(c6_stud)
         ######
@@ -279,7 +353,7 @@ class PGS(nn.Module):
             c7_teach = self.__fw_expand_3layer(up2).detach()
             output7_teach = self.cls7(c7_teach).detach()
 
-        aug_up2, aug_output7_teach = self.transformer(up2, output7_teach, perturbation_mode='G', cascade=cascade)
+        aug_up2, aug_output7_teach = self.transformer(up2, output7_teach, perturbation_mode='G')
         c7_stud = self.__fw_expand_3layer(aug_up2)
         output7_stud = self.cls7(c7_stud)
 
@@ -291,7 +365,7 @@ class PGS(nn.Module):
             c8_teach = self.__fw_expand_2layer(up3).detach()
             output8_teach = self.cls8(c8_teach).detach()
 
-        aug_up3, aug_output8_teach = self.transformer(up3, output8_teach, perturbation_mode='G', cascade=cascade)
+        aug_up3, aug_output8_teach = self.transformer(up3, output8_teach, perturbation_mode='G')
         c8_stud = self.__fw_expand_2layer(aug_up3)
         output8_stud = self.cls8(c8_stud)
 
@@ -304,7 +378,7 @@ class PGS(nn.Module):
             c9_teach = self.__fw_expand_1layer(up4).detach()
             output9_teach = self.cls9(c9_teach).detach()
 
-        aug_up4, aug_output9_teach = self.transformer(up4, output9_teach, perturbation_mode='G', cascade=cascade)
+        aug_up4, aug_output9_teach = self.transformer(up4, output9_teach, perturbation_mode='G')
         c9_stud = self.__fw_expand_1layer(aug_up4)
         output9_stud = self.cls9(c9_stud)
 
@@ -313,7 +387,7 @@ class PGS(nn.Module):
         return supervised_outputs, unsupervised_outputs
 
     def __fw_unsupervised_layerwise_mix(self, X):  # only_feature space aug
-        cascade = False
+
         # contracting path
         c1, d1, c2, d2, c3, d3, c4, d4 = self.__fw_contracting_path(X)
 
@@ -323,9 +397,9 @@ class PGS(nn.Module):
             c5_teach = self.__fw_bottleneck(d4).detach()
             aug_output5_teach = self.cls5(c5_teach).detach()
 
-        d4_stud, _ = self.transformer(d4, None, perturbation_mode='F', cascade=cascade)
+        d4_stud, _ = self.transformer(d4, None, perturbation_mode='F')
         d4_stud, aug_output5_teach = self.transformer(d4_stud, aug_output5_teach, perturbation_mode='G',
-                                                      cascade=cascade)
+                                                      )
 
         c5_stud = self.__fw_bottleneck(d4_stud)
         output5_stud = self.cls5(c5_stud)
@@ -343,7 +417,7 @@ class PGS(nn.Module):
             aug_output6_teach = self.cls6(c6_teach).detach()
 
         stud_up1, aug_output6_teach = self.transformer(stud_up1, aug_output6_teach, perturbation_mode='G',
-                                                       cascade=cascade)
+                                                       )
         c6_stud = self.__fw_expand_4layer(stud_up1)
         output6_stud = self.cls6(c6_stud)
         ######
@@ -360,7 +434,7 @@ class PGS(nn.Module):
             aug_output7_teach = self.cls7(c7_teach).detach()
 
         stud_up2, aug_output7_teach = self.transformer(stud_up2, aug_output7_teach, perturbation_mode='G',
-                                                       cascade=cascade)
+                                                       )
         c7_stud = self.__fw_expand_3layer(stud_up2)
         output7_stud = self.cls7(c7_stud)
 
@@ -378,7 +452,7 @@ class PGS(nn.Module):
             aug_output8_teach = self.cls8(c8_teach).detach()
 
         stud_up3, aug_output8_teach = self.transformer(stud_up3, aug_output8_teach, perturbation_mode='G',
-                                                       cascade=cascade)
+                                                       )
         c8_stud = self.__fw_expand_2layer(stud_up3)
         output8_stud = self.cls8(c8_stud)
 
@@ -397,7 +471,7 @@ class PGS(nn.Module):
             aug_output9_teach = self.cls9(c9_teach).detach()
 
         stud_up4, aug_output9_teach = self.transformer(stud_up4, aug_output9_teach, perturbation_mode='G',
-                                                       cascade=cascade)
+                                                       )
         c9_stud = self.__fw_expand_1layer(stud_up4)
         output9_stud = self.cls9(c9_stud)
 
@@ -406,7 +480,7 @@ class PGS(nn.Module):
         return supervised_outputs, unsupervised_outputs
 
     def __fw_unsupervised_layerwise_mix2(self, X):  # only geometrical aug
-        cascade = False
+
         # contracting path
         c1, d1, c2, d2, c3, d3, c4, d4 = self.__fw_contracting_path(X)
 
@@ -416,7 +490,7 @@ class PGS(nn.Module):
             c5_teach = self.__fw_bottleneck(d4).detach()
             output5_teach = self.cls5(c5_teach).detach()
 
-        d4_stud, aug_output5_teach = self.transformer(d4, output5_teach, perturbation_mode='M', cascade=cascade)
+        d4_stud, aug_output5_teach = self.transformer(d4, output5_teach, perturbation_mode='M')
         c5_stud = self.__fw_bottleneck(d4_stud)
         output5_stud = self.cls5(c5_stud)
 
@@ -428,7 +502,7 @@ class PGS(nn.Module):
             c6_teach = self.__fw_expand_4layer(up1).detach()
             output6_teach = self.cls6(c6_teach).detach()
 
-        aug_up1, aug_output6_teach = self.transformer(up1, output6_teach, perturbation_mode='M', cascade=cascade)
+        aug_up1, aug_output6_teach = self.transformer(up1, output6_teach, perturbation_mode='M')
         c6_stud = self.__fw_expand_4layer(aug_up1)
         output6_stud = self.cls6(c6_stud)
         ######
@@ -439,7 +513,7 @@ class PGS(nn.Module):
             c7_teach = self.__fw_expand_3layer(up2).detach()
             output7_teach = self.cls7(c7_teach).detach()
 
-        aug_up2, aug_output7_teach = self.transformer(up2, output7_teach, perturbation_mode='M', cascade=cascade)
+        aug_up2, aug_output7_teach = self.transformer(up2, output7_teach, perturbation_mode='M')
         c7_stud = self.__fw_expand_3layer(aug_up2)
         output7_stud = self.cls7(c7_stud)
 
@@ -451,7 +525,7 @@ class PGS(nn.Module):
             c8_teach = self.__fw_expand_2layer(up3).detach()
             output8_teach = self.cls8(c8_teach).detach()
 
-        aug_up3, aug_output8_teach = self.transformer(up3, output8_teach, perturbation_mode='M', cascade=cascade)
+        aug_up3, aug_output8_teach = self.transformer(up3, output8_teach, perturbation_mode='M')
         c8_stud = self.__fw_expand_2layer(aug_up3)
         output8_stud = self.cls8(c8_stud)
 
@@ -464,7 +538,7 @@ class PGS(nn.Module):
             c9_teach = self.__fw_expand_1layer(up4).detach()
             output9_teach = self.cls9(c9_teach).detach()
 
-        aug_up4, aug_output9_teach = self.transformer(up4, output9_teach, perturbation_mode='M', cascade=cascade)
+        aug_up4, aug_output9_teach = self.transformer(up4, output9_teach, perturbation_mode='M')
         c9_stud = self.__fw_expand_1layer(aug_up4)
         output9_stud = self.cls9(c9_stud)
 
@@ -473,7 +547,7 @@ class PGS(nn.Module):
         return supervised_outputs, unsupervised_outputs
 
     def __fw_unsupervised_cross_consistency(self, X):
-        cascade = False
+
         # contracting path
         c1, d1, c2, d2, c3, d3, c4, d4 = self.__fw_contracting_path(X)
 
@@ -483,7 +557,7 @@ class PGS(nn.Module):
             c5_teach = self.__fw_bottleneck(d4).detach()
             aug_output5_teach = self.cls5(c5_teach).detach()
 
-        d4_stud, _ = self.transformer(d4, None, cascade=cascade)
+        d4_stud, _ = self.transformer(d4, None)
         c5_stud = self.__fw_bottleneck(d4_stud)
         output5_stud = self.cls5(c5_stud)
 

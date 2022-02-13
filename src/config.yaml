@@ -13,6 +13,7 @@ test_mode: "test2020_new"
 train_unsup_mode: "train2018_semi_unsup"
 train_sup_mode: "train2018_semi_sup"
 train_sup_rate: 10 #rate of labeled data
+layerwise: 'layerwiseF'
 #data loader and pre-processing
 t1: True
 t2: True
@@ -32,12 +33,14 @@ num_perturbators: 4
 optimizer: "SGD" #SGD OR ADAM
 #supervised training setting
 supervised_training:
+  temp: 0.2
   sup_loss: 'CE' # CE, DSC, FOCAL, CE_DSC, CE_FOCAL, DSC_FOCAL, CE_FOCAL_DSC
   lr: 0.01
   lr_gamma: 0.5
   scheduler_step_size: 5
 #unsupervised training
 unsupervised_training:
+  temp: 0.85
   consistency_loss: 'MSE' # CE, KL, MSE, DSC
   lr: 0.001
   lr_gamma: 0.5

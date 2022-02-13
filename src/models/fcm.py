@@ -1,6 +1,5 @@
 import numpy as np
 import skfuzzy as fuzz
-import matplotlib.pyplot as plt
 from utils import utils
 import torch
 
@@ -57,7 +56,6 @@ def removing_hyper_intense():
 
 
 if __name__ == '__main__':
-    from evaluation_metrics import dice_coef
 
     utils.Constants.FCM = False
     dataset = utils.Constants.Datasets.PittLocalFull

@@ -4,13 +4,13 @@ val_mode: "test2019_new"
 test_mode: "test2020_new"
 train_unsup_mode: "train2018_semi_unsup"
 train_sup_mode: "train2018_semi_sup"
-train_sup_rate: 3 #rate of labeled data
+train_sup_rate: 10 #rate of labeled data     ?
 #data loader and pre-processing
 t1: True
 t2: True
 t1ce: True
 augment: True
-wmh_threshold: 0.5
+wmh_threshold: 0.5  #?
 mixup_threshold: None
 intensity_rescale: True
 #model
@@ -31,16 +31,16 @@ supervised_training:
 #unsupervised training
 unsupervised_training:
   consistency_loss: 'MSE' # CE, KL, MSE, DSC
-  lr: 0.001
+  lr: 0.01
   lr_gamma: 0.5
-  scheduler_step_size: 5
+  scheduler_step_size: 10
   consist_w_unsup:
     rampup: 'linear_rampup' #ramp_types = ['sigmoid_rampup', 'linear_rampup', 'cosine_rampup', 'log_rampup', 'exp_rampup']
     final_w: 10
     rampup_ends: 20
 
 #hyper parameters
-experiment_mode: "semi_alternate"
+experiment_mode: "partially_sup"  # [ 'semi_alternate' , 'partially_sup' , 'semi_alternate_mix_F_G']
 n_epochs: 70
 batch_size: 32
 parallel: True

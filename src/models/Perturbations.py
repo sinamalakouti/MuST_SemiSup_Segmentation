@@ -5,6 +5,7 @@ from torch.distributions.uniform import Uniform
 import torch
 import torch.nn as nn
 from torch.autograd import Variable
+import torchvision.transforms.functional as augmentor
 
 
 class FeatureDropDecoder(nn.Module):
@@ -233,6 +234,91 @@ def mixup_featureSpace(X, Y):
     return X_transform, Y_transform
 
 
+def fw_input_geo_aug(X, Y):
+    n = len(X)
+    (Y5, Y6, Y7, Y8, Y9) = Y
+
+    Y5 = torch.nn.functional.softmax(Y5 / 0.85, dim=1)  # 0.85 for pgs for brats
+    Y6 = torch.nn.functional.softmax(Y6 / 0.85, dim=1)  # 0.85 for pgs for brats
+    Y7 = torch.nn.functional.softmax(Y7 / 0.85, dim=1)  # 0.85 for pgs for brats
+    Y8 = torch.nn.functional.softmax(Y8 / 0.85, dim=1)  # 0.85 for pgs for brats
+    Y9 = torch.nn.functional.softmax(Y9 / 0.85, dim=1)  # 0.85 for pgs for brats
+
+    X_transform = []
+    Y5_transform = []
+    Y6_transform = []
+    Y7_transform = []
+    Y8_transform = []
+    Y9_transform = []
+    for i in range(n):
+        x = X[i]
+        (x1, x2, x3, x4) = (x[0], x[1], x[2], x[3])
+        (y5, y6, y7, y8, y9) = (Y5[i], Y6[i], Y7[i], Y8[i], Y9[i])
+        scale = np.random.uniform(.8, 1.2)
+        angle = np.random.uniform(-180, 180)
+        shear = np.random.uniform(-30, 30)
+
+        x1 = augmentor.to_pil_image(x1, mode='F')
+        x2 = augmentor.to_pil_image(x2, mode='F')
+        x3 = augmentor.to_pil_image(x3, mode='F')
+        x4 = augmentor.to_pil_image(x4, mode='F')
+        # y5 = augmentor.to_pil_image(y5, mode='F')
+        # y6 = augmentor.to_pil_image(y6, mode='F')
+        # y7 = augmentor.to_pil_image(y7, mode='F')
+        # y8 = augmentor.to_pil_image(y8, mode='F')
+        # y9 = augmentor.to_pil_image(y9, mode='F')
+
+        x1_transform = F.affine(x1,
+                                angle=angle, translate=(0, 0), shear=shear, scale=scale)
+        x2_transform = F.affine(x2,
+                                angle=angle, translate=(0, 0), shear=shear, scale=scale)
+        x3_transform = F.affine(x3,
+                                angle=angle, translate=(0, 0), shear=shear, scale=scale)
+        x4_transform = F.affine(x4,
+                                angle=angle, translate=(0, 0), shear=shear, scale=scale)
+
+        y5_transform = F.affine(y5,
+                                angle=angle, translate=(0, 0), shear=shear, scale=scale)
+        y6_transform = F.affine(y6,
+                                angle=angle, translate=(0, 0), shear=shear, scale=scale)
+        y7_transform = F.affine(y7,
+                                angle=angle, translate=(0, 0), shear=shear, scale=scale)
+        y8_transform = F.affine(y8,
+                                angle=angle, translate=(0, 0), shear=shear, scale=scale)
+        y9_transform = F.affine(y9,
+                                angle=angle, translate=(0, 0), shear=shear, scale=scale)
+
+        x1_transform = augmentor.to_tensor(x1_transform)
+        x2_transform = augmentor.to_tensor(x2_transform)
+        x3_transform = augmentor.to_tensor(x3_transform)
+        x4_transform = augmentor.to_tensor(x4_transform)
+        # y5_transform = augmentor.to_tensor(y5_transform)
+        # y6_transform = augmentor.to_tensor(y6_transform)
+        # y7_transform = augmentor.to_tensor(y7_transform)
+        # y8_transform = augmentor.to_tensor(y8_transform)
+        # y9_transform = augmentor.to_tensor(y9_transform)
+
+        x_transform = torch.cat((x1_transform, x2_transform))
+        x_transform = torch.cat((x_transform, x3_transform))
+        x_transform = torch.cat((x_transform, x4_transform))
+
+        X_transform.append(x_transform)
+        Y5_transform.append(y5_transform)
+        Y6_transform.append(y6_transform)
+        Y7_transform.append(y7_transform)
+        Y8_transform.append(y8_transform)
+        Y9_transform.append(y9_transform)
+
+    X_transform = torch.stack(X_transform)
+    Y5_transform = torch.stack(Y5_transform)
+    Y6_transform = torch.stack(Y6_transform)
+    Y7_transform = torch.stack(Y7_transform)
+    Y8_transform = torch.stack(Y8_transform)
+    Y9_transform = torch.stack(Y9_transform)
+    Y_transform = (Y5_transform, Y6_transform, Y7_transform, Y8_transform, Y9_transform)
+    return X_transform, Y_transform
+
+
 class Perturbator(nn.Module):
 
     def __init__(self, cfg):
@@ -291,7 +377,8 @@ class Perturbator(nn.Module):
             x_transform, y_transform = x, y
         return x_transform, y_transform
 
-    def forward(self, x, y, perturbation_mode='F', use_softmax=False):  # mode = F (feature_space), G (geometrical), M (mix)
+    def forward(self, x, y, perturbation_mode='F',
+                use_softmax=False):  # mode = F (feature_space), G (geometrical), M (mix)
         if use_softmax or perturbation_mode == 'G' or perturbation_mode == 'M':
             y = torch.nn.functional.softmax(y / self.cfg.temp, dim=1)  # 0.85 for pgs for brats
         if perturbation_mode == 'G':
@@ -301,3 +388,50 @@ class Perturbator(nn.Module):
         elif perturbation_mode == 'M':
             x_transform, y_transform = self.__fw_mix(x, y)
         return x_transform, y_transform
+
+
+def InputPeturbator():
+    def augment(X, Y):
+        # NOTE: method expects numpy float arrays
+        # to_pil_image makes assumptions based on input when mode = None
+        # i.e. it should infer that mode = 'F'
+        # manually setting mode to 'F' in this function
+
+        angle = np.random.uniform(-180, 180)
+        scale = np.random.uniform(.8, 1.2)
+        shear = np.random.uniform(-30, 30)
+
+        for x_data, y_data in (X, Y):
+            x = x_data[0, :, :]
+            t1 = x_data[1, :, :]
+            t2 = x_data[2, :, :]
+            t1ce = x_data[3, :, :]
+            y = y_data
+        x = augmentor.to_pil_image(x, mode='F')
+        y = augmentor.to_pil_image(y, mode='F')
+
+        t1 = augmentor.to_pil_image(t1, mode='F')
+        t2 = augmentor.to_pil_image(t2, mode='F')
+        t1ce = augmentor.to_pil_image(t1ce, mode='F')
+
+        x = augmentor.affine(x,
+                             angle=angle, translate=(0, 0), shear=shear, scale=scale)
+        y = augmentor.affine(y,
+                             angle=angle, translate=(0, 0), shear=shear, scale=scale)
+        if t1 is not None:
+            t1 = augmentor.affine(t1,
+                                  angle=angle, translate=(0, 0), shear=shear, scale=scale)
+            t1 = augmentor.to_tensor(t1).float()
+        if t2 is not None:
+            t2 = augmentor.affine(t2,
+                                  angle=angle, translate=(0, 0), shear=shear, scale=scale)
+            t2 = augmentor.to_tensor(t2).float()
+        if t1ce is not None:
+            t1ce = augmentor.affine(t1ce,
+                                    angle=angle, translate=(0, 0), shear=shear, scale=scale)
+            t1ce = augmentor.to_tensor(t1ce).float()
+
+        x = augmentor.to_tensor(x).float()
+        y = augmentor.to_tensor(y).float()
+
+        return x, t1, t2, t1ce, y
