@@ -129,7 +129,6 @@ class Unet(nn.Module):
         self.conv9 = ConvBlock(self.dim_inputs[8], self.dim_outputs[8], self.strides[8], self.kernel_sizes[8])
 
         # classifiers
-        print(self.dim_outputs[4])
         self.cls5 = CLS(self.dim_outputs[4], self.dim_outputs[-1])
         self.cls6 = CLS(self.dim_outputs[5], self.dim_outputs[-1])
         self.cls7 = CLS(self.dim_outputs[6], self.dim_outputs[-1])
@@ -141,13 +140,13 @@ class Unet(nn.Module):
             sup_outputs = self.__fw_supervised(X)
             return sup_outputs, None
 
-        if self.cfg.layerwise == 'layerwiseG':
+        if self.config.layerwise == 'layerwiseG':
             return self.__fw_unsupervised_Gaug()
-        elif self.cfg.layerwise == 'layerwiseF':
+        elif self.config.layerwise == 'layerwiseF':
             return self.__fw_unsupervised_Faug(X)
 
     def __fw_unsupervised_layerwise3(self, X):  # only_feature space aug + detach Teach_output
-        cascade = False
+
         # contracting path
         c1, d1, c2, d2, c3, d3, c4, d4 = self.__fw_contracting_path(X)
 
@@ -156,7 +155,7 @@ class Unet(nn.Module):
         with torch.no_grad():
             aug_output5_teach = self.cls5(c5_teach).detach()
 
-        d4_stud, _ = self.transformer(d4, None, perturbation_mode='F', cascade=cascade)
+        d4_stud, _ = self.transformer(d4, None, perturbation_mode='F')
         c5_stud = self.__fw_bottleneck(d4_stud)
         output5_stud = self.cls5(c5_stud)
 
@@ -226,10 +225,9 @@ class Unet(nn.Module):
 
         supervised_outputs = aug_output5_teach, aug_output6_teach, aug_output7_teach, aug_output8_teach, aug_output9_teach
         unsupervised_outputs = output5_stud, output6_stud, output7_stud, output8_stud, output9_stud
-        return supervised_outputs, unsupervised_outputs
+        return supervised_outputs, unsupervised_outputs     
 
     def __fw_unsupervised_Gaug(self, X):  # only geometrical aug
-        cascade = False
         # contracting path
         c1, d1, c2, d2, c3, d3, c4, d4 = self.__fw_contracting_path(X)
 
@@ -239,7 +237,7 @@ class Unet(nn.Module):
             c5_teach = self.__fw_bottleneck(d4).detach()
             output5_teach = self.cls5(c5_teach).detach()
 
-        d4_stud, aug_output5_teach = self.transformer(d4, output5_teach, perturbation_mode='G', cascade=cascade)
+        d4_stud, aug_output5_teach = self.transformer(d4, output5_teach, perturbation_mode='G')
         c5_stud = self.__fw_bottleneck(d4_stud)
         output5_stud = self.cls5(c5_stud)
 
@@ -251,7 +249,7 @@ class Unet(nn.Module):
             c6_teach = self.__fw_expand_4layer(up1).detach()
             output6_teach = self.cls6(c6_teach).detach()
 
-        aug_up1, aug_output6_teach = self.transformer(up1, output6_teach, perturbation_mode='G', cascade=cascade)
+        aug_up1, aug_output6_teach = self.transformer(up1, output6_teach, perturbation_mode='G')
         c6_stud = self.__fw_expand_4layer(aug_up1)
         output6_stud = self.cls6(c6_stud)
         ######
@@ -262,7 +260,7 @@ class Unet(nn.Module):
             c7_teach = self.__fw_expand_3layer(up2).detach()
             output7_teach = self.cls7(c7_teach).detach()
 
-        aug_up2, aug_output7_teach = self.transformer(up2, output7_teach, perturbation_mode='G', cascade=cascade)
+        aug_up2, aug_output7_teach = self.transformer(up2, output7_teach, perturbation_mode='G')
         c7_stud = self.__fw_expand_3layer(aug_up2)
         output7_stud = self.cls7(c7_stud)
 
@@ -274,7 +272,7 @@ class Unet(nn.Module):
             c8_teach = self.__fw_expand_2layer(up3).detach()
             output8_teach = self.cls8(c8_teach).detach()
 
-        aug_up3, aug_output8_teach = self.transformer(up3, output8_teach, perturbation_mode='G', cascade=cascade)
+        aug_up3, aug_output8_teach = self.transformer(up3, output8_teach, perturbation_mode='G')
         c8_stud = self.__fw_expand_2layer(aug_up3)
         output8_stud = self.cls8(c8_stud)
 
@@ -287,7 +285,7 @@ class Unet(nn.Module):
             c9_teach = self.__fw_expand_1layer(up4).detach()
             output9_teach = self.cls9(c9_teach).detach()
 
-        aug_up4, aug_output9_teach = self.transformer(up4, output9_teach, perturbation_mode='G', cascade=cascade)
+        aug_up4, aug_output9_teach = self.transformer(up4, output9_teach, perturbation_mode='G')
         c9_stud = self.__fw_expand_1layer(aug_up4)
         output9_stud = self.cls9(c9_stud)
 
@@ -296,7 +294,6 @@ class Unet(nn.Module):
         return supervised_outputs, unsupervised_outputs
 
     def __fw_unsupervised_Faug(self, X):  # only_feature space aug
-        cascade = False
         # contracting path
         c1, d1, c2, d2, c3, d3, c4, d4 = self.__fw_contracting_path(X)
 
@@ -306,7 +303,7 @@ class Unet(nn.Module):
             c5_teach = self.__fw_bottleneck(d4).detach()
             aug_output5_teach = self.cls5(c5_teach).detach()
 
-        d4_stud, _ = self.transformer(d4, None, perturbation_mode='F', cascade=cascade)
+        d4_stud, _ = self.transformer(d4, None, perturbation_mode='F')
         c5_stud = self.__fw_bottleneck(d4_stud)
         output5_stud = self.cls5(c5_stud)
 

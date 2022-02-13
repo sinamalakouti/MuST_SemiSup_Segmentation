@@ -6,6 +6,7 @@ import torch
 import torch.nn as nn
 from torch.autograd import Variable
 import torchvision.transforms.functional as augmentor
+from PIL import ImageOps, ImageEnhance, ImageFilter, Image
 
 
 class FeatureDropDecoder(nn.Module):
@@ -235,6 +236,16 @@ def mixup_featureSpace(X, Y):
 
 
 def fw_input_geo_aug(X, Y):
+    def rotate(x, level, magnitude=10, max_level=30, *args, **kwargs):
+        degree = int((level / magnitude) * max_level)
+        if random.random() > 0.5:
+            degree = -degree
+        return x.rotate(degree)
+
+    def sharpness(x, level, magnitude=10, max_level=1.8, *args, **kwargs):
+        level = (level / magnitude) * max_level + 0.1
+        return ImageEnhance.Sharpness(x).enhance(level)
+
     n = len(X)
     (Y5, Y6, Y7, Y8, Y9) = Y
 
@@ -278,15 +289,29 @@ def fw_input_geo_aug(X, Y):
                                 angle=angle, translate=(0, 0), shear=shear, scale=scale)
 
         y5_transform = F.affine(y5,
-                                angle=angle, translate=(0, 0), shear=shear, scale=scale)
+                                angle=angle, translate=(0, 0), shear=shear, scale=scale, fillcolor= -100)
+        mask5 = y5_transform != -100
+        y5_transform = y5_transform * mask5
+
         y6_transform = F.affine(y6,
-                                angle=angle, translate=(0, 0), shear=shear, scale=scale)
+                                angle=angle, translate=(0, 0), shear=shear, scale=scale, fillcolor=-100)
+        mask6 = y6_transform != -100
+        y6_transform = y6_transform * mask6
+
         y7_transform = F.affine(y7,
-                                angle=angle, translate=(0, 0), shear=shear, scale=scale)
+                                angle=angle, translate=(0, 0), shear=shear, scale=scale, fillcolor=-100)
+        mask7 = y7_transform != -100
+        y7_transform = y7_transform * mask7
+
         y8_transform = F.affine(y8,
-                                angle=angle, translate=(0, 0), shear=shear, scale=scale)
+                                angle=angle, translate=(0, 0), shear=shear, scale=scale, fillcolor=-100)
+        mask8 = y8_transform != -100
+        y8_transform = y8_transform * mask8
+
         y9_transform = F.affine(y9,
-                                angle=angle, translate=(0, 0), shear=shear, scale=scale)
+                                angle=angle, translate=(0, 0), shear=shear, scale=scale, fillcolor=-100)
+        mask9 = y9_transform != -100
+        y9_transform = y9_transform * mask9
 
         x1_transform = augmentor.to_tensor(x1_transform)
         x2_transform = augmentor.to_tensor(x2_transform)
@@ -316,7 +341,7 @@ def fw_input_geo_aug(X, Y):
     Y8_transform = torch.stack(Y8_transform)
     Y9_transform = torch.stack(Y9_transform)
     Y_transform = (Y5_transform, Y6_transform, Y7_transform, Y8_transform, Y9_transform)
-    return X_transform, Y_transform
+    return X_transform, Y_transform, (mask5, mask6, mask7, mask8, mask9)
 
 
 class Perturbator(nn.Module):
@@ -388,50 +413,3 @@ class Perturbator(nn.Module):
         elif perturbation_mode == 'M':
             x_transform, y_transform = self.__fw_mix(x, y)
         return x_transform, y_transform
-
-
-def InputPeturbator():
-    def augment(X, Y):
-        # NOTE: method expects numpy float arrays
-        # to_pil_image makes assumptions based on input when mode = None
-        # i.e. it should infer that mode = 'F'
-        # manually setting mode to 'F' in this function
-
-        angle = np.random.uniform(-180, 180)
-        scale = np.random.uniform(.8, 1.2)
-        shear = np.random.uniform(-30, 30)
-
-        for x_data, y_data in (X, Y):
-            x = x_data[0, :, :]
-            t1 = x_data[1, :, :]
-            t2 = x_data[2, :, :]
-            t1ce = x_data[3, :, :]
-            y = y_data
-        x = augmentor.to_pil_image(x, mode='F')
-        y = augmentor.to_pil_image(y, mode='F')
-
-        t1 = augmentor.to_pil_image(t1, mode='F')
-        t2 = augmentor.to_pil_image(t2, mode='F')
-        t1ce = augmentor.to_pil_image(t1ce, mode='F')
-
-        x = augmentor.affine(x,
-                             angle=angle, translate=(0, 0), shear=shear, scale=scale)
-        y = augmentor.affine(y,
-                             angle=angle, translate=(0, 0), shear=shear, scale=scale)
-        if t1 is not None:
-            t1 = augmentor.affine(t1,
-                                  angle=angle, translate=(0, 0), shear=shear, scale=scale)
-            t1 = augmentor.to_tensor(t1).float()
-        if t2 is not None:
-            t2 = augmentor.affine(t2,
-                                  angle=angle, translate=(0, 0), shear=shear, scale=scale)
-            t2 = augmentor.to_tensor(t2).float()
-        if t1ce is not None:
-            t1ce = augmentor.affine(t1ce,
-                                    angle=angle, translate=(0, 0), shear=shear, scale=scale)
-            t1ce = augmentor.to_tensor(t1ce).float()
-
-        x = augmentor.to_tensor(x).float()
-        y = augmentor.to_tensor(y).float()
-
-        return x, t1, t2, t1ce, y

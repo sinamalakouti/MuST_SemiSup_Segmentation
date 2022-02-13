@@ -29,7 +29,7 @@ for p in sys.path:
     print("path  ", p)
 
 
-def __fw_outputwise_unsup_loss(y_stud, y_teach, loss_functions, cfg):
+def __fw_outputwise_unsup_loss(y_stud, y_teach, loss_functions, cfg, masks=None):
     (_, unsup_loss) = loss_functions
 
     assert len(y_teach) == len(y_stud), "Error! unsup_preds and sup_preds have to have same length"
@@ -38,10 +38,13 @@ def __fw_outputwise_unsup_loss(y_stud, y_teach, loss_functions, cfg):
 
     for i in range(num_preds):
         teach_pred = y_teach[i]
-
         stud_pred = y_stud[i]
         assert teach_pred.shape == stud_pred.shape, "Error! for preds number {}, supervised and unsupervised" \
                                                     " prediction shape is not similar!".format(i)
+        if masks is not None:
+            teach_pred = teach_pred * masks[i]
+            stud_pred = stud_pred * masks[i]
+
         if cfg.unsupervised_training.consistency_loss == 'CE':
             teach_pred = torch.nn.functional.softmax(teach_pred, dim=1)
             losses.append(- torch.mean(
@@ -54,7 +57,7 @@ def __fw_outputwise_unsup_loss(y_stud, y_teach, loss_functions, cfg):
             losses.append(
                 unsup_loss(stud_pred, teach_pred, i, use_softmax=True))
         elif cfg.unsupervised_training.consistency_loss == 'MSE':
-            teach_pred = torch.nn.functional.softmax(teach_pred / 0.85, dim=1)
+            #     teach_pred = torch.nn.functional.softmax(teach_pred / 0.85, dim=1)
             stud_pred = torch.nn.functional.softmax(stud_pred, dim=1)
             mse = torch.nn.MSELoss()
             loss = mse(stud_pred, teach_pred.detach())
@@ -80,7 +83,7 @@ def __fw_sup_loss(y_preds, y_true, sup_loss):
                 w_diff = output.size()[-1] - target_fg.size()[-1]
                 #
                 target_fg = F.pad(target_fg, (w_diff // 2, w_diff - w_diff // 2,
-                                        h_diff // 2, h_diff - h_diff // 2))
+                                              h_diff // 2, h_diff - h_diff // 2))
 
             assert output.shape[-2:] == target_fg.shape[-2:], "output and target shape is not similar!!"
         if output.shape[1] != target_fg.shape[1] and type(sup_loss) == torch.nn.CrossEntropyLoss and len(
@@ -92,7 +95,7 @@ def __fw_sup_loss(y_preds, y_true, sup_loss):
     return total_loss
 
 
-def compute_loss(y_preds, y_true, loss_functions, is_supervised, cfg):
+def compute_loss(y_preds, y_true, loss_functions, is_supervised, cfg, masks=None):
     if is_supervised:
         total_loss = __fw_sup_loss(y_preds, y_true, loss_functions[0])
 
@@ -101,7 +104,7 @@ def compute_loss(y_preds, y_true, loss_functions, is_supervised, cfg):
         '''
 
     else:
-        total_loss = __fw_outputwise_unsup_loss(y_preds, y_true, loss_functions, cfg)
+        total_loss = __fw_outputwise_unsup_loss(y_preds, y_true, loss_functions, cfg, masks)
 
     return total_loss
 
@@ -235,8 +238,8 @@ def trainPgs_semi_alternate(train_sup_loader, train_unsup_loader, model, optimiz
         uLoss = compute_loss(student_outputs, teacher_outputs, loss_functions, is_supervised=False, cfg=cfg)
         # unsupervised training - backward
         weight_unsup = cons_w_unsup(epochid, batch_idx)
-        uloss = uLoss * weight_unsup
-        uloss.backward()
+        uloss_final = uLoss * weight_unsup
+        uloss_final.backward()
         optimizer[1].step()
 
         # todo:  delete unsupervised data from GPU
@@ -292,14 +295,14 @@ def trainPgs_semi_alternate_I_and_F_aug(train_sup_loader, train_unsup_loader, mo
 
         # unsupervised training - forward
         teacher_outputs, _ = model(b_usnup_orig.to(device), is_supervised=True)
-        b_unsup_aug, teacher_outputs = Perturbations.fw_input_geo_aug(b_usnup_orig, teacher_outputs)
+        b_unsup_aug, teacher_outputs, masks = Perturbations.fw_input_geo_aug(b_usnup_orig, teacher_outputs)
         _, student_outputs = model(b_unsup_aug.to(device), is_supervised=False)
 
-        uLoss = compute_loss(student_outputs, teacher_outputs, loss_functions, is_supervised=False, cfg=cfg)
+        uLoss = compute_loss(student_outputs, teacher_outputs, loss_functions, masks=masks, is_supervised=False, cfg=cfg)
         # unsupervised training - backward
         weight_unsup = cons_w_unsup(epochid, batch_idx)
-        uloss = uLoss * weight_unsup
-        uloss.backward()
+        uloss_finall = uLoss * weight_unsup
+        uloss_finall.backward()
         optimizer[1].step()
 
         # todo:  delete unsupervised data from GPU
