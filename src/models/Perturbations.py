@@ -125,7 +125,7 @@ class MixupDecoder(nn.Module):
     def forward(self, x_transform, y_transform):
         None
 
-
+#
 # class MixFeat(nn.Module):
 #     """MixFeat <https://openreview.net/forum?id=HygT9oRqFX>"""
 #
@@ -144,8 +144,8 @@ class MixupDecoder(nn.Module):
 #             @tf.custom_gradient
 #             def (x):
 #                 shape = x.shape
-#                 indices = torch.arange(start=0, stop=shape[0])
-#                 indices = tf.random.shuffle(indices)
+#
+#                 indices = torch.random.shuffle(shape[0])
 #                 rs = K.concatenate([K.constant([1], dtype="int32"), shape[1:]])
 #                 r = K.random_normal(rs, 0, self.sigma, dtype="float16")
 #                 theta = K.random_uniform(rs, -np.pi, +np.pi, dtype="float16")

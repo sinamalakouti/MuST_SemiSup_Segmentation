@@ -294,7 +294,8 @@ def trainPgs_semi_alternate_I_and_F_aug(train_sup_loader, train_unsup_loader, mo
         # b_unsup = b_unsup.to(device)
 
         # unsupervised training - forward
-        teacher_outputs, _ = model(b_usnup_orig.to(device), is_supervised=True)
+        with torch.no_grad():
+            teacher_outputs, _ = model(b_usnup_orig.to(device), is_supervised=True)
         b_unsup_aug, teacher_outputs, masks = Perturbations.fw_input_geo_aug(b_usnup_orig, teacher_outputs)
         _, student_outputs = model(b_unsup_aug.to(device), is_supervised=False)
 
