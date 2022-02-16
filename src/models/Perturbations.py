@@ -249,11 +249,17 @@ def fw_input_geo_aug(X, Y):
     n = len(X)
     (Y5, Y6, Y7, Y8, Y9) = Y
 
-    Y5 = torch.nn.functional.softmax(Y5 / 0.85, dim=1)  # 0.85 for pgs for brats
-    Y6 = torch.nn.functional.softmax(Y6 / 0.85, dim=1)  # 0.85 for pgs for brats
-    Y7 = torch.nn.functional.softmax(Y7 / 0.85, dim=1)  # 0.85 for pgs for brats
-    Y8 = torch.nn.functional.softmax(Y8 / 0.85, dim=1)  # 0.85 for pgs for brats
-    Y9 = torch.nn.functional.softmax(Y9 / 0.85, dim=1)  # 0.85 for pgs for brats
+    # Y5 = torch.nn.functional.softmax(Y5 / 0.85, dim=1)  # 0.85 for pgs for brats
+    # Y6 = torch.nn.functional.softmax(Y6 / 0.85, dim=1)  # 0.85 for pgs for brats
+    # Y7 = torch.nn.functional.softmax(Y7 / 0.85, dim=1)  # 0.85 for pgs for brats
+    # Y8 = torch.nn.functional.softmax(Y8 / 0.85, dim=1)  # 0.85 for pgs for brats
+    # Y9 = torch.nn.functional.softmax(Y9 / 0.85, dim=1)  # 0.85 for pgs for brats
+
+    Y5 = torch.nn.functional.softmax(Y5, dim=1)  # 0.85 for pgs for brats
+    Y6 = torch.nn.functional.softmax(Y6, dim=1)  # 0.85 for pgs for brats
+    Y7 = torch.nn.functional.softmax(Y7, dim=1)  # 0.85 for pgs for brats
+    Y8 = torch.nn.functional.softmax(Y8, dim=1)  # 0.85 for pgs for brats
+    Y9 = torch.nn.functional.softmax(Y9, dim=1)  # 0.85 for pgs for brats
 
     X_transform = []
     Y5_transform = []
@@ -273,11 +279,6 @@ def fw_input_geo_aug(X, Y):
         x2 = augmentor.to_pil_image(x2, mode='F')
         x3 = augmentor.to_pil_image(x3, mode='F')
         x4 = augmentor.to_pil_image(x4, mode='F')
-        # y5 = augmentor.to_pil_image(y5, mode='F')
-        # y6 = augmentor.to_pil_image(y6, mode='F')
-        # y7 = augmentor.to_pil_image(y7, mode='F')
-        # y8 = augmentor.to_pil_image(y8, mode='F')
-        # y9 = augmentor.to_pil_image(y9, mode='F')
 
         x1_transform = F.affine(x1,
                                 angle=angle, translate=(0, 0), shear=shear, scale=scale)
@@ -317,11 +318,6 @@ def fw_input_geo_aug(X, Y):
         x2_transform = augmentor.to_tensor(x2_transform)
         x3_transform = augmentor.to_tensor(x3_transform)
         x4_transform = augmentor.to_tensor(x4_transform)
-        # y5_transform = augmentor.to_tensor(y5_transform)
-        # y6_transform = augmentor.to_tensor(y6_transform)
-        # y7_transform = augmentor.to_tensor(y7_transform)
-        # y8_transform = augmentor.to_tensor(y8_transform)
-        # y9_transform = augmentor.to_tensor(y9_transform)
 
         x_transform = torch.cat((x1_transform, x2_transform))
         x_transform = torch.cat((x_transform, x3_transform))

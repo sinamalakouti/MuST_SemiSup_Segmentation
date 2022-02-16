@@ -29,6 +29,57 @@ for p in sys.path:
     print("path  ", p)
 
 
+def __fw_unsup_loss(y_stud, y_teach, loss_functions, cfg, mask=None):
+    if cfg.unsupervised_training.loss_method == 'output-wise':
+        return __fw_outputwise_unsup_loss(y_stud, y_teach, loss_functions, cfg, mask)
+    else:
+        return __fw_downsample_unsup_loss(y_stud, y_teach, loss_functions, cfg, mask)
+
+
+def __fw_downsample_unsup_loss(y_stud, y_teach, loss_functions, cfg, mask=None):
+    # downsample main decoder's output
+    (_, unsup_loss) = loss_functions
+    # todo handle if mask is not None
+    losses = []
+    p = torch.nn.functional.softmax(y_teach, dim=1)
+    if cfg.unsupervised_training.T is not None:  # sharpening
+        pt = p ** (1 / cfg.unsupervised_training.T)
+        y_true = pt / pt.sum(dim=1, keepdim=True)
+
+    n_outputs = len(y_stud)
+    maxpool = nn.MaxPool2d(kernel_size=2, stride=2, padding=0)
+    for i in range(n_outputs - 1, -1, -1):
+        output = y_stud[i]
+        if i != n_outputs - 1:
+            y_true = maxpool(y_true)
+            if y_true.shape[-1] != output.shape[-1] or y_true.shape[-2] != output.shape[-2]:
+                h_diff = output.size()[-2] - y_true.size()[-2]
+                w_diff = output.size()[-1] - y_true.size()[-1]
+                #
+                y_true = F.pad(y_true, (w_diff // 2, w_diff - w_diff // 2,
+                                        h_diff // 2, h_diff - h_diff // 2))
+            assert output.shape[-2:] == y_true.shape[-2:], "output and target shape is not similar!!"
+
+        if cfg.unsupervised_training.consistency_loss == 'CE':
+            losses.append(- torch.mean(
+                torch.sum(y_true.detach()
+                          * torch.nn.functional.log_softmax(stud_pred, dim=1), dim=1)))
+        elif cfg.unsupervised_training.consistency_loss == 'KL':
+            losses.append(
+                softmax_kl_loss(stud_pred, y_true.detach(), conf_mask=False, threshold=None, use_softmax=True))
+        elif cfg.unsupervised_training.consistency_loss == 'balanced_CE':
+            losses.append(
+                unsup_loss(stud_pred, y_true.detach(), i, use_softmax=True))
+        elif cfg.unsupervised_training.consistency_loss == 'MSE':
+            #     teach_pred = torch.nn.functional.softmax(teach_pred / 0.85, dim=1)
+            stud_pred = torch.nn.functional.softmax(stud_pred, dim=1)
+            mse = torch.nn.MSELoss()
+            loss = mse(stud_pred, y_true.detach())
+            losses.append(loss)
+    total_loss = sum(losses)
+    return total_loss
+
+
 def __fw_outputwise_unsup_loss(y_stud, y_teach, loss_functions, cfg, masks=None):
     (_, unsup_loss) = loss_functions
 
@@ -57,7 +108,13 @@ def __fw_outputwise_unsup_loss(y_stud, y_teach, loss_functions, cfg, masks=None)
             losses.append(
                 unsup_loss(stud_pred, teach_pred, i, use_softmax=True))
         elif cfg.unsupervised_training.consistency_loss == 'MSE':
-            #     teach_pred = torch.nn.functional.softmax(teach_pred / 0.85, dim=1)
+            if cfg.expriment_mode != 'semi_alternate_mix_F_G':
+                teach_pred = torch.nn.functional.softmax(teach_pred, dim=1)
+
+            if cfg.unsupervised_training.T is not None:  # sharpening
+                    pt = teach_pred ** (1 / cfg.unsupervised_training.T)
+                    teach_pred = pt / pt.sum(dim=1, keepdim=True)
+                # teach_pred = torch.nn.functional.softmax(teach_pred / 0.85, dim=1)
             stud_pred = torch.nn.functional.softmax(stud_pred, dim=1)
             mse = torch.nn.MSELoss()
             loss = mse(stud_pred, teach_pred.detach())
@@ -70,7 +127,7 @@ def __fw_sup_loss(y_preds, y_true, sup_loss):
     # iterate over all level's output
     losses = []
     target_fg = y_true
-    target_bg = 1 - target_fg
+    # 1 - target_fg
     n_outputs = len(y_preds)
     maxpool = nn.MaxPool2d(kernel_size=2, stride=2, padding=0)
     for i in range(n_outputs - 1, -1, -1):
@@ -102,16 +159,15 @@ def compute_loss(y_preds, y_true, loss_functions, is_supervised, cfg, masks=None
         ''' y_preds is students preds and y_true is teacher_preds!
                     for comparing outputs together!  # consistency of original output and noisy output 
         '''
-
     else:
-        total_loss = __fw_outputwise_unsup_loss(y_preds, y_true, loss_functions, cfg, masks)
+        total_loss = __fw_unsup_loss(y_preds, y_true, loss_functions, cfg, masks)
+        # total_loss = __fw_outputwise_unsup_loss(y_preds, y_true, loss_functions, cfg, masks)
 
     return total_loss
 
 
 def trainPgs_semi(train_sup_loader, train_unsup_loader, model, optimizer, device, loss_functions, cons_w_unsup, epochid,
                   cfg):
-    total_loss = 0
     model.train()
 
     train_sup_iterator = iter(train_sup_loader)
@@ -166,7 +222,6 @@ def trainPgs_semi(train_sup_loader, train_unsup_loader, model, optimizer, device
 def trainPgs_semi_downSample(train_sup_loader, train_unsup_loader, model, optimizer, device, loss_functions,
                              cons_w_unsup, epochid,
                              cfg):
-    total_loss = 0
     model.train()
     # dataloader
     semi_dataLoader = zip(train_sup_loader, train_unsup_loader)
@@ -299,7 +354,8 @@ def trainPgs_semi_alternate_I_and_F_aug(train_sup_loader, train_unsup_loader, mo
         b_unsup_aug, teacher_outputs, masks = Perturbations.fw_input_geo_aug(b_usnup_orig, teacher_outputs)
         _, student_outputs = model(b_unsup_aug.to(device), is_supervised=False)
 
-        uLoss = compute_loss(student_outputs, teacher_outputs, loss_functions, masks=masks, is_supervised=False, cfg=cfg)
+        uLoss = compute_loss(student_outputs, teacher_outputs, loss_functions, masks=masks, is_supervised=False,
+                             cfg=cfg)
         # unsupervised training - backward
         weight_unsup = cons_w_unsup(epochid, batch_idx)
         uloss_finall = uLoss * weight_unsup
@@ -346,7 +402,6 @@ def trainPgs_semi_alternate_I_and_F_aug(train_sup_loader, train_unsup_loader, mo
 
 def trainPgs_sup_upSample(train_sup_loader, train_unsup_loader, model, optimizer, device, loss_functions, cons_w_unsup,
                           epochid, cfg):
-    total_loss = 0
     model.train()
 
     train_sup_iterator = iter(train_sup_loader)
@@ -392,7 +447,6 @@ def trainPgs_sup_upSample(train_sup_loader, train_unsup_loader, model, optimizer
 
 
 def trainPgs_sup(train_sup_loader, model, optimizer, device, loss_functions, epochid, cfg):
-    total_loss = 0
     model.train()
     sup_loss = loss_functions[0]
 
@@ -479,7 +533,7 @@ def eval_per_subjectPgs(model, device, threshold, cfg, data_mode):
             print("############# LOSS for subject {} is {} ##############".format(subjects[0], loss_val.item()))
             if cfg.oneHot:
                 target[target >= 1] = 1
-                target_WT = seg2WT(target, 1, oneHot=cfg.oneHot)
+                # target_WT = seg2WT(target, 1, oneHot=cfg.oneHot)
                 y_pred = outputs
             else:
                 sf = torch.nn.Softmax2d()
@@ -521,15 +575,15 @@ def eval_per_subjectPgs(model, device, threshold, cfg, data_mode):
             dice_arrWT.append(metrics_WT['dsc'].item())
             dice_arrET.append(metrics_ET['dsc'].item())
             dice_arrTC.append(metrics_TC['dsc'].item())
-            ### ET <-> TC
+            # ET <-> TC
             PPV_arrWT.append(metrics_WT['ppv'].item())
             PPV_arrET.append(metrics_ET['ppv'].item())
             PPV_arrTC.append(metrics_TC['ppv'].item())
-            ### ET <-> TC
+            # ET <-> TC
             sensitivity_arrWT.append(metrics_WT['sens'].item())
             sensitivity_arrET.append(metrics_ET['sens'].item())
             sensitivity_arrTC.append(metrics_TC['sens'].item())
-            ### ET <-> TC
+            # ET <-> TC
             specificity_arrWT.append(metrics_WT['spec'].item())
             specificity_arrET.append(metrics_ET['spec'].item())
             specificity_arrTC.append(metrics_TC['spec'].item())
@@ -556,20 +610,20 @@ def initialize_directories(output_dir, seed, cfg):
             os.mkdir(output_dir, 0o777)
         except OSError:
             print("Creation of the directory %s failed" % output_dir)
-    if cfg.experiment_mode == 'semi' or cfg.experiment_mode == 'semi_alternate' or cfg.experiment_mode == "semi_alternate_mix_F_G":
+    output_dir = os.path.join(output_dir, cfg.experiment_mode)
+    if not os.path.isdir(output_dir):
+        try:
+            os.mkdir(output_dir, 0o777)
+        except OSError:
+            print("Creation of the directory %s failed" % output_dir)
+    if cfg.experiment_mode != 'fully_sup':
         output_dir = os.path.join(output_dir, "sup_ratio_{}".format(cfg.train_sup_rate))
         if not os.path.isdir(output_dir):
             try:
                 os.mkdir(output_dir, 0o777)
             except OSError:
                 print("Creation of the directory %s failed" % output_dir)
-    elif cfg.experiment_mode == 'partially_sup':
-        output_dir = os.path.join(output_dir, "partiallySup_ratio_{}".format(cfg.train_sup_rate))
-        if not os.path.isdir(output_dir):
-            try:
-                os.mkdir(output_dir, 0o777)
-            except OSError:
-                print("Creation of the directory %s failed" % output_dir)
+
     elif cfg.experiment_mode == 'fully_sup':
         output_dir = os.path.join(output_dir, "fullySup_ratio_{}".format(cfg.train_sup_rate))
         if not os.path.isdir(output_dir):
@@ -607,6 +661,9 @@ def initialize_directories(output_dir, seed, cfg):
             os.mkdir(os.path.join(output_dir, "runs"), 0o777)
         except OSError:
             print("Creation of the directory %s failed" % os.path.join(output_dir, "runs"))
+    # save config file!
+    with open(os.path.join(output_dir, 'config.yaml'), 'w') as file:
+        docs = yaml.dump(cfg, file)
 
     output_image_dir = os.path.join(output_dir, "result_images/")
 
@@ -627,8 +684,8 @@ def get_train_dataloaders(dataset, cfg):
     print('size of labeled training set: number of subjects:    ', len(train_sup_loader.dataset.subjects_name))
     print("labeled subjects  ", train_sup_loader.dataset.subjects_name)
 
-    if cfg.experiment_mode == 'semi' or cfg.experiment_mode == 'partially_sup_upSample' or cfg.experiment_mode == 'semi_downSample' \
-            or cfg.experiment_mode == 'semi_alternate':
+    if cfg.experiment_mode == 'semi' or cfg.experiment_mode == 'partially_sup_upSample' or \
+            cfg.experiment_mode == 'semi_downSample' or cfg.experiment_mode == 'semi_alternate':
         train_unsup_loader = utils.get_trainset(dataset, batch_size=cfg.batch_size,
                                                 intensity_rescale=cfg.intensity_rescale,
                                                 mixup_threshold=cfg.mixup_threshold,
@@ -672,66 +729,6 @@ def Pgs_train_val(dataset, n_epochs, wmh_threshold, output_dir, args, cfg, seed)
 
     output_model_dir, output_image_dir = initialize_directories(output_dir, seed, cfg)
 
-    # if not os.path.isdir(output_dir):
-    #     try:
-    #         os.mkdir(output_dir, 0o777)
-    #     except OSError:
-    #         print("Creation of the directory %s failed" % output_dir)
-    # if cfg.experiment_mode == 'semi' or cfg.experiment_mode == 'partially_sup_upSample' or cfg.experiment_mode == 'semi_downSample' or cfg.experiment_mode == 'semi_alternate':
-    #     output_dir = os.path.join(output_dir, "sup_ratio_{}".format(cfg.train_sup_rate))
-    #     if not os.path.isdir(output_dir):
-    #         try:
-    #             os.mkdir(output_dir, 0o777)
-    #         except OSError:
-    #             print("Creation of the directory %s failed" % output_dir)
-    # elif cfg.experiment_mode == 'partially_sup':
-    #     output_dir = os.path.join(output_dir, "partiallySup_ratio_{}".format(cfg.train_sup_rate))
-    #     if not os.path.isdir(output_dir):
-    #         try:
-    #             os.mkdir(output_dir, 0o777)
-    #         except OSError:
-    #             print("Creation of the directory %s failed" % output_dir)
-    # elif cfg.experiment_mode == 'fully_sup':
-    #     output_dir = os.path.join(output_dir, "fullySup_ratio_{}".format(cfg.train_sup_rate))
-    #     if not os.path.isdir(output_dir):
-    #         try:
-    #             os.mkdir(output_dir, 0o777)
-    #         except OSError:
-    #             print("Creation of the directory %s failed" % output_dir)
-    #
-    # output_dir = os.path.join(output_dir, "seed_{}".format(seed))
-    # if not os.path.isdir(output_dir):
-    #     try:
-    #         os.mkdir(output_dir, 0o777)
-    #     except OSError:
-    #         print("Creation of the directory %s failed" % output_dir)
-    #
-    # output_model_dir = os.path.join(output_dir, "best_model")
-    #
-    # print("output_model_dir is   ", output_model_dir)
-    #
-    # if not os.path.isdir(output_model_dir):
-    #     try:
-    #         os.mkdir(output_model_dir, 0o777)
-    #     except OSError:
-    #         print("Creation of the directory %s failed" % output_model_dir)
-    #
-    # if not os.path.isdir(os.path.join(output_dir, "runs")):
-    #     try:
-    #         os.mkdir(os.path.join(output_dir, "runs"), 0o777)
-    #     except OSError:
-    #         print("Creation of the directory %s failed" % os.path.join(output_dir, "runs"))
-    #
-    # output_image_dir = os.path.join(output_dir, "result_images/")
-    #
-    # if not os.path.isdir(output_image_dir):
-    #     try:
-    #         os.mkdir(output_image_dir, 0o777)
-    #     except OSError:
-    #         print("Creation of the directory %s failed" % output_image_dir)
-
-    # log_file_path = os.path.join(output_dir, "log_{}.log".format(args.training_mode))
-    # sys.stdout = open(log_file_path, "w")
     print("EXPERIMENT DESCRIPTION:   {}".format(cfg.information))
 
     print("******* TRAINING PGS ***********")
@@ -753,16 +750,19 @@ def Pgs_train_val(dataset, n_epochs, wmh_threshold, output_dir, args, cfg, seed)
     # loading the datasets
     train_sup_loader, train_unsup_loader = get_train_dataloaders(dataset, cfg)
 
-    # load optimizers
-    optimizer_unsup = torch.optim.SGD(pgsnet.parameters(), cfg.unsupervised_training.lr, momentum=0.9,
-                                      weight_decay=1e-4)
+    # load optimizers & schedulers
+    if 'alternate' in cfg.experiment_mode:
+        optimizer_unsup = torch.optim.SGD(pgsnet.parameters(), cfg.unsupervised_training.lr, momentum=0.9,
+                                          weight_decay=1e-4)
+        scheduler_unsup = lr_scheduler.StepLR(optimizer_unsup,
+                                              step_size=cfg.unsupervised_training.scheduler_step_size,
+                                              gamma=cfg.unsupervised_training.lr_gamma)
+    else:
+        optimizer_unsup = None
+        scheduler_unsup = None
     optimizer_sup = torch.optim.SGD(pgsnet.parameters(), cfg.supervised_training.lr, momentum=0.9,
                                     weight_decay=1e-4)
-    # load schedulers
 
-    scheduler_unsup = lr_scheduler.StepLR(optimizer_unsup,
-                                          step_size=cfg.unsupervised_training.scheduler_step_size,
-                                          gamma=cfg.unsupervised_training.lr_gamma)
     scheduler_sup = lr_scheduler.StepLR(optimizer_sup, step_size=cfg.supervised_training.scheduler_step_size,
                                         gamma=cfg.supervised_training.lr_gamma)
 
@@ -822,25 +822,20 @@ def Pgs_train_val(dataset, n_epochs, wmh_threshold, output_dir, args, cfg, seed)
                                   epoch, cfg)
 
         if epoch % 2 == 0:
-            val_final_dice, val_final_PPV, val_final_sensitivity, val_final_specificity, val_final_hd = eval_per_subjectPgs(
-                pgsnet, device,
-                wmh_threshold,
-                cfg,
-                cfg.val_mode)
+            val_final_dice, val_final_PPV, val_final_sensitivity, val_final_specificity, val_final_hd = \
+                eval_per_subjectPgs(pgsnet, device, wmh_threshold, cfg, cfg.val_mode)
 
             if val_final_dice['WT'] > best_score:
                 print("****************** BEST SCORE @ ITERATION {} is {} ******************".format(epoch,
                                                                                                      val_final_dice[
                                                                                                          'WT']))
                 best_score = val_final_dice['WT']
-                path = os.path.join(output_model_dir, 'pgsnet_best.model')
-                with open(path, 'wb') as f:
-                    torch.save(pgsnet, f)
-            test_final_dice, test_final_PPV, test_final_sensitivity, test_final_specificity, test_final_hd = eval_per_subjectPgs(
-                pgsnet, device,
-                wmh_threshold,
-                cfg,
-                cfg.test_mode)
+                if args.save_model:
+                    path = os.path.join(output_model_dir, 'pgsnet_best.model')
+                    with open(path, 'wb') as f:
+                        torch.save(pgsnet, f)
+            test_final_dice, test_final_PPV, test_final_sensitivity, test_final_specificity, test_final_hd = \
+                eval_per_subjectPgs(pgsnet, device, wmh_threshold, cfg, cfg.test_mode)
             save_score_all(output_image_dir,
                            (test_final_dice, test_final_hd, test_final_PPV, test_final_sensitivity,
                             test_final_specificity),
@@ -885,7 +880,7 @@ def Pgs_train_val(dataset, n_epochs, wmh_threshold, output_dir, args, cfg, seed)
                        'val_TC_subject_wise_SPECIFCITY': val_final_specificity['TC'],
                        })
 
-        if cfg.experiment_mode == 'semi_alternate':
+        if scheduler_unsup is not None:
             scheduler_sup.step()
             scheduler_unsup.step()
         else:
@@ -895,18 +890,15 @@ def Pgs_train_val(dataset, n_epochs, wmh_threshold, output_dir, args, cfg, seed)
                                                                                                 wmh_threshold,
                                                                                                 cfg,
                                                                                                 cfg.val_mode)
-    print(
-        "** (WT) SUBJECT WISE SCORE @ Iteration {} is DICE: {}, HD: {}, PPV:{}, Sensitivity: {}, Specificity: {}  **".
-            format(cfg.n_epochs, final_dice['WT'], final_hd['WT'], final_PPV['WT'], final_sensitivity['WT'],
-                   final_specificity['WT']))
-    print(
-        "** (ET) SUBJECT WISE SCORE @ Iteration {} is DICE: {}, HD: {}, :{}, Sensitivity:{}, Specificity: {}  **".
-            format(cfg.n_epochs, final_dice['ET'], final_hd['ET'], final_PPV['ET'], final_sensitivity['ET'],
-                   final_specificity['ET']))
-    print(
-        "** (TC) SUBJECT WISE SCORE @ Iteration {} is DICE: {}, HD: {}, PPV:{}, Sensitivity:{}, Specificity: {}  **".
-            format(cfg.n_epochs, final_dice['TC'], final_hd['TC'], final_PPV['TC'], final_sensitivity['TC'],
-                   final_specificity['TC']))
+    print("** (WT) SUBJECT WISE SCORE @ Iteration {} is DICE: {}, HD: {}, PPV:{}, Sensitivity: {}, Specificity: {}  **"
+          .format(cfg.n_epochs, final_dice['WT'], final_hd['WT'], final_PPV['WT'], final_sensitivity['WT'],
+                  final_specificity['WT']))
+    print("** (ET) SUBJECT WISE SCORE @ Iteration {} is DICE: {}, HD: {}, :{}, Sensitivity:{}, Specificity: {}  **"
+          .format(cfg.n_epochs, final_dice['ET'], final_hd['ET'], final_PPV['ET'], final_sensitivity['ET'],
+                  final_specificity['ET']))
+    print("** (TC) SUBJECT WISE SCORE @ Iteration {} is DICE: {}, HD: {}, PPV:{}, Sensitivity:{}, Specificity: {}  **".
+          format(cfg.n_epochs, final_dice['TC'], final_hd['TC'], final_PPV['TC'], final_sensitivity['TC'],
+                 final_specificity['TC']))
 
     save_score_all(output_image_dir, (final_dice, final_hd, final_PPV, final_sensitivity, final_specificity),
                    cfg.n_epochs, mode=cfg.val_mode)
@@ -928,11 +920,8 @@ def Pgs_train_val(dataset, n_epochs, wmh_threshold, output_dir, args, cfg, seed)
                'val_TC_subject_wise_SPECIFCITY': final_specificity['TC'],
                })
 
-    test_final_dice, test_final_PPV, test_final_sensitivity, test_final_specificity, test_final_hd = eval_per_subjectPgs(
-        pgsnet, device,
-        wmh_threshold,
-        cfg,
-        cfg.test_mode)
+    test_final_dice, test_final_PPV, test_final_sensitivity, test_final_specificity, test_final_hd = \
+        eval_per_subjectPgs(pgsnet, device, wmh_threshold, cfg, cfg.test_mode)
     save_score_all(output_image_dir,
                    (test_final_dice, test_final_hd, test_final_PPV, test_final_sensitivity,
                     test_final_specificity),
@@ -957,8 +946,8 @@ def Pgs_train_val(dataset, n_epochs, wmh_threshold, output_dir, args, cfg, seed)
 
 
 @torch.no_grad()
-def save_score(dir_path, score, iter):
-    dir_path = os.path.join(dir_path, "results_iter{}".format(iter))
+def save_score(dir_path, score, iteration):
+    dir_path = os.path.join(dir_path, "results_iter{}".format(iteration))
     if not os.path.isdir(dir_path):
         try:
             os.mkdir(dir_path, 0o777)
@@ -969,18 +958,18 @@ def save_score(dir_path, score, iter):
     with open(output_score_path, "w") as f:
         f.write("average WT dice score per subject at iter {}  :   {}\n"
                 "average ET dice score per subject   {}\n"
-                "average TC dice score per subject    {}\n".format(iter, score['WT'], score['ET'], score['TC']))
+                "average TC dice score per subject    {}\n".format(iteration, score['WT'], score['ET'], score['TC']))
 
 
 @torch.no_grad()
-def save_score_all(dir_path, scores, iter, mode):  # mode = 2020 test or 2019 test
+def save_score_all(dir_path, scores, iteration, mode):  # mode = 2020 test or 2019 test
     final_dice = scores[0]
     final_hd = scores[1]
     final_PPV = scores[2]
     final_sensitivity = scores[3]
     final_specificity = scores[4]
 
-    dir_path = os.path.join(dir_path, "{}_results_iter{}".format(mode, iter))
+    dir_path = os.path.join(dir_path, "{}_results_iter{}".format(mode, iteration))
     if not os.path.isdir(dir_path):
         try:
             os.mkdir(dir_path, 0o777)
@@ -992,20 +981,21 @@ def save_score_all(dir_path, scores, iter, mode):  # mode = 2020 test or 2019 te
         f.write("AVG SCORES PER  SUBJECTS AT ITERATION {}:\n"
                 " **WT**  DICE: {}, PPV:{}, Sensitivity: {}, hd: {}, specificity: {}\n"
                 " **ET**  DICE: {}, PPV:{}, Sensitivity: {}, hd: {}, specificity: {}\n"
-                " **TC**  DICE: {}, PPV:{}, Sensitivity: {}, hd: {}, specificity: {}\n".format(
-            iter, final_dice['WT'], final_PPV['WT'], final_sensitivity['WT'], final_hd['WT'], final_specificity['WT'],
-            final_dice['ET'], final_PPV['ET'], final_sensitivity['ET'], final_hd['ET'], final_specificity['ET'],
-            final_dice['TC'], final_PPV['TC'], final_sensitivity['TC'], final_hd['TC'], final_specificity['TC']))
+                " **TC**  DICE: {}, PPV:{}, Sensitivity: {}, hd: {}, specificity: {}\n".
+                format(iteration, final_dice['WT'], final_PPV['WT'], final_sensitivity['WT'], final_hd['WT'],
+                       final_specificity['WT'], final_dice['ET'], final_PPV['ET'], final_sensitivity['ET'],
+                       final_hd['ET'], final_specificity['ET'], final_dice['TC'], final_PPV['TC'],
+                       final_sensitivity['TC'], final_hd['TC'], final_specificity['TC']))
 
 
 @torch.no_grad()
-def save_score_all2(dir_path, scores, iter):
+def save_score_all2(dir_path, scores, iteration):
     final_dice = scores[0]
     final_hd = scores[1]
     final_PPV = scores[2]
     final_sensitivity = scores[3]
 
-    dir_path = os.path.join(dir_path, "results_iter{}".format(iter))
+    dir_path = os.path.join(dir_path, "results_iter{}".format(iteration))
     if not os.path.isdir(dir_path):
         try:
             os.mkdir(dir_path, 0o777)
@@ -1017,15 +1007,15 @@ def save_score_all2(dir_path, scores, iter):
         f.write("AVG SCORES PER  SUBJECTS AT ITERATION {}:\n"
                 " **WT**  DICE: {}, PPV:{}, Sensitivity: {}, h95: {}\n"
                 " **ET**  DICE: {}, PPV:{}, Sensitivity: {}, h95: {}\n"
-                " **TC**  DICE: {}, PPV:{}, Sensitivity: {}, h95: {}\n".format(
-            iter, final_dice['WT'], final_PPV['WT'], final_sensitivity['WT'], final_hd['WT'],
-            final_dice['ET'], final_PPV['ET'], final_sensitivity['ET'], final_hd['ET'],
-            final_dice['TC'], final_PPV['TC'], final_sensitivity['TC'], final_hd['TC']))
+                " **TC**  DICE: {}, PPV:{}, Sensitivity: {}, h95: {}\n"
+                .format(iteration, final_dice['WT'], final_PPV['WT'], final_sensitivity['WT'], final_hd['WT'],
+                        final_dice['ET'], final_PPV['ET'], final_sensitivity['ET'], final_hd['ET'],
+                        final_dice['TC'], final_PPV['TC'], final_sensitivity['TC'], final_hd['TC']))
 
 
 @torch.no_grad()
-def save_predictions(y_pred, threshold, dir_path, score, iter):
-    dir_path = os.path.join(dir_path, "results_iter{}".format(iter))
+def save_predictions(y_pred, threshold, dir_path, score, iteration):
+    dir_path = os.path.join(dir_path, "results_iter{}".format(iteration))
     if not os.path.isdir(dir_path):
         try:
             os.mkdir(dir_path, 0o777)
@@ -1034,7 +1024,7 @@ def save_predictions(y_pred, threshold, dir_path, score, iter):
 
     output_score_path = os.path.join(dir_path, "result.txt")
     with open(output_score_path, "w") as f:
-        f.write("average dice score per subject (5 image) at iter {}  :   {}".format(iter, score))
+        f.write("average dice score per subject (5 image) at iter {}  :   {}".format(iteration, score))
     if not os.path.isdir(dir_path):
         try:
             os.mkdir(dir_path, 0o777)
@@ -1058,18 +1048,20 @@ def main():
         type=str,
         help="output directory for results"
     )
-
+    parser.add_argument(
+        "--save_model",
+        type=bool,
+        default=False
+    )
     parser.add_argument(
         "--config",
         type=str,
         default='PGS_config.yaml'
     )
-
     parser.add_argument(
-        "--training_mode",
-        default="semi_sup",
+        "--wandb",
         type=str,
-        help="training mode supervised (sup), n subject supervised (n_sup), all supervised (all_sup)"
+        defaul="CVPR2022_BRATS"
     )
 
     dataset = utils.Constants.Datasets.Brat20
@@ -1084,9 +1076,7 @@ def main():
     random.seed(cfg.seed)
     os.environ['CUDA_VISIBLE_DEVICES'] = cfg.cuda
 
-    if cfg.experiment_mode == 'semi' or cfg.experiment_mode == 'partially_sup_upSample' or \
-            cfg.experiment_mode == 'semi_downSample' or cfg.experiment_mode == 'semi_alternate' \
-            or 'semi' in cfg.experiment_mode:
+    if 'semi' in cfg.experiment_mode or cfg.experiment_mode == 'partially_sup_upSample':
         cfg.train_sup_mode = 'train2018_semi_sup' + str(cfg.train_sup_rate)
         cfg.train_unsup_mode = 'train2018_semi_unsup' + str(cfg.train_sup_rate)
     elif cfg.experiment_mode == 'partially_sup':
@@ -1097,7 +1087,8 @@ def main():
         cfg.train_unsup_mode = None
 
     config_params = dict(args=args, config=cfg)
-    wandb.init(project="CVPR2022_BRATS", config=config_params)
+
+    wandb.init(project=args.wandb, config=config_params)
     Pgs_train_val(dataset, cfg.n_epochs, cfg.wmh_threshold, args.output_dir, args, cfg, cfg.seed)
 
 

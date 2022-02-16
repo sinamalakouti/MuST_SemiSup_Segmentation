@@ -30,7 +30,9 @@ supervised_training:
   scheduler_step_size: 5
 #unsupervised training
 unsupervised_training:
+  loss_method: 'output-wise' # output-wise , down-sample
   consistency_loss: 'MSE' # CE, KL, MSE, DSC
+  T: 0.5  # temperature value for softmax function!  if None -> no sharpening
   lr: 0.01
   lr_gamma: 0.5
   scheduler_step_size: 10
@@ -40,8 +42,8 @@ unsupervised_training:
     rampup_ends: 20
 
 #hyper parameters
-experiment_mode: "partially_sup"  # [ 'semi_alternate' , 'partially_sup' , 'semi_alternate_mix_F_G']
-n_epochs: 70
+experiment_mode: "semi_alternate"  # [ 'semi_alternate' , 'partially_sup' , 'semi_alternate_mix_F_G']
+n_epochs: 50
 batch_size: 32
 parallel: True
 cuda: "0,1"

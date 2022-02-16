@@ -68,12 +68,13 @@ class Up(torch.nn.Module):
 
     def forward(self, X, transformer):
         x1, x2 = X
-        # if transformer is None:
-        #     x1 = self.up(x1)
-        # else:
-        #     x1 = self.up(transformer(x1, None, perturbation_mode='F')[0])
-        #     x2 = transformer(x2, None, perturbation_mode='F')[0]
-        x1 = self.up(x1)
+        if transformer is None:
+            x1 = self.up(x1)
+        else:
+            # x1 = self.up(transformer(x1, None, perturbation_mode='F')[0])
+            x1 = transformer(self.up(x1), None, perturbation_mode='F')[0]
+            x2 = transformer(x2, None, perturbation_mode='F')[0]
+        # x1 = self.up(x1)
         # bxcxhxw
         h_diff = x2.size()[2] - x1.size()[2]
         w_diff = x2.size()[3] - x1.size()[3]
@@ -81,11 +82,12 @@ class Up(torch.nn.Module):
         x1 = F.pad(x1, (w_diff // 2, w_diff - w_diff // 2,
                         h_diff // 2, h_diff - h_diff // 2))
         res = torch.cat([x2, x1], dim=1)
-        if transformer is None:
-            return res
-
-        return res, transformer(res, perturbation_mode='F')[0]
-
+        return res
+        # if transformer is None:
+        #     return res
+"""
+        return res, transformer(res, None, perturbation_mode='F')[0]
+"""
 
 class Down(nn.Module):
     def __init__(self):
@@ -150,7 +152,7 @@ class PGS(nn.Module):
             return sup_outputs, None
 
         elif type_unsup == 'layerwise':
-            return self.__fw_unsupervised_layerwise3(X)
+            return self.__fw_unsupervised_layerwise2(X)
 
         elif type_unsup == 'unsupervised':
             return self.__fw_unsupervised_feautre_sapce(X)
