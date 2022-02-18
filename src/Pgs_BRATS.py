@@ -1077,7 +1077,7 @@ def main():
     torch.cuda.manual_seed(cfg.seed)
     np.random.seed(cfg.seed)
     random.seed(cfg.seed)
-    os.environ['CUDA_VISIBLE_DEVICES'] = cfg.cuda
+    #os.environ['CUDA_VISIBLE_DEVICES'] = cfg.cuda
 
     if 'semi' in cfg.experiment_mode or cfg.experiment_mode == 'partially_sup_upSample':
         cfg.train_sup_mode = 'train2018_semi_sup' + str(cfg.train_sup_rate)
