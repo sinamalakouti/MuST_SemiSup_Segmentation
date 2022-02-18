@@ -108,12 +108,15 @@ def __fw_outputwise_unsup_loss(y_stud, y_teach, loss_functions, cfg, masks=None)
             losses.append(
                 unsup_loss(stud_pred, teach_pred, i, use_softmax=True))
         elif cfg.unsupervised_training.consistency_loss == 'MSE':
-            if cfg.expriment_mode != 'semi_alternate_mix_F_G':
+            if cfg.experiment_mode != 'semi_alternate_mix_F_G':
                 teach_pred = torch.nn.functional.softmax(teach_pred, dim=1)
 
-            if cfg.unsupervised_training.T is not None:  # sharpening
-                    pt = teach_pred ** (1 / cfg.unsupervised_training.T)
-                    teach_pred = pt / pt.sum(dim=1, keepdim=True)
+            if cfg.unsupervised_training.T is not None:# sharpening
+                pt = teach_pred ** (1 / cfg.unsupervised_training.T)
+                teach_pred = pt / pt.sum(dim=1, keepdim=True)
+                if teach_pred.isnan().sum() > 0:
+                    teach_pred[teach_pred.isnan()] = 0
+
                 # teach_pred = torch.nn.functional.softmax(teach_pred / 0.85, dim=1)
             stud_pred = torch.nn.functional.softmax(stud_pred, dim=1)
             mse = torch.nn.MSELoss()
@@ -1061,7 +1064,7 @@ def main():
     parser.add_argument(
         "--wandb",
         type=str,
-        defaul="CVPR2022_BRATS"
+        default="CVPR2022_BRATS"
     )
 
     dataset = utils.Constants.Datasets.Brat20
