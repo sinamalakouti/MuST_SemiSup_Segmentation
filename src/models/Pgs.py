@@ -415,16 +415,16 @@ class PGS(nn.Module):
 
         # contracting path
         c1 = self.conv1(X)
-        c1 = self.transformer(c1, None, perturbation_mode='F')
+        c1 = self.transformer(c1, None, perturbation_mode='F')[0]
         d1 = self.down1(c1)
         c2 = self.conv2(d1)
-        c2 = self.transformer(c2, None, perturbation_mode='F')
+        c2 = self.transformer(c2, None, perturbation_mode='F')[0]
         d2 = self.down2(c2)
         c3 = self.conv3(d2)
-        c3 = self.transformer(c3, None, perturbation_mode='F')
+        c3 = self.transformer(c3, None, perturbation_mode='F')[0]
         d3 = self.down3(c3)
         c4 = self.conv4(d3)
-        c4 = self.transformer(c4, None, perturbation_mode='F')
+        c4 = self.transformer(c4, None, perturbation_mode='F')[0]
         d4 = self.down4(c4)
 
         # bottleneck
