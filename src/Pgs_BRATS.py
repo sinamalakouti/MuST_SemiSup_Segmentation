@@ -1,24 +1,26 @@
 import os
 import sys
-import torch
-import torch.nn as nn
-from torch.optim import lr_scheduler
-
-from utils import utils
-from losses.loss import consistency_weight, Consistency_CE, softmax_kl_loss
-
-from losses.evaluation_metrics import dice_coef, do_eval
-from dataset.Brat20 import Brat20Test, seg2WT, seg2TC, seg2ET
-from models import Perturbations
-from models import Pgs
-import matplotlib.pyplot as plt
-import torch.nn.functional as F
 import numpy as np
 import random
 import argparse
 import yaml
 from easydict import EasyDict as edict
 import datetime
+
+import torch
+import torch.nn as nn
+from torch.optim import lr_scheduler
+import matplotlib.pyplot as plt
+import torch.nn.functional as F
+
+from losses.evaluation_metrics import dice_coef, do_eval
+from dataset.Brat20 import Brat20Test, seg2WT, seg2TC, seg2ET
+from models import Perturbations
+from models import Pgs, Pgs3
+from utils import utils
+from losses.loss import consistency_weight, Consistency_CE, softmax_kl_loss
+
+
 import wandb
 
 sys.path.append('src')
@@ -739,8 +741,11 @@ def Pgs_train_val(dataset, n_epochs, wmh_threshold, output_dir, args, cfg, seed)
     print("unsup learning_rate is    ", cfg.unsupervised_training.lr)
 
     # load model
-    pgsnet = Pgs.PGS(inputs_dim, outputs_dim, kernels, strides, cfg)
-
+    if cfg.model =='PGS':
+        pgsnet = Pgs.PGS(inputs_dim, outputs_dim, kernels, strides, cfg)
+    elif cfg.model =='PGS3':
+        pgsnet = Pgs3.PGS3(inputs_dim, outputs_dim, kernels, strides, cfg)
+        
     if torch.cuda.is_available():
         if type(pgsnet) is not torch.nn.DataParallel and cfg.parallel and cfg.parallel:
             pgsnet = torch.nn.DataParallel(pgsnet)
