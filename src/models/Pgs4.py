@@ -141,7 +141,7 @@ class PGS4(nn.Module):
         # self.conv7_stud = ConvBlock(self.dim_inputs[6], self.dim_outputs[6], self.strides[6], self.kernel_sizes[6])
         self.up3 = Up(self.dim_outputs[6], self.dim_outputs[6], False)
         # self.up3_stud = Up(self.dim_outputs[6], self.dim_outputs[6], False)
-        self.conv8_ = ConvBlock(self.dim_inputs[7], self.dim_outputs[7], self.strides[7], self.kernel_sizes[7])
+        self.conv8 = ConvBlock(self.dim_inputs[7], self.dim_outputs[7], self.strides[7], self.kernel_sizes[7])
         # self.conv8_stud = ConvBlock(self.dim_inputs[7], self.dim_outputs[7], self.strides[7], self.kernel_sizes[7])
         self.up4 = Up(self.dim_outputs[7], self.dim_outputs[7], False)
         # self.up4_stud = Up(self.dim_outputs[7], self.dim_outputs[7], False)
