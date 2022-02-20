@@ -742,8 +742,11 @@ def Pgs_train_val(dataset, n_epochs, wmh_threshold, output_dir, args, cfg, seed)
 
     # load model
     if cfg.model =='PGS':
+        print("Hi")
         pgsnet = Pgs.PGS(inputs_dim, outputs_dim, kernels, strides, cfg)
+
     elif cfg.model =='PGS3':
+
         pgsnet = Pgs3.PGS3(inputs_dim, outputs_dim, kernels, strides, cfg)
 
     if torch.cuda.is_available():
