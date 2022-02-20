@@ -126,26 +126,26 @@ class PGS4(nn.Module):
 
         # bottleneck
 
-        self.conv5_teach = ConvBlock(self.dim_inputs[4], self.dim_outputs[4], self.strides[4], self.kernel_sizes[4])
+        self.conv5 = ConvBlock(self.dim_inputs[4], self.dim_outputs[4], self.strides[4], self.kernel_sizes[4])
         # self.conv5_stud = ConvBlock(self.dim_inputs[4], self.dim_outputs[4], self.strides[4], self.kernel_sizes[4])
 
         # Expanding path
 
-        self.up1_teach = Up(self.dim_outputs[4], self.dim_outputs[4], False)
+        self.up1 = Up(self.dim_outputs[4], self.dim_outputs[4], False)
         # self.up1_stud = Up(self.dim_outputs[4], self.dim_outputs[4], False)
-        self.conv6_teach = ConvBlock(self.dim_inputs[5], self.dim_outputs[5], self.strides[5], self.kernel_sizes[5])
+        self.conv6 = ConvBlock(self.dim_inputs[5], self.dim_outputs[5], self.strides[5], self.kernel_sizes[5])
         # self.conv6_stud = ConvBlock(self.dim_inputs[5], self.dim_outputs[5], self.strides[5], self.kernel_sizes[5])
-        self.up2_teach = Up(self.dim_outputs[5], self.dim_outputs[5], False)
+        self.up2 = Up(self.dim_outputs[5], self.dim_outputs[5], False)
         # self.up2_stud = Up(self.dim_outputs[5], self.dim_outputs[5], False)
-        self.conv7_teach = ConvBlock(self.dim_inputs[6], self.dim_outputs[6], self.strides[6], self.kernel_sizes[6])
+        self.conv7 = ConvBlock(self.dim_inputs[6], self.dim_outputs[6], self.strides[6], self.kernel_sizes[6])
         # self.conv7_stud = ConvBlock(self.dim_inputs[6], self.dim_outputs[6], self.strides[6], self.kernel_sizes[6])
-        self.up3_teach = Up(self.dim_outputs[6], self.dim_outputs[6], False)
+        self.up3 = Up(self.dim_outputs[6], self.dim_outputs[6], False)
         # self.up3_stud = Up(self.dim_outputs[6], self.dim_outputs[6], False)
-        self.conv8_teach = ConvBlock(self.dim_inputs[7], self.dim_outputs[7], self.strides[7], self.kernel_sizes[7])
+        self.conv8_ = ConvBlock(self.dim_inputs[7], self.dim_outputs[7], self.strides[7], self.kernel_sizes[7])
         # self.conv8_stud = ConvBlock(self.dim_inputs[7], self.dim_outputs[7], self.strides[7], self.kernel_sizes[7])
-        self.up4_teach = Up(self.dim_outputs[7], self.dim_outputs[7], False)
+        self.up4 = Up(self.dim_outputs[7], self.dim_outputs[7], False)
         # self.up4_stud = Up(self.dim_outputs[7], self.dim_outputs[7], False)
-        self.conv9_teach = ConvBlock(self.dim_inputs[8], self.dim_outputs[8], self.strides[8], self.kernel_sizes[8])
+        self.conv9 = ConvBlock(self.dim_inputs[8], self.dim_outputs[8], self.strides[8], self.kernel_sizes[8])
         # self.conv9_stud = ConvBlock(self.dim_inputs[8], self.dim_outputs[8], self.strides[8], self.kernel_sizes[8])
 
         # student  decoders
@@ -156,15 +156,15 @@ class PGS4(nn.Module):
 
         # classifiers
         print(self.dim_outputs[4])
-        self.cls5_teach = CLS(self.dim_outputs[4], self.dim_outputs[-1])
+        self.cls5 = CLS(self.dim_outputs[4], self.dim_outputs[-1])
 
-        self.cls6_teach = CLS(self.dim_outputs[5], self.dim_outputs[-1])
+        self.cls6 = CLS(self.dim_outputs[5], self.dim_outputs[-1])
         # self.decode6_stud = CLS(self.dim_outputs[5], self.dim_outputs[-1])
-        self.cls7_teach = CLS(self.dim_outputs[6], self.dim_outputs[-1])
+        self.cls7 = CLS(self.dim_outputs[6], self.dim_outputs[-1])
         # self.cls7_stud = CLS(self.dim_outputs[6], self.dim_outputs[-1])
-        self.cls8_teach = CLS(self.dim_outputs[7], self.dim_outputs[-1])
+        self.cls8 = CLS(self.dim_outputs[7], self.dim_outputs[-1])
         # self.cls8_stud = CLS(self.dim_outputs[7], self.dim_outputs[-1])
-        self.cls9_teach = CLS(self.dim_outputs[8], self.dim_outputs[-1])  # main classifier
+        self.cls9 = CLS(self.dim_outputs[8], self.dim_outputs[-1])  # main classifier
         # self.cls9_stud = CLS(self.dim_outputs[8], self.dim_outputs[-1])  # main classifier
 
     def forward(self, X, is_supervised):
