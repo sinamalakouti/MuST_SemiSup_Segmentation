@@ -169,11 +169,11 @@ class PGS3(nn.Module):
             return sup_outputs, None
 
         elif type_unsup == 'layerwise':
-            return self.__fw_unsupervised_layerwise5(X)
+            return self.__fw_unsupervised_layerwise2(X)
             # return self.__fw_unsupervised_layerwislayerwise2e2(X)
 
-        elif type_unsup == 'unsupervised':
-            return self.__fw_unsupervised_feautre_sapce(X)
+        # elif type_unsup == 'unsupervised':
+        #     return self.__fw_unsupervised_feautre_sapce(X)
 
         else:
 
