@@ -168,7 +168,7 @@ class MixupDecoder(nn.Module):
 #         return K.in_train_phase(_mixfeat, _passthru, training=training)
 
 
-def get_r_adv(x, y_tr, it=1, xi=1e-1, eps=10.0):
+def get_r_adv(x, decoder, it=1, xi=1e-1, eps=10.0):
     """
     Virtual Adversarial Training
     https://arxiv.org/abs/1704.03976
@@ -200,8 +200,8 @@ class VATDecoder(nn.Module):
         self.eps = eps
         self.it = iterations
 
-    def forward(self, x):
-        r_adv = get_r_adv(x, self.it, self.xi, self.eps)
+    def forward(self, x, decoder):
+        r_adv = get_r_adv(x, decoder, self.it, self.xi, self.eps)
         return x + r_adv
 
 
@@ -352,7 +352,9 @@ class Perturbator(nn.Module):
         self.vflip_decoder = VFlipDecoder()
         self.uni_decoder = UniformNoiseDecoder()
         self.gaussian_decoder = GaussianNoiseDecoder()
+        self.vat_decoder = VATDecoder()
         self.cfg = cfg
+
 
     def __fw_geometrical_aug(self, x, y):
         random_selector = np.random.randint(4)
@@ -366,18 +368,24 @@ class Perturbator(nn.Module):
             x_transform, y_transform = x, y
         return x_transform, y_transform
 
-    def __fw_feature_space_aug(self, x, y):
-        random_selector = np.random.randint(4)
+    def __fw_feature_space_aug(self, x, y, decoder=None):
+        if decoder:
+            random_selector = np.random.randint(5)
+        else:
+            random_selector = np.random.randint(4)
         if random_selector == 0:  # feature drop out
             x_transform, y_transform = self.feature_dropout(x, y)
         elif random_selector == 1:  # spatial drop out
             x_transform, y_transform = self.spatial_dropout(x, y)
-        elif random_selector == 2:  # uniform dist
+        elif random_selector == 2:  # uniform noise
             x_transform, y_transform = self.uni_decoder(x, y)
-        elif random_selector == 3:  # gaussion noise
+        elif random_selector == 3:  # Gaussian noise
             x_transform, y_transform = self.gaussian_decoder(x, y)
-        elif random_selector == 4:  # identity
-            x_transform, y_transform = x, y
+        elif random_selector == 4:
+            x_transform = self.vat_decoder(x = x, decoder=decoder)
+            y_transform = y
+        # elif random_selector == 4:  # identity
+        #     x_transform, y_transform = x, y
         return x_transform, y_transform
 
     def __fw_mix(self, x, y):  # mix of feature perturbation and geometrical augmentaiton
@@ -398,14 +406,14 @@ class Perturbator(nn.Module):
             x_transform, y_transform = x, y
         return x_transform, y_transform
 
-    def forward(self, x, y, perturbation_mode='F',
+    def forward(self, x, y, decoder=None,  perturbation_mode='F',
                 use_softmax=False):  # mode = F (feature_space), G (geometrical), M (mix)
         if use_softmax or perturbation_mode == 'G' or perturbation_mode == 'M':
             y = torch.nn.functional.softmax(y / self.cfg.temp, dim=1)  # 0.85 for pgs for brats
         if perturbation_mode == 'G':
             x_transform, y_transform = self.__fw_geometrical_aug(x, y)
         elif perturbation_mode == 'F':
-            x_transform, y_transform = self.__fw_feature_space_aug(x, y)
+            x_transform, y_transform = self.__fw_feature_space_aug(x, y, decoder = decoder)
         elif perturbation_mode == 'M':
             x_transform, y_transform = self.__fw_mix(x, y)
         return x_transform, y_transform
