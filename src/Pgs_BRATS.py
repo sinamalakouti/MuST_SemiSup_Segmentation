@@ -16,7 +16,7 @@ import torch.nn.functional as F
 from losses.evaluation_metrics import dice_coef, do_eval
 from dataset.Brat20 import Brat20Test, seg2WT, seg2TC, seg2ET
 from models import Perturbations
-from models import Pgs, Pgs3
+from models import Pgs, Pgs4
 from utils import utils
 from losses.loss import consistency_weight, Consistency_CE, softmax_kl_loss
 
@@ -745,9 +745,9 @@ def Pgs_train_val(dataset, n_epochs, wmh_threshold, output_dir, args, cfg, seed)
         print("Hi")
         pgsnet = Pgs.PGS(inputs_dim, outputs_dim, kernels, strides, cfg)
 
-    elif cfg.model =='PGS3':
+    elif cfg.model =='PGS4':
 
-        pgsnet = Pgs3.PGS3(inputs_dim, outputs_dim, kernels, strides, cfg)
+        pgsnet = Pgs4.PGS4(inputs_dim, outputs_dim, kernels, strides, cfg)
 
     if torch.cuda.is_available():
         if type(pgsnet) is not torch.nn.DataParallel and cfg.parallel and cfg.parallel:
