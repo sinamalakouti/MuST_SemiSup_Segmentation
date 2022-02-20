@@ -101,9 +101,9 @@ class Down(nn.Module):
         return self.net(X)
 
 
-class PGS2(nn.Module):
+class PGS4(nn.Module):
     def __init__(self, dim_inputs, dim_outputs, kernel_sizes, strides, cfg):
-        super(PGS2, self).__init__()
+        super(PGS4, self).__init__()
         self.dim_inputs = dim_inputs
         self.dim_outputs = dim_outputs
         self.kernel_sizes = kernel_sizes
