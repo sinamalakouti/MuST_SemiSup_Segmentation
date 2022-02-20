@@ -414,12 +414,18 @@ class PGS(nn.Module):
     def __fw_unsupervised_layerwise5(self, X):  # only_feature space aug
 
         # contracting path
-        c1_teach, d1, c2_teach, d2, c3_teach, d3, c4_teach, d4 = self.__fw_contracting_path(X)
-
-        c1_stud = self.transformer(c1_teach, None, perturbation_mode='F')
-        c2_stud = self.transformer(c2_teach, None, perturbation_mode='F')
-        c3_stud = self.transformer(c3_teach, None, perturbation_mode='F')
-        c4_stud = self.transformer(c4_teach, None, perturbation_mode='F')
+        c1 = self.conv1(X)
+        c1 = self.transformer(c1, None, perturbation_mode='F')
+        d1 = self.down1(c1)
+        c2 = self.conv2(d1)
+        c2 = self.transformer(c2, None, perturbation_mode='F')
+        d2 = self.down2(c2)
+        c3 = self.conv3(d2)
+        c3 = self.transformer(c3, None, perturbation_mode='F')
+        d3 = self.down3(c3)
+        c4 = self.conv4(d3)
+        c4 = self.transformer(c4, None, perturbation_mode='F')
+        d4 = self.down4(c4)
 
         # bottleneck
 
@@ -431,14 +437,13 @@ class PGS(nn.Module):
         output5_stud = self.cls5(c5_stud)
 
         # expanding path
-        teach_up1 = self.__fw_up(c5_teach, c4_teach, self.up1,
+        teach_up1 = self.__fw_up(c5_teach, c4, self.up1,
                                  transformer=None) if self.config.information_passing_strategy == 'teacher' \
-            else self.__fw_up(c5_stud, c4_teach, self.up1, transformer=None)
+            else self.__fw_up(c5_stud, c4, self.up1, transformer=None)
 
-        stud_up1 = self.__fw_up(c5_teach, c4_stud, self.up1,
+        stud_up1 = self.__fw_up(c5_teach, c4, self.up1,
                                 transformer=self.transformer) if self.config.information_passing_strategy == 'teacher' \
-            else self.__fw_up(c5_stud, c4_stud, self.up1, transformer=self.transformer)
-
+            else self.__fw_up(c5_stud, c4, self.up1, transformer=self.transformer)
 
         c6_teach = self.__fw_expand_4layer(teach_up1)
         aug_output6_teach = self.cls6(c6_teach)
@@ -446,14 +451,13 @@ class PGS(nn.Module):
         c6_stud = self.__fw_expand_4layer(stud_up1)
         output6_stud = self.cls6(c6_stud)
         ######
-        teach_up2 = self.__fw_up(c6_teach, c3_teach, self.up2,
+        teach_up2 = self.__fw_up(c6_teach, c3, self.up2,
                                  transformer=None) if self.config.information_passing_strategy == 'teacher' \
-            else self.__fw_up(c6_stud, c3_teach, self.up2, transformer=None)
+            else self.__fw_up(c6_stud, c3, self.up2, transformer=None)
 
-        stud_up2 = self.__fw_up(c6_teach, c3_stud, self.up2,
+        stud_up2 = self.__fw_up(c6_teach, c3, self.up2,
                                 transformer=self.transformer) if self.config.information_passing_strategy == 'teacher' \
-            else self.__fw_up(c6_stud, c3_stud, self.up2, transformer=self.transformer)
-
+            else self.__fw_up(c6_stud, c3, self.up2, transformer=self.transformer)
 
         c7_teach = self.__fw_expand_3layer(teach_up2)
         aug_output7_teach = self.cls7(c7_teach)
@@ -462,14 +466,13 @@ class PGS(nn.Module):
         output7_stud = self.cls7(c7_stud)
 
         #####
-        teach_up3 = self.__fw_up(c7_teach, c2_teach, self.up3,
+        teach_up3 = self.__fw_up(c7_teach, c2, self.up3,
                                  transformer=None) if self.config.information_passing_strategy == 'teacher' \
-            else self.__fw_up(c7_stud, c2_teach, self.up3, transformer=None)
+            else self.__fw_up(c7_stud, c2, self.up3, transformer=None)
 
-        stud_up3 = self.__fw_up(c7_teach, c2_stud, self.up3,
+        stud_up3 = self.__fw_up(c7_teach, c2, self.up3,
                                 transformer=self.transformer) if self.config.information_passing_strategy == 'teacher' \
-            else self.__fw_up(c7_stud, c2_stud, self.up3, transformer=self.transformer)
-
+            else self.__fw_up(c7_stud, c2, self.up3, transformer=self.transformer)
 
         c8_teach = self.__fw_expand_2layer(teach_up3)
         aug_output8_teach = self.cls8(c8_teach)
@@ -478,16 +481,15 @@ class PGS(nn.Module):
         output8_stud = self.cls8(c8_stud)
 
         ####
-        teach_up4 = self.__fw_up(c8_teach, c1_teach, self.up4,
+        teach_up4 = self.__fw_up(c8_teach, c1, self.up4,
                                  transformer=None) if self.config.information_passing_strategy == 'teacher' \
-            else self.__fw_up(c8_stud, c1_teach, self.up4, transformer=None)
+            else self.__fw_up(c8_stud, c1, self.up4, transformer=None)
 
-        stud_up4 = self.__fw_up(c8_teach, c1_stud, self.up4,
+        stud_up4 = self.__fw_up(c8_teach, c1, self.up4,
                                 transformer=self.transformer) if self.config.information_passing_strategy == 'teacher' \
-            else self.__fw_up(c8_stud, c1_stud, self.up4, transformer=self.transformer)
+            else self.__fw_up(c8_stud, c1, self.up4, transformer=self.transformer)
 
-
-            # output9 is the main output of the network
+        # output9 is the main output of the network
         c9_teach = self.__fw_expand_1layer(teach_up4)
         aug_output9_teach = self.cls9(c9_teach)
 
@@ -497,6 +499,7 @@ class PGS(nn.Module):
         supervised_outputs = aug_output5_teach, aug_output6_teach, aug_output7_teach, aug_output8_teach, aug_output9_teach
         unsupervised_outputs = output5_stud, output6_stud, output7_stud, output8_stud, output9_stud
         return supervised_outputs, unsupervised_outputs
+
     def __fw_unsupervised_feautre_sapce(self, X):  # only_feature space aug
 
         # contracting path
