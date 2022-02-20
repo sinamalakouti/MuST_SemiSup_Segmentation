@@ -266,31 +266,31 @@ class PGS4(nn.Module):
 
         return c1, d1, c2, d2, c3, d3, c4, d4
 
-    def __fw_bottleneck(self, conv, X):
-        # c5 = self.conv5(X)
-        c5 = conv(X)
+    def __fw_bottleneck(self, X):
+        c5 = self.conv5(X)
+        # c5 = conv(X)
         # out = self.cls5(c5)
         return c5
 
     def __fw_up(self, X_expand, X_contract, up_module, transformer=None):
         return up_module((X_expand, X_contract), transformer)
 
-    def __fw_expand_4layer(self, conv, X):
-        # c6 = self.conv6(X)
-        c6 = conv(X)
+    def __fw_expand_4layer(self, X):
+        c6 = self.conv6(X)
+        # c6 = conv(X)
         return c6
 
-    def __fw_expand_3layer(self, conv, X):
+    def __fw_expand_3layer(self, X):
         c7 = self.conv7(X)
-        c7 = conv(X)
+        # c7 = conv(X)
         return c7
 
-    def __fw_expand_2layer(self, conv, X):
-        # c8 = self.conv8(X)
-        c8 = conv(X)
+    def __fw_expand_2layer(self, X):
+        c8 = self.conv8(X)
+        # c8 = conv(X)
         return c8
 
-    def __fw_expand_1layer(self, conv, X):
-        # c9 = self.conv9(X)
-        c9 = conv(X)
+    def __fw_expand_1layer(self, X):
+        c9 = self.conv9(X)
+        # c9 = conv(X)
         return c9
