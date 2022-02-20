@@ -171,8 +171,8 @@ class PGS4(nn.Module):
         type_unsup = 'layerwise'
         # type_unsup = 'unsupervised'  # both feature_level (F) and input level (G) augmentation
         if is_supervised:
-            sup_outputs = self.__fw_supervised(X)
-            return sup_outputs, None
+            main_outputs, decoder_outputs = self.__fw_supervised(X)
+            return main_outputs, decoder_outputs
 
         elif type_unsup == 'layerwise':
             return self.__fw_unsupervised_layerwise2(X)
@@ -200,7 +200,6 @@ class PGS4(nn.Module):
 
         # contracting path
         c1_teach, d1, c2_teach, d2, c3_teach, d3, c4_teach, d4 = self.__fw_contracting_path(X)
-
         with torch.no_grad():
             out4_teach = self.decode4_stud(c4_teach)
             out3_teach = self.decode3_stud(c3_teach)
@@ -251,8 +250,14 @@ class PGS4(nn.Module):
         up4 = self.__fw_up(c8, c1, self.up4)
         c9 = self.__fw_expand_1layer(up4)
         output9 = self.cls9(c9)
+        main_outputs = (output5, output6, output7, output8, output9)
 
-        return output5, output6, output7, output8, output9
+        dec_out_6 = self.decode4_stud(c4)
+        dec_out_7 = self.decode3_stud(c3)
+        dec_out_8 = self.decode2_stud(c2)
+        dec_out_9 = self.decode1_stud(c1)
+        decoder_outputs = (dec_out_6, dec_out_7, dec_out_8, dec_out_9)
+        return main_outputs, decoder_outputs
 
     def __fw_contracting_path(self, X):
         c1 = self.conv1(X)

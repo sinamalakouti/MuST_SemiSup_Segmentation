@@ -20,7 +20,6 @@ from models import Pgs, Pgs4
 from utils import utils
 from losses.loss import consistency_weight, Consistency_CE, softmax_kl_loss
 
-
 import wandb
 
 sys.path.append('src')
@@ -111,9 +110,9 @@ def __fw_outputwise_unsup_loss(y_stud, y_teach, loss_functions, cfg, masks=None)
                 unsup_loss(stud_pred, teach_pred, i, use_softmax=True))
         elif cfg.unsupervised_training.consistency_loss == 'MSE':
             if cfg.experiment_mode != 'semi_alternate_mix_F_G':
-                teach_pred = torch.nn.functional.softmax(teach_pred, dim=1)
+                teach_pred = torch.nn.functional.softmax(teach_pred.detach(), dim=1)
 
-            if cfg.unsupervised_training.T is not None:# sharpening
+            if cfg.unsupervised_training.T is not None:  # sharpening
                 pt = teach_pred ** (1 / cfg.unsupervised_training.T)
                 teach_pred = pt / pt.sum(dim=1, keepdim=True)
                 if teach_pred.isnan().sum() > 0:
@@ -122,7 +121,7 @@ def __fw_outputwise_unsup_loss(y_stud, y_teach, loss_functions, cfg, masks=None)
                 # teach_pred = torch.nn.functional.softmax(teach_pred / 0.85, dim=1)
             stud_pred = torch.nn.functional.softmax(stud_pred, dim=1)
             mse = torch.nn.MSELoss()
-            loss = mse(stud_pred, teach_pred.detach())
+            loss = mse(stud_pred, teach_pred)
             losses.append(loss)
     total_loss = sum(losses)
     return total_loss
@@ -314,6 +313,70 @@ def trainPgs_semi_alternate(train_sup_loader, train_unsup_loader, model, optimiz
         sup_outputs, _ = model(b_sup, is_supervised=True)
         sLoss = compute_loss(sup_outputs, target_sup, loss_functions, is_supervised=True, cfg=cfg)
 
+        # supervised training - backward
+        sLoss.backward()
+        optimizer[0].step()
+
+        print("**************** UNSUP LOSSS ( weighted) : {} ****************".format(uLoss))
+        print("**************** SUP LOSSS  : {} ****************".format(sLoss))
+
+        with torch.no_grad():
+            sf = torch.nn.Softmax2d()
+            target_sup[target_sup >= 1] = 1
+            target_sup = target_sup
+            y_pred = sf(sup_outputs[-1])
+            y_WT = seg2WT(y_pred, 0.5, cfg.oneHot)  # I can identify the threshold! -> more confidence!
+            dice_score = dice_coef(target_sup.reshape(y_WT.shape), y_WT)
+            wandb.log(
+                {"sup_batch_id": batch_idx + epochid * len(train_sup_loader),
+                 "sup loss": sLoss,
+                 "unsup_batch_id": batch_idx + epochid * len(train_sup_loader),
+                 "unsup loss": uLoss,
+                 "batch_score_WT": dice_score,
+                 'weight unsup': weight_unsup
+                 })
+
+    return model
+
+
+def trainPgs_semi_alternate2(train_sup_loader, train_unsup_loader, model, optimizer, device, loss_functions,
+                             cons_w_unsup, epochid,
+                             cfg):
+    model.train()
+    # semi_loader -> size of smaller set (supervised loader)
+    semi_loader = zip(train_sup_loader, train_unsup_loader)
+
+    for batch_idx, (batch_sup, batch_unsup) in enumerate(semi_loader):
+        optimizer[0].zero_grad()
+        optimizer[1].zero_grad()
+
+        b_unsup = batch_unsup['data']
+        b_unsup = b_unsup.to(device)
+
+        # unsupervised training - forward
+        teacher_outputs, student_outputs = model(b_unsup, is_supervised=False)
+
+        uLoss = compute_loss(student_outputs, teacher_outputs, loss_functions, is_supervised=False, cfg=cfg)
+
+        b_sup = batch_sup['data'].to(device)
+        target_sup = batch_sup['label'].to(device)
+
+        # unsupervised training - backward
+        weight_unsup = cons_w_unsup(epochid, batch_idx)
+        uloss_final = uLoss * weight_unsup
+        uloss_final.backward()
+        optimizer[1].step()
+
+        # todo:  delete unsupervised data from GPU
+        # supervised training
+        optimizer[0].zero_grad()
+        optimizer[1].zero_grad()
+
+        # supervised training - forward
+        sup_outputs, dec_outputs = model(b_sup, is_supervised=True)
+        sLoss1 = compute_loss(sup_outputs, target_sup, loss_functions, is_supervised=True, cfg=cfg)
+        sLoss2 = compute_loss(dec_outputs, target_sup, loss_functions, is_supervised=True, cfg=cfg)
+        sLoss = (sLoss1 + sLoss2) / 2
         # supervised training - backward
         sLoss.backward()
         optimizer[0].step()
@@ -741,11 +804,11 @@ def Pgs_train_val(dataset, n_epochs, wmh_threshold, output_dir, args, cfg, seed)
     print("unsup learning_rate is    ", cfg.unsupervised_training.lr)
 
     # load model
-    if cfg.model =='PGS':
+    if cfg.model == 'PGS':
         print("Hi")
         pgsnet = Pgs.PGS(inputs_dim, outputs_dim, kernels, strides, cfg)
 
-    elif cfg.model =='PGS4':
+    elif cfg.model == 'PGS4':
 
         pgsnet = Pgs4.PGS4(inputs_dim, outputs_dim, kernels, strides, cfg)
 
@@ -1085,7 +1148,7 @@ def main():
     torch.cuda.manual_seed(cfg.seed)
     np.random.seed(cfg.seed)
     random.seed(cfg.seed)
-    #os.environ['CUDA_VISIBLE_DEVICES'] = cfg.cuda
+    # os.environ['CUDA_VISIBLE_DEVICES'] = cfg.cuda
 
     if 'semi' in cfg.experiment_mode or cfg.experiment_mode == 'partially_sup_upSample':
         cfg.train_sup_mode = 'train2018_semi_sup' + str(cfg.train_sup_rate)
