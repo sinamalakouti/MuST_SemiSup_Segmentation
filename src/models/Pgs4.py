@@ -148,11 +148,16 @@ class PGS4(nn.Module):
         self.conv9 = ConvBlock(self.dim_inputs[8], self.dim_outputs[8], self.strides[8], self.kernel_sizes[8])
         # self.conv9_stud = ConvBlock(self.dim_inputs[8], self.dim_outputs[8], self.strides[8], self.kernel_sizes[8])
 
-        # student  decoders
+        # INTERMEIDATE  decoders
         self.decode4_stud = CLS(self.dim_outputs[3], self.dim_outputs[-1])
         self.decode3_stud = CLS(self.dim_outputs[2], self.dim_outputs[-1])
         self.decode2_stud = CLS(self.dim_outputs[1], self.dim_outputs[-1])
         self.decode1_stud = CLS(self.dim_outputs[0], self.dim_outputs[-1])
+
+        self.decode4_teach = CLS(self.dim_outputs[3], self.dim_outputs[-1])
+        self.decode3_teach = CLS(self.dim_outputs[2], self.dim_outputs[-1])
+        self.decode2_teach = CLS(self.dim_outputs[1], self.dim_outputs[-1])
+        self.decode1_teach = CLS(self.dim_outputs[0], self.dim_outputs[-1])
 
         # classifiers
         print(self.dim_outputs[4])
@@ -200,11 +205,11 @@ class PGS4(nn.Module):
 
         # contracting path
         c1_teach, d1, c2_teach, d2, c3_teach, d3, c4_teach, d4 = self.__fw_contracting_path(X)
-        with torch.no_grad():
-            out4_teach = self.decode4_stud(c4_teach)
-            out3_teach = self.decode3_stud(c3_teach)
-            out2_teach = self.decode2_stud(c2_teach)
-            out1_teach = self.decode1_stud(c1_teach)
+
+        out4_teach = self.decode4_teac(c4_teach)
+        out3_teach = self.decode3_teach(c3_teach)
+        out2_teach = self.decode2_teach(c2_teach)
+        out1_teach = self.decode1_teach(c1_teach)
 
         c1_stud = self.transformer(c1_teach, None, perturbation_mode='F')[0]
         c2_stud = self.transformer(c2_teach, None, perturbation_mode='F')[0]
@@ -252,10 +257,10 @@ class PGS4(nn.Module):
         output9 = self.cls9(c9)
         main_outputs = (output5, output6, output7, output8, output9)
 
-        dec_out_6 = self.decode4_stud(c4)
-        dec_out_7 = self.decode3_stud(c3)
-        dec_out_8 = self.decode2_stud(c2)
-        dec_out_9 = self.decode1_stud(c1)
+        dec_out_6 = self.decode4_teach(c4)
+        dec_out_7 = self.decode3_teach(c3)
+        dec_out_8 = self.decode2_teach(c2)
+        dec_out_9 = self.decode1_teach(c1)
         decoder_outputs = (dec_out_6, dec_out_7, dec_out_8, dec_out_9)
         return main_outputs, decoder_outputs
 
