@@ -377,7 +377,7 @@ def trainPgs_semi_alternate2(train_sup_loader, train_unsup_loader, model, optimi
         sup_outputs, dec_outputs = model(b_sup, is_supervised=True)
         sLoss1 = compute_loss(sup_outputs, target_sup, loss_functions, is_supervised=True, cfg=cfg)
         sLoss2 = compute_loss(dec_outputs, target_sup, loss_functions, is_supervised=True, cfg=cfg)
-        sLoss = (sLoss1 + sLoss2) / 2
+        sLoss = sLoss1 + sLoss2 / 2
         # supervised training - backward
         sLoss.backward()
         optimizer[0].step()
