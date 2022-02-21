@@ -147,16 +147,17 @@ class PGS(nn.Module):
         self.cls8 = CLS(self.dim_outputs[7], self.dim_outputs[-1])
         self.cls9 = CLS(self.dim_outputs[8], self.dim_outputs[-1])  # main classifier
 
-    def forward(self, X, is_supervised):
+    def forward(self, X, is_supervised,cfg):
         type_unsup = 'layerwise'
         # type_unsup = 'unsupervised'  # both feature_level (F) and input level (G) augmentation
         if is_supervised:
             sup_outputs = self.__fw_supervised(X)
             return sup_outputs, None
 
-        elif type_unsup == 'layerwise':
-            return self.__fw_unsupervised_layerwise5(X)
-            # return self.__fw_unsupervised_layerwislayerwise2e2(X)
+        elif cfg.unsupervised_training.consistency_training_method == 'layerwise_normal':
+            return self.__fw_unsupervised_layerwise2(X)
+        elif cfg.unsupervised_training.consistency_training_method == 'layerwise_no_detach':
+            return self.__fw_unsupervised_layerwise4(X)
 
         elif type_unsup == 'unsupervised':
             return self.__fw_unsupervised_feautre_sapce(X)
@@ -259,7 +260,7 @@ class PGS(nn.Module):
         unsupervised_outputs = output5_stud, output6_stud, output7_stud, output8_stud, output9_stud
         return supervised_outputs, unsupervised_outputs
 
-    def __fw_unsupervised_layerwise3(self, X):    # only_feature space aug
+    def __fw_unsupervised_layerwise3(self, X):  # only_feature space aug
         # not detaching decoder feature extraactor!
         # contracting path
         c1, d1, c2, d2, c3, d3, c4, d4 = self.__fw_contracting_path(X)
@@ -352,7 +353,6 @@ class PGS(nn.Module):
                                 transformer=self.transformer) if self.config.information_passing_strategy == 'teacher' \
             else self.__fw_up(c5_stud, c4, self.up1, transformer=self.transformer)
 
-
         c6_teach = self.__fw_expand_4layer(teach_up1)
         aug_output6_teach = self.cls6(c6_teach)
 
@@ -366,7 +366,6 @@ class PGS(nn.Module):
         stud_up2 = self.__fw_up(c6_teach, c3, self.up2,
                                 transformer=self.transformer) if self.config.information_passing_strategy == 'teacher' \
             else self.__fw_up(c6_stud, c3, self.up2, transformer=self.transformer)
-
 
         c7_teach = self.__fw_expand_3layer(teach_up2)
         aug_output7_teach = self.cls7(c7_teach)
@@ -383,7 +382,6 @@ class PGS(nn.Module):
                                 transformer=self.transformer) if self.config.information_passing_strategy == 'teacher' \
             else self.__fw_up(c7_stud, c2, self.up3, transformer=self.transformer)
 
-
         c8_teach = self.__fw_expand_2layer(teach_up3)
         aug_output8_teach = self.cls8(c8_teach)
 
@@ -398,79 +396,6 @@ class PGS(nn.Module):
         stud_up4 = self.__fw_up(c8_teach, c1, self.up4,
                                 transformer=self.transformer) if self.config.information_passing_strategy == 'teacher' \
             else self.__fw_up(c8_stud, c1, self.up4, transformer=self.transformer)
-
-
-            # output9 is the main output of the network
-        c9_teach = self.__fw_expand_1layer(teach_up4)
-        aug_output9_teach = self.cls9(c9_teach)
-
-        c9_stud = self.__fw_expand_1layer(stud_up4)
-        output9_stud = self.cls9(c9_stud)
-
-        supervised_outputs = aug_output5_teach, aug_output6_teach, aug_output7_teach, aug_output8_teach, aug_output9_teach
-        unsupervised_outputs = output5_stud, output6_stud, output7_stud, output8_stud, output9_stud
-        return supervised_outputs, unsupervised_outputs
-
-    def __fw_unsupervised_layerwislayerwise6(self, X):  # only_feature space aug
-        # we also apply VAT perturbation.     aug(  < c_decoder, c_skip > )  and no detach
-
-        # contracting path
-
-        c1, d1, c2, d2, c3, d3, c4, d4 = self.__fw_contracting_path(X)
-
-        # bottleneck
-
-        c5_teach = self.__fw_bottleneck(d4)
-        aug_output5_teach = self.cls5(c5_teach)
-
-        d4_stud = self.transformer(d4, None, decoder=self.conv5, perturbation_mode='F')[0]
-        c5_stud = self.__fw_bottleneck(d4_stud)
-        output5_stud = self.cls5(c5_stud)
-
-        # expanding path
-        teach_up1 = self.__fw_up(c5_teach, c4, self.up1,
-                                 transformer=None) if self.config.information_passing_strategy == 'teacher' \
-            else self.__fw_up(c5_stud, c4, self.up1, transformer=None)
-
-        stud_up1 = self.transformer(teach_up1, None, decoder=self.conv6, perturbation_mode='F')[0]
-
-        c6_teach = self.__fw_expand_4layer(teach_up1)
-        aug_output6_teach = self.cls6(c6_teach)
-
-        c6_stud = self.__fw_expand_4layer(stud_up1)
-        output6_stud = self.cls6(c6_stud)
-        ######
-        teach_up2 = self.__fw_up(c6_teach, c3, self.up2,
-                                 transformer=None) if self.config.information_passing_strategy == 'teacher' \
-            else self.__fw_up(c6_stud, c3, self.up2, transformer=None)
-
-        stud_up2 = self.transformer(teach_up2, None, decoder=self.conv7, perturbation_mode='F')[0]
-
-        c7_teach = self.__fw_expand_3layer(teach_up2)
-        aug_output7_teach = self.cls7(c7_teach)
-
-        c7_stud = self.__fw_expand_3layer(stud_up2)
-        output7_stud = self.cls7(c7_stud)
-
-        #####
-        teach_up3 = self.__fw_up(c7_teach, c2, self.up3,
-                                 transformer=None) if self.config.information_passing_strategy == 'teacher' \
-            else self.__fw_up(c7_stud, c2, self.up3, transformer=None)
-
-        stud_up3 = self.transformer(teach_up3, None, decoder=self.conv8, perturbation_mode='F')[0]
-
-        c8_teach = self.__fw_expand_2layer(teach_up3)
-        aug_output8_teach = self.cls8(c8_teach)
-
-        c8_stud = self.__fw_expand_2layer(stud_up3)
-        output8_stud = self.cls8(c8_stud)
-
-        ####
-        teach_up4 = self.__fw_up(c8_teach, c1, self.up4,
-                                 transformer=None) if self.config.information_passing_strategy == 'teacher' \
-            else self.__fw_up(c8_stud, c1, self.up4, transformer=None)
-
-        stud_up4 = self.transformer(teach_up4, None, decoder=self.conv9, perturbation_mode='F')[0]
 
         # output9 is the main output of the network
         c9_teach = self.__fw_expand_1layer(teach_up4)

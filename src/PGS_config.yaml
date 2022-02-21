@@ -14,7 +14,7 @@ wmh_threshold: 0.5  #?
 mixup_threshold: None
 intensity_rescale: True
 #model
-model: "PGS" #PGS,PGSMT, UNET
+model: "PGS" #  PGS , PGS2 , PGS3 , PGSMT , UNET
 semi_mode: "shared"   # shared, MT
 gradient_stop_strategy: "stop_feature" #stop_feature, stop_output
 information_passing_strategy: "teacher" #student, teacher
@@ -30,9 +30,10 @@ supervised_training:
   scheduler_step_size: 5
 #unsupervised training
 unsupervised_training:
+  consistency_training_method: 'layerwise_no_detach' # 'layerwise_normal' 'layerwise_no_detach'
   loss_method: 'output-wise' # output-wise , down-sample
   consistency_loss: 'MSE' # CE, KL, MSE, DSC
-  T: 0.5  # temperature value for softmax function!  if None -> no sharpening
+  T: null  # temperature value for softmax function!  if None -> no sharpening
   lr: 0.01
   lr_gamma: 0.5
   scheduler_step_size: 10
