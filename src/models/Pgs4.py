@@ -206,7 +206,7 @@ class PGS4(nn.Module):
         # contracting path
         c1_teach, d1, c2_teach, d2, c3_teach, d3, c4_teach, d4 = self.__fw_contracting_path(X)
 
-        out4_teach = self.decode4_teac(c4_teach)
+        out4_teach = self.decode4_teach(c4_teach)
         out3_teach = self.decode3_teach(c3_teach)
         out2_teach = self.decode2_teach(c2_teach)
         out1_teach = self.decode1_teach(c1_teach)
