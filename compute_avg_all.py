@@ -491,11 +491,14 @@ print("******  SUP 3 RATIO ******")
 # sup 3 ratio
 print("superivsed")
 sup3_avg_wt,sup3_avg_et,sup3_avg_tc =  partially_sup_3()
+
 print('semi')
 semi3_avg_wt,semi3_avg_et,semi3_avg_tc  = semi_sup_3()
 
 diff_wt, diff_et,diff_tc = (semi3_avg_wt - sup3_avg_wt), (semi3_avg_et - sup3_avg_et) , (semi3_avg_tc - sup3_avg_tc)
 
+print("HIHIHI")
+print((semi3_avg_wt - sup3_avg_wt))
 print('wt max diff : index:{} value{}'.format(np.argmax(diff_wt), np.max(diff_wt) ))
 
 print('et max diff : index:{} value{}'.format(np.argmax(diff_wt), np.max(diff_wt) ))
@@ -503,21 +506,21 @@ print('et max diff : index:{} value{}'.format(np.argmax(diff_wt), np.max(diff_wt
 print('tc max diff : index:{} value{}'.format(np.argmax(diff_wt), np.max(diff_wt)))
 
 print("******  SUP 5 RATIO ******")
-# # sup 5 ratio
-# print("superivsed")
-sup5_avg_wt,sup5_avg_et,sup5_avg_tc = partially_sup_5()
-# print('unsupervised')
-semi5_avg_wt,semi5_avg_et,semi5_avg_tc  = semi_sup_5()
-
-diff_wt, diff_et,diff_tc = (semi5_avg_wt - sup5_avg_wt), (semi5_avg_et - sup5_avg_et) , (semi5_avg_tc - sup5_avg_tc)
-
-
-
-print('wt max diff : index:{} value{}'.format(np.argmax(diff_wt), np.max(diff_wt) ))
-
-print('et max diff : index:{} value{}'.format(np.argmax(diff_wt), np.max(diff_wt) ))
-
-print('tc max diff : index:{} value{}'.format(np.argmax(diff_wt), np.max(diff_wt)))
+# # # sup 5 ratio
+# # print("superivsed")
+# sup5_avg_wt,sup5_avg_et,sup5_avg_tc = partially_sup_5()
+# # print('unsupervised')
+# semi5_avg_wt,semi5_avg_et,semi5_avg_tc  = semi_sup_5()
+#
+# diff_wt, diff_et,diff_tc = (semi5_avg_wt - sup5_avg_wt), (semi5_avg_et - sup5_avg_et) , (semi5_avg_tc - sup5_avg_tc)
+#
+#
+#
+# print('wt max diff : index:{} value{}'.format(np.argmax(diff_wt), np.max(diff_wt) ))
+#
+# print('et max diff : index:{} value{}'.format(np.argmax(diff_wt), np.max(diff_wt) ))
+#
+# print('tc max diff : index:{} value{}'.format(np.argmax(diff_wt), np.max(diff_wt)))
 
 
 
