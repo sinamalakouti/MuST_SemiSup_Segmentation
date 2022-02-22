@@ -149,7 +149,7 @@ def avg_all(root, root2020, seed):
     print("WT is ", WT)
     print("ET is ", ET)
     print("TC is ", TC)
-    
+
     return WT, ET , TC
 
 
@@ -374,13 +374,17 @@ def partially_sup_3():
     print("FINAL AVG")
 
     print("** WT** ")
-    print( ( (WT1 + WT2 + WT3)/3) [16])
-    print(np.max((WT1 + WT2 + WT3)/3))
-
+    print( ( (WT1 + WT2 + WT3)/3) )
+    print(np.ar((WT1 + WT2 + WT3)/3))
+    avg_wt = (WT1 + WT2 + WT3)/3
     print("** ET **")
     print( ((ET1 + ET2 + ET3)/3) [16])
+    avg_et = (ET1 + ET2 + ET3)/3
     print("***TC***")
     print( ((TC1 + TC2 + TC3)/3) [16])
+    avg_tc = (TC1 + TC2 + TC3)/3
+
+    return avg_wt,avg_et, avg_tc
 
 
 def semi_sup_3():
@@ -447,35 +451,54 @@ def semi_sup_3():
 
     WT3, ET3, TC3 = avg_all(root2019, root2020, seed)
 
+
     print("FINAL AVG")
 
     print("** WT** ")
-    print(((WT1 + WT2 + WT3) / 3)[16])
-    print(np.max((WT1 + WT2 + WT3) / 3))
-
+    print( ( (WT1 + WT2 + WT3)/3) )
+    print(np.ar((WT1 + WT2 + WT3)/3))
+    avg_wt = (WT1 + WT2 + WT3)/3
     print("** ET **")
-    print(((ET1 + ET2 + ET3) / 3)[16])
+    print( ((ET1 + ET2 + ET3)/3) [16])
+    avg_et = (ET1 + ET2 + ET3)/3
     print("***TC***")
-    print(((TC1 + TC2 + TC3) / 3)[16])
+    print( ((TC1 + TC2 + TC3)/3) [16])
+    avg_tc = (TC1 + TC2 + TC3)/3
+
+    return avg_wt,avg_et, avg_tc
 
 
-
+print("******  SUP 3 RATIO ******")
 # sup 3 ratio
 print("superivsed")
-partially_sup_3()
-print('unsupervised')
-semi_sup_3()
+sup3_avg_wt,sup3_avg_et,sup3_avg_tc =  partially_sup_3()
+print('semi')
+semi3_avg_wt,semi3_avg_et,semi3_avg_tc  = semi_sup_3()
 
+diff_wt, diff_et,diff_tc = (semi3_avg_wt - sup3_avg_wt), (semi3_avg_et - sup3_avg_et) , (semi3_avg_tc - sup3_avg_tc)
 
+print('wt max diff : index:{} value{}'.format(np.argmax(diff_wt), np.max(diff_wt) ))
+
+print('et max diff : index:{} value{}'.format(np.argmax(diff_wt), np.max(diff_wt) ))
+
+print('tc max diff : index:{} value{}'.format(np.argmax(diff_wt), np.max(diff_wt)))
+
+print("******  SUP 5 RATIO ******")
 # # sup 5 ratio
 # print("superivsed")
-# partially_sup_5()
+sup5_avg_wt,sup5_avg_et,sup5_avg_tc = partially_sup_5()
 # print('unsupervised')
-# semi_sup_5()
+semi5_avg_wt,semi5_avg_et,semi5_avg_tc  = semi_sup_5()
+
+diff_wt, diff_et,diff_tc = (semi5_avg_wt - sup5_avg_wt), (semi5_avg_et - sup5_avg_et) , (semi5_avg_tc - sup5_avg_tc)
 
 
 
+print('wt max diff : index:{} value{}'.format(np.argmax(diff_wt), np.max(diff_wt) ))
 
+print('et max diff : index:{} value{}'.format(np.argmax(diff_wt), np.max(diff_wt) ))
+
+print('tc max diff : index:{} value{}'.format(np.argmax(diff_wt), np.max(diff_wt)))
 
 
 
