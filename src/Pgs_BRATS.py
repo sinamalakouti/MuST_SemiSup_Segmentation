@@ -1010,8 +1010,8 @@ def Pgs_train_val(dataset, n_epochs, wmh_threshold, output_dir, args, cfg, seed)
     save_score_all(output_image_dir,
                    (test_final_dice, test_final_hd, test_final_PPV, test_final_sensitivity,
                     test_final_specificity),
-                   epoch, mode=cfg.test_mode)
-    wandb.log({'epoch_id': epoch,
+                   cfg.n_epochs, mode=cfg.test_mode)
+    wandb.log({'epoch_id': cfg.n_epochs,
                'test_WT_subject_wis_DSC': test_final_dice['WT'],
                'test_WT_subject_wise_HD': test_final_hd['WT'],
                'test_WT_subject_wise_PPV': test_final_PPV['WT'],
