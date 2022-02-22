@@ -54,7 +54,10 @@ def read(root, root2020):
     print("WT  ", WT[mi])
     print("ET  ", ET[mi])
     print("TC  ", TC[mi])
-
+    if iteration[mi] == 50:
+        r = 49
+    else:
+        r = iteration[mi]
     path = root2020 + str(iteration[mi])
     path = os.path.join(path, 'result.txt')
     file1 = open(path, 'r')
