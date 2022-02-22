@@ -80,17 +80,17 @@ def read(root, root2020):
 
 
 print("************** SEED 41 **************")
-ratio = 10
+ratio = 3
 seed = 41
 year2019 = 'test2019'
-
+date_time = '2022-02-15 22:14:39.973107'
 year2020 = 'test2020'
 
-root2019 = '/projects/sina/W-Net/miccai2022/semi_alternate/sup_ratio_{}/seed_{}/2022-02-21 09:55:59.117838/' \
-           'result_images/{}_new_results_iter'.format(ratio, seed, year2019)
+root2019 = '/projects/sina/W-Net/miccai2022/semi_alternate/sup_ratio_{}/seed_{}/{}/' \
+           'result_images/{}_new_results_iter'.format(ratio, seed,date_time,  year2019)
 
-root2020 = '/projects/sina/W-Net/miccai2022/semi_alternate/sup_ratio_{}/seed_{}/2022-02-21 09:55:59.117838/' \
-           'result_images/{}_new_results_iter'.format(ratio, seed, year2020)
+root2020 = '/projects/sina/W-Net/miccai2022/semi_alternate/sup_ratio_{}/seed_{}/{}/' \
+           'result_images/{}_new_results_iter'.format(ratio, seed, date_time,year2020)
 
 #CVPR
 # root2019 = '/projects/sina/W-Net/PGS_result/Brats/CVPR2022/semi_pgs_CE_all2018/sup_ratio_{}/seed_{}/result_images/{}_new_results_iter'.format(
@@ -105,15 +105,17 @@ w41, e41, t41 = read(root2019, root2020)
 print("************** SEED 42 **************")
 
 seed = 42
-
+date_time = '2022-02-16 10:28:39.015293'
 year2019 = 'test2019'
 year2020 = 'test2020'
 
-root2019 = '/projects/sina/W-Net/miccai2022/semi_alternate/sup_ratio_{}/seed_{}/2022-02-21 13:46:42.254403/' \
-           'result_images/{}_new_results_iter'.format(ratio, seed, year2019)
 
-root2020 = '/projects/sina/W-Net/miccai2022/semi_alternate/sup_ratio_{}/seed_{}/2022-02-21 13:46:42.254403/' \
-           'result_images/{}_new_results_iter'.format(ratio, seed, year2020)
+root2019 = '/projects/sina/W-Net/miccai2022/semi_alternate/sup_ratio_{}/seed_{}/{}/' \
+           'result_images/{}_new_results_iter'.format(ratio, seed,date_time,  year2019)
+
+root2020 = '/projects/sina/W-Net/miccai2022/semi_alternate/sup_ratio_{}/seed_{}/{}/' \
+           'result_images/{}_new_results_iter'.format(ratio, seed, date_time,year2020)
+
 
 #       CVPR
 # root2019 = '/projects/sina/W-Net/PGS_result/Brats/CVPR2022/semi_pgs_CE_all2018/sup_ratio_{}/seed_{}/result_images/{}_new_results_iter'.format(
@@ -130,12 +132,13 @@ seed = 43
 
 year2019 = 'test2019'
 year2020 = 'test2020'
+date_time = '2022-02-16 07:48:53.989469'
 
-root2019 = '/projects/sina/W-Net/miccai2022/semi_alternate/sup_ratio_{}/seed_{}/2022-02-21 17:23:56.694623/' \
-           'result_images/{}_new_results_iter'.format(ratio, seed, year2019)
+root2019 = '/projects/sina/W-Net/miccai2022/semi_alternate/sup_ratio_{}/seed_{}/{}/' \
+           'result_images/{}_new_results_iter'.format(ratio, seed,date_time,  year2019)
 
-root2020 = '/projects/sina/W-Net/miccai2022/semi_alternate/sup_ratio_{}/seed_{}/2022-02-21 17:23:56.694623/' \
-           'result_images/{}_new_results_iter'.format(ratio, seed, year2020)
+root2020 = '/projects/sina/W-Net/miccai2022/semi_alternate/sup_ratio_{}/seed_{}/{}/' \
+           'result_images/{}_new_results_iter'.format(ratio, seed, date_time, year2020)
 
 #CVPR
 # root2019 = '/projects/sina/W-Net/PGS_result/Brats/CVPR2022/semi_pgs_CE_all2018/sup_ratio_{}/seed_{}/result_images/{}_new_results_iter'.format(
