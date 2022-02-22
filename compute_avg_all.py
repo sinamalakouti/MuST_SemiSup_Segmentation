@@ -308,11 +308,170 @@ def semi_sup_5():
     print(((TC1 + TC2 + TC3) / 3)[16])
 
 
-# sup 4 ratio
+
+def partially_sup_3():
+    #sup is semi  partially_sup is partially_sup
+    mode = 'partiallySup'
+
+
+    seed = 41
+    year2019 = 'test2019'
+    year2020 = 'test2020'
+
+    ratio = 3
+    date_time = '2022-02-15 13:25:46.112535'
+    root2019 = '/projects/sina/W-Net/cvpr2022/partiallySup_ratio_{}/seed_{}/{}/result_images/{}_new_results_iter'.format(
+        ratio, seed, date_time, year2019)
+    root2020 = '/projects/sina/W-Net/cvpr2022/partiallySup_ratio_{}/seed_{}/{}/result_images/{}_new_results_iter'.format(
+        ratio, seed, date_time, year2020)
+
+    WT1, ET1 , TC1 = avg_all(root2019, root2020, seed)
+
+    seed = 42
+
+    year2019 = 'test2019'
+    year2020 = 'test2020'
+
+    ratio=3
+    date_time = '2022-02-16 10:36:06.734794'
+
+    root2019 = '/projects/sina/W-Net/cvpr2022/partiallySup_ratio_{}/seed_{}/{}/result_images/{}_new_results_iter'.format(
+        ratio, seed, date_time, year2019)
+    root2020 = '/projects/sina/W-Net/cvpr2022/partiallySup_ratio_{}/seed_{}/{}/result_images/{}_new_results_iter'.format(
+        ratio, seed, date_time, year2020)
+
+    # root2019 = '/projects/sina/W-Net/PGS_result/Brats/CVPR2022/semi_pgs_CE_all2018/{}_ratio_{}/seed_{}/result_images/{}_new_results_iter'.format(mode,
+    #     ratio, seed, year2019)
+    #
+    # root2020 = '/projects/sina/W-Net/PGS_result/Brats/CVPR2022/semi_pgs_CE_all2018/{}_ratio_{}/seed_{}/result_images/{}_new_results_iter'.format(mode,
+    #     ratio, seed, year2020)
+
+    WT2, ET2 , TC2 = avg_all(root2019, root2020,seed)
+
+
+    seed = 43
+
+    year2019 = 'test2019'
+    year2020 = 'test2020'
+
+    date_time = '2022-02-16 07:40:06.416577'
+    root2019 = '/projects/sina/W-Net/cvpr2022/partiallySup_ratio_{}/seed_{}/{}/result_images/{}_new_results_iter'.format(
+        ratio, seed, date_time, year2019)
+    root2020 = '/projects/sina/W-Net/cvpr2022/partiallySup_ratio_{}/seed_{}/{}/result_images/{}_new_results_iter'.format(
+        ratio, seed, date_time, year2020)
+
+
+    # root2019 = '/projects/sina/W-Net/PGS_result/Brats/CVPR2022/semi_pgs_CE_all2018/{}_ratio_{}/seed_{}/result_images/{}_new_results_iter'.format(mode,
+    #     ratio, seed, year2019)
+    #
+    # root2020 = '/projects/sina/W-Net/PGS_result/Brats/CVPR2022/semi_pgs_CE_all2018/{}_ratio_{}/seed_{}/result_images/{}_new_results_iter'.format(mode,
+    #     ratio, seed, year2020)
+
+    WT3, ET3 , TC3 = avg_all(root2019, root2020, seed)
+
+
+
+    print("FINAL AVG")
+
+    print("** WT** ")
+    print( ( (WT1 + WT2 + WT3)/3) [16])
+    print(np.max((WT1 + WT2 + WT3)/3))
+
+    print("** ET **")
+    print( ((ET1 + ET2 + ET3)/3) [16])
+    print("***TC***")
+    print( ((TC1 + TC2 + TC3)/3) [16])
+
+
+def semi_sup_3():
+    # sup is semi  partially_sup is partially_sup
+    mode = 'partiallySup'
+
+    seed = 41
+    year2019 = 'test2019'
+    year2020 = 'test2020'
+
+    ratio = 3
+    date_time = '2022-02-15 22:14:39.973107'
+    root2019 = '/projects/sina/W-Net/cvpr2022/sup_ratio_{}/seed_{}/{}/' \
+               'result_images/{}_new_results_iter'.format(ratio, seed,date_time,  year2019)
+
+    root2020 = '/projects/sina/W-Net/cvpr2022/sup_ratio_{}/seed_{}/{}/' \
+               'result_images/{}_new_results_iter'.format(ratio, seed,date_time,  year2020)
+
+
+
+    WT1, ET1, TC1 = avg_all(root2019, root2020, seed)
+
+    seed = 42
+
+    year2019 = 'test2019'
+    year2020 = 'test2020'
+
+    ratio = 3
+    date_time = '2022-02-16 10:28:39.015293'
+    root2019 = '/projects/sina/W-Net/cvpr2022/sup_ratio_{}/seed_{}/{}/' \
+               'result_images/{}_new_results_iter'.format(ratio, seed, date_time, year2019)
+
+    root2020 = '/projects/sina/W-Net/cvpr2022/sup_ratio_{}/seed_{}/{}/' \
+               'result_images/{}_new_results_iter'.format(ratio, seed, date_time, year2020)
+
+
+
+    # root2019 = '/projects/sina/W-Net/PGS_result/Brats/CVPR2022/semi_pgs_CE_all2018/{}_ratio_{}/seed_{}/result_images/{}_new_results_iter'.format(mode,
+    #     ratio, seed, year2019)
+    #
+    # root2020 = '/projects/sina/W-Net/PGS_result/Brats/CVPR2022/semi_pgs_CE_all2018/{}_ratio_{}/seed_{}/result_images/{}_new_results_iter'.format(mode,
+    #     ratio, seed, year2020)
+
+    WT2, ET2, TC2 = avg_all(root2019, root2020, seed)
+
+    seed = 43
+
+    year2019 = 'test2019'
+    year2020 = 'test2020'
+
+    ratio = 3
+    date_time = '2022-02-16 07:48:53.989469'
+    root2019 = '/projects/sina/W-Net/cvpr2022/sup_ratio_{}/seed_{}/{}/' \
+               'result_images/{}_new_results_iter'.format(ratio, seed, date_time, year2019)
+
+    root2020 = '/projects/sina/W-Net/cvpr2022/sup_ratio_{}/seed_{}/{}/' \
+               'result_images/{}_new_results_iter'.format(ratio, seed, date_time, year2020)
+
+    # root2019 = '/projects/sina/W-Net/PGS_result/Brats/CVPR2022/semi_pgs_CE_all2018/{}_ratio_{}/seed_{}/result_images/{}_new_results_iter'.format(mode,
+    #     ratio, seed, year2019)
+    #
+    # root2020 = '/projects/sina/W-Net/PGS_result/Brats/CVPR2022/semi_pgs_CE_all2018/{}_ratio_{}/seed_{}/result_images/{}_new_results_iter'.format(mode,
+    #     ratio, seed, year2020)
+
+    WT3, ET3, TC3 = avg_all(root2019, root2020, seed)
+
+    print("FINAL AVG")
+
+    print("** WT** ")
+    print(((WT1 + WT2 + WT3) / 3)[16])
+    print(np.max((WT1 + WT2 + WT3) / 3))
+
+    print("** ET **")
+    print(((ET1 + ET2 + ET3) / 3)[16])
+    print("***TC***")
+    print(((TC1 + TC2 + TC3) / 3)[16])
+
+
+
+# sup 3 ratio
 print("superivsed")
-partially_sup_5()
+partially_sup_3()
 print('unsupervised')
-semi_sup_5()
+semi_sup_3()
+
+
+# # sup 5 ratio
+# print("superivsed")
+# partially_sup_5()
+# print('unsupervised')
+# semi_sup_5()
 
 
 
