@@ -86,10 +86,10 @@ year2019 = 'test2019'
 date_time = '2022-02-15 22:14:39.973107'
 year2020 = 'test2020'
 
-root2019 = '/projects/sina/W-Net/miccai2022/semi_alternate/sup_ratio_{}/seed_{}/{}/' \
+root2019 = '/projects/sina/W-Net/cvpr2022/semi_alternate/sup_ratio_{}/seed_{}/{}/' \
            'result_images/{}_new_results_iter'.format(ratio, seed,date_time,  year2019)
 
-root2020 = '/projects/sina/W-Net/miccai2022/semi_alternate/sup_ratio_{}/seed_{}/{}/' \
+root2020 = '/projects/sina/W-Net/cvpr2022/semi_alternate/sup_ratio_{}/seed_{}/{}/' \
            'result_images/{}_new_results_iter'.format(ratio, seed, date_time,year2020)
 
 #CVPR
@@ -110,10 +110,10 @@ year2019 = 'test2019'
 year2020 = 'test2020'
 
 
-root2019 = '/projects/sina/W-Net/miccai2022/semi_alternate/sup_ratio_{}/seed_{}/{}/' \
+root2019 = '/projects/sina/W-Net/cvpr2022/semi_alternate/sup_ratio_{}/seed_{}/{}/' \
            'result_images/{}_new_results_iter'.format(ratio, seed,date_time,  year2019)
 
-root2020 = '/projects/sina/W-Net/miccai2022/semi_alternate/sup_ratio_{}/seed_{}/{}/' \
+root2020 = '/projects/sina/W-Net/cvpr2022/semi_alternate/sup_ratio_{}/seed_{}/{}/' \
            'result_images/{}_new_results_iter'.format(ratio, seed, date_time,year2020)
 
 
@@ -134,10 +134,10 @@ year2019 = 'test2019'
 year2020 = 'test2020'
 date_time = '2022-02-16 07:48:53.989469'
 
-root2019 = '/projects/sina/W-Net/miccai2022/semi_alternate/sup_ratio_{}/seed_{}/{}/' \
+root2019 = '/projects/sina/W-Net/cvpr2022/semi_alternate/sup_ratio_{}/seed_{}/{}/' \
            'result_images/{}_new_results_iter'.format(ratio, seed,date_time,  year2019)
 
-root2020 = '/projects/sina/W-Net/miccai2022/semi_alternate/sup_ratio_{}/seed_{}/{}/' \
+root2020 = '/projects/sina/W-Net/cvpr2022/semi_alternate/sup_ratio_{}/seed_{}/{}/' \
            'result_images/{}_new_results_iter'.format(ratio, seed, date_time, year2020)
 
 #CVPR
