@@ -375,7 +375,7 @@ def partially_sup_3():
 
     print("** WT** ")
     print( ( (WT1 + WT2 + WT3)/3) )
-    print(np.ar((WT1 + WT2 + WT3)/3))
+    print(((WT1 + WT2 + WT3)/3))
     avg_wt = (WT1 + WT2 + WT3)/3
     print("** ET **")
     print( ((ET1 + ET2 + ET3)/3) [16])
