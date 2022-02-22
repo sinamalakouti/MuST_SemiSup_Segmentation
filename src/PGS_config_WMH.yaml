@@ -22,8 +22,11 @@ supervised_training:
   scheduler_step_size: 20
 #unsupervised training
 unsupervised_training:
+  consistency_training_method: 'layerwise_normal' # 'layerwise_normal' 'layerwise_no_detach'
+  loss_method: 'output-wise' # output-wise , down-sample
   consistency_loss: 'MSE' # CE, KL, MSE, DSC
-  lr: 0.001
+  T: 0.5
+  lr: 0.01
   lr_gamma: 0.5
   scheduler_step_size: 30
   consist_w_unsup:
@@ -31,7 +34,7 @@ unsupervised_training:
     final_w: 10
     rampup_ends: 20
 #hyper parameters
-experiment_mode: "partially_sup"
+experiment_mode: "semi_alternate"  # [ 'semi_alternate' , 'partially_sup' , 'semi_alternate_mix_F_G']
 n_epochs: 80
 batch_size: 16
 parallel: False
