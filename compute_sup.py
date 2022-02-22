@@ -24,7 +24,7 @@ def read(root, root2020):
         tc_strs = TC_line.split(' ')
         for i, s in enumerate(wt_strs):
             if s != 'DICE:':
-                print("s is ", s)
+                # print("s is ", s)
                 continue
             WT.append(np.float(wt_strs[i + 1].split(',')[0]))
             ET.append(np.float(et_strs[i + 1].split(',')[0]))
@@ -146,7 +146,7 @@ root2020 = '/projects/sina/W-Net/miccai2022/partially_sup/sup_ratio_{}/seed_{}/2
 
 w43, e43, t43 = read(root2019, root2020)
 
-print("TTESTTTTT")
+print("Final Result")
 print("WT    ", (w41 + w42 + w43) / 3)
 print("ET    ", (e41 + e42 + e43) / 3)
 print("TC    ", (t41 + t42 + t43) / 3)
