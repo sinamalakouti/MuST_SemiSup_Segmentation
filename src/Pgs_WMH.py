@@ -592,7 +592,7 @@ def Pgs_train_val(dataset, n_epochs, wmh_threshold, output_dir, args, cfg, seed)
                                              shuffle=False)
 
     # load optimizers & schedulers
-    if 'alternate' in cfg.experiment.mode:
+    if 'alternate' in cfg.experiment_mode:
         optimizer_unsup = torch.optim.SGD(pgsnet.parameters(), cfg.unsupervised_training.lr, momentum=0.9,
                                           weight_decay=1e-4)
         scheduler_unsup = lr_scheduler.StepLR(optimizer_unsup,
