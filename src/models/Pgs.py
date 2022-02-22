@@ -147,16 +147,16 @@ class PGS(nn.Module):
         self.cls8 = CLS(self.dim_outputs[7], self.dim_outputs[-1])
         self.cls9 = CLS(self.dim_outputs[8], self.dim_outputs[-1])  # main classifier
 
-    def forward(self, X, is_supervised,cfg):
+    def forward(self, X, is_supervised):
         type_unsup = 'layerwise'
         # type_unsup = 'unsupervised'  # both feature_level (F) and input level (G) augmentation
         if is_supervised:
             sup_outputs = self.__fw_supervised(X)
             return sup_outputs, None
 
-        elif cfg.unsupervised_training.consistency_training_method == 'layerwise_normal':
+        elif self.config.unsupervised_training.consistency_training_method == 'layerwise_normal':
             return self.__fw_unsupervised_layerwise2(X)
-        elif cfg.unsupervised_training.consistency_training_method == 'layerwise_no_detach':
+        elif self.config.unsupervised_training.consistency_training_method == 'layerwise_no_detach':
             return self.__fw_unsupervised_layerwise4(X)
 
         elif type_unsup == 'unsupervised':

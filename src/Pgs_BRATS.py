@@ -295,7 +295,7 @@ def trainPgs_semi_alternate(train_sup_loader, train_unsup_loader, model, optimiz
         b_unsup = b_unsup.to(device)
 
         # unsupervised training - forward
-        teacher_outputs, student_outputs = model(b_unsup, is_supervised=False,cfg=cfg)
+        teacher_outputs, student_outputs = model(b_unsup, is_supervised=False)
         uLoss = compute_loss(student_outputs, teacher_outputs, loss_functions, is_supervised=False, cfg=cfg)
         # unsupervised training - backward
         weight_unsup = cons_w_unsup(epochid, batch_idx)
@@ -312,7 +312,7 @@ def trainPgs_semi_alternate(train_sup_loader, train_unsup_loader, model, optimiz
         target_sup = batch_sup['label'].to(device)
 
         # supervised training - forward
-        sup_outputs, _ = model(b_sup, is_supervised=True,cfg=cfg)
+        sup_outputs, _ = model(b_sup, is_supervised=True)
         sLoss = compute_loss(sup_outputs, target_sup, loss_functions, is_supervised=True, cfg=cfg)
 
         # supervised training - backward
@@ -527,7 +527,7 @@ def trainPgs_sup(train_sup_loader, model, optimizer, device, loss_functions, epo
         target_sup = batch_sup['label'].to(device)
 
         print("subject is : ", batch_sup['subject'])
-        sup_outputs, _ = model(b_sup, is_supervised=True, cfg=cfg)
+        sup_outputs, _ = model(b_sup, is_supervised=True)
         total_loss = compute_loss(sup_outputs, target_sup, (sup_loss, None), is_supervised=True, cfg=cfg)
 
         # wandb.log({"batch_id": step + epochid * len(train_sup_loader), "loss": total_loss})
@@ -594,7 +594,7 @@ def eval_per_subjectPgs(model, device, threshold, cfg, data_mode):
             subjects = batch['subjects']
             assert len(np.unique(subjects)) == 1, print("More than one subject at a time")
             b = b.to(device)
-            outputs, _ = model(b, True, cfg=cfg)
+            outputs, _ = model(b, True)
 
             if cfg.oneHot:
                 sf = torch.nn.Softmax2d()
