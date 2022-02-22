@@ -55,5 +55,5 @@ if __name__ == '__main__':
                     # for gpu in [0, 1]:
                     # manually select device with CUDA_VISIBLE_DEVICES
                     gpu = 0
-                    with open(f'anthony_configs/wmh-{mode}-{rate}-{seed}-{temp}.yaml', 'w') as out:
+                    with open(f'../src/anthony_configs/wmh-{mode}-{rate}-{seed}-{temp}.yaml', 'w') as out:
                         out.write(make_config(seed, rate, mode, gpu, temp))
