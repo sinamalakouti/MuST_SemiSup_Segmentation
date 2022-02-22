@@ -371,7 +371,7 @@ def eval_per_subjectPgs(model, device, threshold, cfg, data_mode, val_loader):
             brain_mask = brain_mask.reshape(y_WT.shape)
             y_subject = y_subject.reshape(y_WT.shape)
             y_WT = y_WT[brain_mask]
-            y_subject = y_subject[brain_mask]
+            y_subject = y_subject[brain_mask].bool()
             metrics_WMH = do_eval(y_subject.to('cpu'), y_WT.to('cpu'))
             print(
                 "(WMH) :  DICE SCORE   {}, PPV  {},  Sensitivity: {}, Specificity: {}, Hausdorff: {}".format(
