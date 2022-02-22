@@ -338,7 +338,7 @@ class PGS(nn.Module):
         # bottleneck
 
         c5_teach = self.__fw_bottleneck(d4)
-        aug_output5_teach = self.cls5(c5_teach)
+        aug_output5_teach = self.cls5(self.transformer(c5_teach, None, perturbation_mode='F')[0])
 
         d4_stud, _ = self.transformer(d4, None, perturbation_mode='F')
         c5_stud = self.__fw_bottleneck(d4_stud)
@@ -346,7 +346,7 @@ class PGS(nn.Module):
 
         # expanding path
         teach_up1 = self.__fw_up(c5_teach, c4, self.up1,
-                                 transformer=None) if self.config.information_passing_strategy == 'teacher' \
+                                 transformer=self.transformer) if self.config.information_passing_strategy == 'teacher' \
             else self.__fw_up(c5_stud, c4, self.up1, transformer=None)
 
         stud_up1 = self.__fw_up(c5_teach, c4, self.up1,
@@ -360,7 +360,7 @@ class PGS(nn.Module):
         output6_stud = self.cls6(c6_stud)
         ######
         teach_up2 = self.__fw_up(c6_teach, c3, self.up2,
-                                 transformer=None) if self.config.information_passing_strategy == 'teacher' \
+                                 transformer=self.transformer) if self.config.information_passing_strategy == 'teacher' \
             else self.__fw_up(c6_stud, c3, self.up2, transformer=None)
 
         stud_up2 = self.__fw_up(c6_teach, c3, self.up2,
@@ -375,7 +375,7 @@ class PGS(nn.Module):
 
         #####
         teach_up3 = self.__fw_up(c7_teach, c2, self.up3,
-                                 transformer=None) if self.config.information_passing_strategy == 'teacher' \
+                                 transformer=self.transformer) if self.config.information_passing_strategy == 'teacher' \
             else self.__fw_up(c7_stud, c2, self.up3, transformer=None)
 
         stud_up3 = self.__fw_up(c7_teach, c2, self.up3,
@@ -390,7 +390,7 @@ class PGS(nn.Module):
 
         ####
         teach_up4 = self.__fw_up(c8_teach, c1, self.up4,
-                                 transformer=None) if self.config.information_passing_strategy == 'teacher' \
+                                 transformer=self.transformer) if self.config.information_passing_strategy == 'teacher' \
             else self.__fw_up(c8_stud, c1, self.up4, transformer=None)
 
         stud_up4 = self.__fw_up(c8_teach, c1, self.up4,
