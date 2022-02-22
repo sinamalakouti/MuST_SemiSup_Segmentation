@@ -106,7 +106,6 @@ def avg_all(root, root2020, seed):
         tc_strs = TC_line.split(' ')
         for i,  s in enumerate(wt_strs):
             if s != 'DICE:':
-                print("s is ", s)
                 continue
             WT2019.append(np.float(wt_strs[ i +1].split(',')[0]))
             ET2019.append(np.float(et_strs[i + 1].split(',')[0]))
