@@ -58,7 +58,7 @@ def read(root, root2020):
         r = 49
     else:
         r = iteration[mi]
-    path = root2020 + str(iteration[mi])
+    path = root2020 + str(r)
     path = os.path.join(path, 'result.txt')
     file1 = open(path, 'r')
     Lines = file1.readlines()
