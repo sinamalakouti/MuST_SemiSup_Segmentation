@@ -880,7 +880,7 @@ def Pgs_train_val(dataset, n_epochs, wmh_threshold, output_dir, args, cfg, seed)
                                      epoch, cfg)
         elif cfg.experiment_mode == 'semi_alternate':
 
-            trainPgs_semi_alternate2(train_sup_loader, train_unsup_loader, pgsnet,
+            trainPgs_semi_alternate(train_sup_loader, train_unsup_loader, pgsnet,
                                     (optimizer_sup, optimizer_unsup), device,
                                     (torch.nn.CrossEntropyLoss(), cons_loss_fn),
                                     cons_w_unsup,
