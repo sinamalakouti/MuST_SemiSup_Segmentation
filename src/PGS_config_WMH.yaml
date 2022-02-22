@@ -1,5 +1,6 @@
 #trianing and test splits
-train_sup_rate: 5 #rate of labeled data
+val_mode: 'val_heldout'
+train_sup_rate: 5 #rate of labeled data    cvpr rates: 20, 25, 30    (available rates: 5, 10, 20, 25, 30)
 #data loader and pre-processing
 t1: True
 wmh_threshold: 0.5
@@ -35,7 +36,7 @@ unsupervised_training:
     rampup_ends: 20
 #hyper parameters
 experiment_mode: "semi_alternate"  # [ 'semi_alternate' , 'partially_sup' , 'semi_alternate_mix_F_G']
-n_epochs: 80
+n_epochs: 100
 batch_size: 16
 parallel: False
 cuda: "0"
