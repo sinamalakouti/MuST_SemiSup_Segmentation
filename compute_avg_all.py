@@ -154,6 +154,184 @@ def avg_all(root, root2020, seed):
 
 
 
+
+
+def partially_sup_10():
+    #sup is semi  partially_sup is partially_sup
+    mode = 'partiallySup'
+
+
+    seed = 41
+    year2019 = 'test2019'
+    year2020 = 'test2020'
+
+    ratio = 10
+    date_time ='2022-02-21 09:56:12.009571'
+    root2019 = '/projects/sina/W-Net/miccai2022/partially_sup/sup_ratio_{}/seed_{}/{}/result_images/{}_new_results_iter'.format(
+        ratio, seed,date_time, year2019)
+    root2020 = '/projects/sina/W-Net/miccai2022/partially_sup/sup_ratio_{}/seed_{}/{}/result_images/{}_new_results_iter'.format(
+        ratio, seed,date_time, year2020)
+
+
+    WT1, ET1 , TC1 = avg_all(root2019, root2020, seed)
+
+    seed = 42
+
+    year2019 = 'test2019'
+    year2020 = 'test2020'
+
+    ratio = 10
+    date_time = '2022-02-21 12:46:07.095553'
+    root2019 = '/projects/sina/W-Net/miccai2022/partially_sup/sup_ratio_{}/seed_{}/{}/result_images/{}_new_results_iter'.format(
+        ratio, seed, date_time, year2019)
+    root2020 = '/projects/sina/W-Net/miccai2022/partially_sup/sup_ratio_{}/seed_{}/{}/result_images/{}_new_results_iter'.format(
+        ratio, seed, date_time, year2020)
+
+
+    # root2019 = '/projects/sina/W-Net/PGS_result/Brats/CVPR2022/semi_pgs_CE_all2018/{}_ratio_{}/seed_{}/result_images/{}_new_results_iter'.format(mode,
+    #     ratio, seed, year2019)
+    #
+    # root2020 = '/projects/sina/W-Net/PGS_result/Brats/CVPR2022/semi_pgs_CE_all2018/{}_ratio_{}/seed_{}/result_images/{}_new_results_iter'.format(mode,
+    #     ratio, seed, year2020)
+
+    WT2, ET2 , TC2 = avg_all(root2019, root2020,seed)
+
+
+    seed = 43
+
+    year2019 = 'test2019'
+    year2020 = 'test2020'
+
+    ratio = 10
+    date_time = '2022-02-21 15:31:59.339258'
+    root2019 = '/projects/sina/W-Net/miccai2022/partially_sup/sup_ratio_{}/seed_{}/{}/result_images/{}_new_results_iter'.format(
+        ratio, seed, date_time, year2019)
+    root2020 = '/projects/sina/W-Net/miccai2022/partially_sup/sup_ratio_{}/seed_{}/{}/result_images/{}_new_results_iter'.format(
+        ratio, seed, date_time, year2020)
+
+
+    # root2019 = '/projects/sina/W-Net/PGS_result/Brats/CVPR2022/semi_pgs_CE_all2018/{}_ratio_{}/seed_{}/result_images/{}_new_results_iter'.format(mode,
+    #     ratio, seed, year2019)
+    #
+    # root2020 = '/projects/sina/W-Net/PGS_result/Brats/CVPR2022/semi_pgs_CE_all2018/{}_ratio_{}/seed_{}/result_images/{}_new_results_iter'.format(mode,
+    #     ratio, seed, year2020)
+
+    WT3, ET3 , TC3 = avg_all(root2019, root2020, seed)
+
+
+
+    # print("FINAL AVG")
+    #
+    # print("** WT** ")
+    # print( ( (WT1 + WT2 + WT3)/3) [16])
+    # print(np.max((WT1 + WT2 + WT3)/3))
+    #
+    # print("** ET **")
+    # print( ((ET1 + ET2 + ET3)/3) [16])
+    # print("***TC***")
+    # print( ((TC1 + TC2 + TC3)/3) [16])
+
+    print("FINAL AVG")
+
+    print("** WT** ")
+    print( ( (WT1 + WT2 + WT3)/3)[15] )
+    print(((WT1 + WT2 + WT3)/3))
+    avg_wt = (WT1 + WT2 + WT3)/3
+    print("** ET **")
+    print( ((ET1 + ET2 + ET3)/3) [15])
+    avg_et = (ET1 + ET2 + ET3)/3
+    print("***TC***")
+    print( ((TC1 + TC2 + TC3)/3) [15])
+    avg_tc = (TC1 + TC2 + TC3)/3
+    return avg_wt,avg_et, avg_tc
+
+
+def semi_sup_10():
+    # sup is semi  partially_sup is partially_sup
+    mode = 'partiallySup'
+
+    seed = 41
+    year2019 = 'test2019'
+    year2020 = 'test2020'
+
+    ratio = 10
+    date_time = '2022-02-21 09:55:59.117838'
+    root2019 = '/projects/sina/W-Net/miccai2022/semi_alternate/sup_ratio_{}/seed_{}/{}/' \
+               'result_images/{}_new_results_iter'.format(ratio, seed, date_time, year2019)
+
+    root2020 = '/projects/sina/W-Net/miccai2022/semi_alternate/sup_ratio_{}/seed_{}/{}/' \
+               'result_images/{}_new_results_iter'.format(ratio, seed, date_time, year2020)
+
+
+
+    WT1, ET1, TC1 = avg_all(root2019, root2020, seed)
+
+    seed = 42
+
+    year2019 = 'test2019'
+    year2020 = 'test2020'
+
+    ratio = 10
+    date_time = '2022-02-21 13:46:42.254403'
+    root2019 = '/projects/sina/W-Net/miccai2022/semi_alternate/sup_ratio_{}/seed_{}/{}/' \
+               'result_images/{}_new_results_iter'.format(ratio, seed, date_time, year2019)
+
+    root2020 = '/projects/sina/W-Net/miccai2022/semi_alternate/sup_ratio_{}/seed_{}/{}/' \
+               'result_images/{}_new_results_iter'.format(ratio, seed, date_time, year2020)
+
+
+
+    # root2019 = '/projects/sina/W-Net/PGS_result/Brats/CVPR2022/semi_pgs_CE_all2018/{}_ratio_{}/seed_{}/result_images/{}_new_results_iter'.format(mode,
+    #     ratio, seed, year2019)
+    #
+    # root2020 = '/projects/sina/W-Net/PGS_result/Brats/CVPR2022/semi_pgs_CE_all2018/{}_ratio_{}/seed_{}/result_images/{}_new_results_iter'.format(mode,
+    #     ratio, seed, year2020)
+
+    WT2, ET2, TC2 = avg_all(root2019, root2020, seed)
+
+    seed = 43
+
+    year2019 = 'test2019'
+    year2020 = 'test2020'
+
+    ratio = 10
+    date_time = '2022-02-21 17:23:56.694623'
+    root2019 = '/projects/sina/W-Net/miccai2022/semi_alternate/sup_ratio_{}/seed_{}/{}/' \
+               'result_images/{}_new_results_iter'.format(ratio, seed, date_time, year2019)
+
+    root2020 = '/projects/sina/W-Net/miccai2022/semi_alternate/sup_ratio_{}/seed_{}/{}/' \
+               'result_images/{}_new_results_iter'.format(ratio, seed, date_time, year2020)
+
+
+    # root2019 = '/projects/sina/W-Net/PGS_result/Brats/CVPR2022/semi_pgs_CE_all2018/{}_ratio_{}/seed_{}/result_images/{}_new_results_iter'.format(mode,
+    #     ratio, seed, year2019)
+    #
+    # root2020 = '/projects/sina/W-Net/PGS_result/Brats/CVPR2022/semi_pgs_CE_all2018/{}_ratio_{}/seed_{}/result_images/{}_new_results_iter'.format(mode,
+    #     ratio, seed, year2020)
+
+    WT3, ET3, TC3 = avg_all(root2019, root2020, seed)
+
+
+    print("FINAL AVG")
+
+    print("** WT** ")
+    print( ( (WT1 + WT2 + WT3)/3)[15] )
+    print(((WT1 + WT2 + WT3)/3))
+    avg_wt = (WT1 + WT2 + WT3)/3
+    print("** ET **")
+    print( ((ET1 + ET2 + ET3)/3) [15])
+    avg_et = (ET1 + ET2 + ET3)/3
+    print("***TC***")
+    print( ((TC1 + TC2 + TC3)/3) [15])
+    avg_tc = (TC1 + TC2 + TC3)/3
+    return avg_wt, avg_et, avg_tc
+
+
+
+
+
+
+
 def partially_sup_5():
     #sup is semi  partially_sup is partially_sup
     mode = 'partiallySup'
@@ -545,5 +723,37 @@ print('et max diff : index:{} value{}'.format(np.argmax(diff_et[15:]), np.max(di
 
 print('tc max diff : index:{} value{}'.format(np.argmax(diff_tc[15:]), np.max(diff_tc[15:])))
 
+
+print("******  SUP 10 RATIO  RESULT ******")
+
+
+
+# print("superivsed")
+sup10_avg_wt,sup10_avg_et,sup10_avg_tc = partially_sup_10()
+# print('unsupervised')
+semi10_avg_wt,semi10_avg_et,semi10_avg_tc  = semi_sup_10()
+
+diff_wt, diff_et,diff_tc = (semi10_avg_wt - sup10_avg_wt), (semi10_avg_et - sup10_avg_et) , (semi10_avg_tc - sup10_avg_tc)
+
+
+
+
+
+print("******  SUP 10 RATIO  RESULT ******")
+
+print("avg wt difference")
+print((semi10_avg_wt - sup10_avg_wt))
+
+print("avg et difference")
+print(diff_et)
+
+print("avg tc difference")
+print(diff_tc)
+
+print('wt max diff : index:{} value{}'.format(np.argmax(diff_wt[15:]), np.max(diff_wt[15:]) ))
+
+print('et max diff : index:{} value{}'.format(np.argmax(diff_et[15:]), np.max(diff_et[15:]) ))
+
+print('tc max diff : index:{} value{}'.format(np.argmax(diff_tc[15:]), np.max(diff_tc[15:])))
 
 
