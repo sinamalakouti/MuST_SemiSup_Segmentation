@@ -208,8 +208,7 @@ def trainPgs_semi_alternate(train_sup_loader, train_unsup_loader, model, optimiz
         # b_unsup = b_unsup.to(device)
         # unsupervised training - forward
         teacher_outputs, student_outputs = model(b_unsup.to(device), is_supervised=False)
-        uLoss = compute_loss(student_outputs, teacher_outputs, loss_functions, is_supervised=False, cfg=cfg,
-                             cur_epoch=epochid)
+        uLoss = compute_loss(student_outputs, teacher_outputs, loss_functions, is_supervised=False, cfg=cfg)
         # unsupervised training - backward
         weight_unsup = cons_w_unsup(epochid, batch_idx)
         uloss_final = uLoss * weight_unsup
