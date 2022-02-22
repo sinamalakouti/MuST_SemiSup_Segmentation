@@ -233,16 +233,15 @@ def partially_sup_5():
     print("FINAL AVG")
 
     print("** WT** ")
-    print( ( (WT1 + WT2 + WT3)/3) )
+    print( ( (WT1 + WT2 + WT3)/3)[15] )
     print(((WT1 + WT2 + WT3)/3))
     avg_wt = (WT1 + WT2 + WT3)/3
     print("** ET **")
-    print( ((ET1 + ET2 + ET3)/3) [16])
+    print( ((ET1 + ET2 + ET3)/3) [15])
     avg_et = (ET1 + ET2 + ET3)/3
     print("***TC***")
-    print( ((TC1 + TC2 + TC3)/3) [16])
+    print( ((TC1 + TC2 + TC3)/3) [15])
     avg_tc = (TC1 + TC2 + TC3)/3
-
     return avg_wt,avg_et, avg_tc
 
 
@@ -311,19 +310,19 @@ def semi_sup_5():
 
     WT3, ET3, TC3 = avg_all(root2019, root2020, seed)
 
+
     print("FINAL AVG")
 
     print("** WT** ")
-    print(((WT1 + WT2 + WT3) / 3))
-    print(((WT1 + WT2 + WT3) / 3))
-    avg_wt = (WT1 + WT2 + WT3) / 3
+    print( ( (WT1 + WT2 + WT3)/3)[15] )
+    print(((WT1 + WT2 + WT3)/3))
+    avg_wt = (WT1 + WT2 + WT3)/3
     print("** ET **")
-    print(((ET1 + ET2 + ET3) / 3)[16])
-    avg_et = (ET1 + ET2 + ET3) / 3
+    print( ((ET1 + ET2 + ET3)/3) [15])
+    avg_et = (ET1 + ET2 + ET3)/3
     print("***TC***")
-    print(((TC1 + TC2 + TC3) / 3)[16])
-    avg_tc = (TC1 + TC2 + TC3) / 3
-
+    print( ((TC1 + TC2 + TC3)/3) [15])
+    avg_tc = (TC1 + TC2 + TC3)/3
     return avg_wt, avg_et, avg_tc
 
 
@@ -393,14 +392,14 @@ def partially_sup_3():
     print("FINAL AVG")
 
     print("** WT** ")
-    print( ( (WT1 + WT2 + WT3)/3) )
+    print( ( (WT1 + WT2 + WT3)/3)[15] )
     print(((WT1 + WT2 + WT3)/3))
     avg_wt = (WT1 + WT2 + WT3)/3
     print("** ET **")
-    print( ((ET1 + ET2 + ET3)/3) [16])
+    print( ((ET1 + ET2 + ET3)/3) [15])
     avg_et = (ET1 + ET2 + ET3)/3
     print("***TC***")
-    print( ((TC1 + TC2 + TC3)/3) [16])
+    print( ((TC1 + TC2 + TC3)/3) [15])
     avg_tc = (TC1 + TC2 + TC3)/3
 
     return avg_wt,avg_et, avg_tc
