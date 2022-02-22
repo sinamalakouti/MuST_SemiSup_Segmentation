@@ -497,13 +497,22 @@ semi3_avg_wt,semi3_avg_et,semi3_avg_tc  = semi_sup_3()
 
 diff_wt, diff_et,diff_tc = (semi3_avg_wt - sup3_avg_wt), (semi3_avg_et - sup3_avg_et) , (semi3_avg_tc - sup3_avg_tc)
 
-print("HIHIHI")
+print("******  SUP 3 RATIO  RESULT ******")
+
+print("avg wt difference")
 print((semi3_avg_wt - sup3_avg_wt))
-print('wt max diff : index:{} value{}'.format(np.argmax(diff_wt), np.max(diff_wt) ))
 
-print('et max diff : index:{} value{}'.format(np.argmax(diff_wt), np.max(diff_wt) ))
+print("avg et difference")
+print(diff_et)
 
-print('tc max diff : index:{} value{}'.format(np.argmax(diff_wt), np.max(diff_wt)))
+print("avg tc difference")
+print(diff_tc)
+
+print('wt max diff : index:{} value{}'.format(np.argmax(diff_wt[15:]), np.max(diff_wt[15:]) ))
+
+print('et max diff : index:{} value{}'.format(np.argmax(diff_et[15:]), np.max(diff_et[15:]) ))
+
+print('tc max diff : index:{} value{}'.format(np.argmax(diff_tc[15:]), np.max(diff_tc[15:])))
 
 print("******  SUP 5 RATIO ******")
 
@@ -518,12 +527,24 @@ diff_wt, diff_et,diff_tc = (semi5_avg_wt - sup5_avg_wt), (semi5_avg_et - sup5_av
 
 
 
-print('wt max diff : index:{} value{}'.format(np.argmax(diff_wt), np.max(diff_wt) ))
 
-print('et max diff : index:{} value{}'.format(np.argmax(diff_wt), np.max(diff_wt) ))
 
-print('tc max diff : index:{} value{}'.format(np.argmax(diff_wt), np.max(diff_wt)))
+print("******  SUP 5 RATIO  RESULT ******")
 
+print("avg wt difference")
+print((semi5_avg_wt - sup5_avg_wt))
+
+print("avg et difference")
+print(diff_et)
+
+print("avg tc difference")
+print(diff_tc)
+
+print('wt max diff : index:{} value{}'.format(np.argmax(diff_wt[15:]), np.max(diff_wt[15:]) ))
+
+print('et max diff : index:{} value{}'.format(np.argmax(diff_et[15:]), np.max(diff_et[15:]) ))
+
+print('tc max diff : index:{} value{}'.format(np.argmax(diff_tc[15:]), np.max(diff_tc[15:])))
 
 
 
