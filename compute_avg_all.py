@@ -82,65 +82,6 @@ def read(root, root2020):
 
 
 
-
-
-
-
-
-
-ratio = 3
-seed = 41
-year2019 = 'test2019'
-
-year2020 = 'test2020'
-root2019 = '/projects/sina/W-Net/PGS_result/Brats/CVPR2022/semi_pgs_CE_all2018/sup_ratio_{}/seed_{}/result_images/{}_new_results_iter'.format(
-    ratio, seed, year2019)
-
-root2020 = '/projects/sina/W-Net/PGS_result/Brats/CVPR2022/semi_pgs_CE_all2018/sup_ratio_{}/seed_{}/result_images/{}_new_results_iter'.format(
-    ratio, seed, year2020)
-
-w41, e41, t41 = read(root2019, root2020)
-
-
-seed = 42
-
-year2019 = 'test2019'
-year2020 = 'test2020'
-root2019 = '/projects/sina/W-Net/PGS_result/Brats/CVPR2022/semi_pgs_CE_all2018/sup_ratio_{}/seed_{}/result_images/{}_new_results_iter'.format(
-    ratio, seed, year2019)
-
-root2020 = '/projects/sina/W-Net/PGS_result/Brats/CVPR2022/semi_pgs_CE_all2018/sup_ratio_{}/seed_{}/result_images/{}_new_results_iter'.format(
-    ratio, seed, year2020)
-
-w42, e42 ,t42 = read(root2019, root2020)
-
-
-
-seed = 43
-
-year2019 = 'test2019'
-year2020 = 'test2020'
-root2019 = '/projects/sina/W-Net/PGS_result/Brats/CVPR2022/semi_pgs_CE_all2018/sup_ratio_{}/seed_{}/result_images/{}_new_results_iter'.format(
-    ratio, seed, year2019)
-
-root2020 = '/projects/sina/W-Net/PGS_result/Brats/CVPR2022/semi_pgs_CE_all2018/sup_ratio_{}/seed_{}/result_images/{}_new_results_iter'.format(
-    ratio, seed, year2020)
-
-w43, e43 ,t43 = read(root2019, root2020)
-
-
-print("TTESTTTTT")
-print("WT    ", (w41 + w42 + w43)/3)
-print("ET    ", (e41 + e42 + e43)/3)
-print("TC    ", (t41 + t42 + t43)/3)
-
-
-
-
-
-
-
-
 import numpy as np
 import os
 def avg_all(root, root2020, seed):
@@ -204,8 +145,8 @@ def avg_all(root, root2020, seed):
             TC2020.append(np.float(tc_strs[i + 1].split(',')[0]))
 
     WT = (np.array(WT2019) * 50 + np.array(WT2020) * 34) / (34 + 50)
-    ET = (np.array(ET2019) * 50+ np.array(ET2020) * 34) / (34 + 50)
-    TC = (np.array(TC2019) * 50+ np.array(TC2020)* 34) / (34 + 50)
+    ET = (np.array(ET2019) * 50 + np.array(ET2020) * 34) / (34 + 50)
+    TC = (np.array(TC2019) * 50 + np.array(TC2020)* 34) / (34 + 50)
 
     print("WT is ", WT)
     print("ET is ", ET)
@@ -218,16 +159,18 @@ def avg_all(root, root2020, seed):
 #sup is semi  partially_sup is partially_sup
 mode = 'partiallySup'
 
-ratio = 3
+
 seed = 41
 year2019 = 'test2019'
-
 year2020 = 'test2020'
-root2019 = '/projects/sina/W-Net/PGS_result/Brats/CVPR2022/semi_pgs_CE_all2018/{}_ratio_{}/seed_{}/result_images/{}_new_results_iter'.format(mode,
-    ratio, seed, year2019)
 
-root2020 = '/projects/sina/W-Net/PGS_result/Brats/CVPR2022/semi_pgs_CE_all2018/{}_ratio_{}/seed_{}/result_images/{}_new_results_iter'.format(mode,
-    ratio, seed, year2020)
+ratio = 5
+date_time ='2022-02-17 10:10:43.418844'
+root2019 = '/projects/sina/W-Net/cvpr2022/partially_sup/sup_ratio_{}/seed_{}/{}/result_images/{}_new_results_iter'.format(
+    ratio, seed,date_time, year2019)
+root2020 = '/projects/sina/W-Net/cvpr2022/partially_sup/sup_ratio_{}/seed_{}/{}/result_images/{}_new_results_iter'.format(
+    ratio, seed,date_time, year2020)
+
 
 WT1, ET1 , TC1 = avg_all(root2019, root2020, seed)
 
@@ -235,11 +178,20 @@ seed = 42
 
 year2019 = 'test2019'
 year2020 = 'test2020'
-root2019 = '/projects/sina/W-Net/PGS_result/Brats/CVPR2022/semi_pgs_CE_all2018/{}_ratio_{}/seed_{}/result_images/{}_new_results_iter'.format(mode,
-    ratio, seed, year2019)
 
-root2020 = '/projects/sina/W-Net/PGS_result/Brats/CVPR2022/semi_pgs_CE_all2018/{}_ratio_{}/seed_{}/result_images/{}_new_results_iter'.format(mode,
-    ratio, seed, year2020)
+ratio=5
+date_time ='2022-02-17 14:06:15.057081'
+root2019 = '/projects/sina/W-Net/cvpr2022/partially_sup/sup_ratio_{}/seed_{}/{}/result_images/{}_new_results_iter'.format(
+    ratio, seed,date_time, year2019)
+root2020 = '/projects/sina/W-Net/cvpr2022/partially_sup/sup_ratio_{}/seed_{}/{}/result_images/{}_new_results_iter'.format(
+    ratio, seed,date_time, year2020)
+
+
+# root2019 = '/projects/sina/W-Net/PGS_result/Brats/CVPR2022/semi_pgs_CE_all2018/{}_ratio_{}/seed_{}/result_images/{}_new_results_iter'.format(mode,
+#     ratio, seed, year2019)
+#
+# root2020 = '/projects/sina/W-Net/PGS_result/Brats/CVPR2022/semi_pgs_CE_all2018/{}_ratio_{}/seed_{}/result_images/{}_new_results_iter'.format(mode,
+#     ratio, seed, year2020)
 
 WT2, ET2 , TC2 = avg_all(root2019, root2020,seed)
 
@@ -248,11 +200,21 @@ seed = 43
 
 year2019 = 'test2019'
 year2020 = 'test2020'
-root2019 = '/projects/sina/W-Net/PGS_result/Brats/CVPR2022/semi_pgs_CE_all2018/{}_ratio_{}/seed_{}/result_images/{}_new_results_iter'.format(mode,
-    ratio, seed, year2019)
 
-root2020 = '/projects/sina/W-Net/PGS_result/Brats/CVPR2022/semi_pgs_CE_all2018/{}_ratio_{}/seed_{}/result_images/{}_new_results_iter'.format(mode,
-    ratio, seed, year2020)
+date_time = '2022-02-17 16:31:21.376245'
+
+
+root2019 = '/projects/sina/W-Net/cvpr2022/partially_sup/sup_ratio_{}/seed_{}/{}/result_images/{}_new_results_iter'.format(
+    ratio, seed,date_time, year2019)
+root2020 = '/projects/sina/W-Net/cvpr2022/partially_sup/sup_ratio_{}/seed_{}/{}/result_images/{}_new_results_iter'.format(
+    ratio, seed,date_time, year2020)
+
+
+# root2019 = '/projects/sina/W-Net/PGS_result/Brats/CVPR2022/semi_pgs_CE_all2018/{}_ratio_{}/seed_{}/result_images/{}_new_results_iter'.format(mode,
+#     ratio, seed, year2019)
+#
+# root2020 = '/projects/sina/W-Net/PGS_result/Brats/CVPR2022/semi_pgs_CE_all2018/{}_ratio_{}/seed_{}/result_images/{}_new_results_iter'.format(mode,
+#     ratio, seed, year2020)
 
 WT3, ET3 , TC3 = avg_all(root2019, root2020, seed)
 
