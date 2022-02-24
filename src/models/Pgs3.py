@@ -180,12 +180,12 @@ class PGS_Independent(nn.Module):
             return sup_outputs, None
 
         elif self.config.unsupervised_training.consistency_training_method == 'layerwise_normal':
-            return self.__fw_unsupervised_independent_decoders(X)
+            return self.__fw_unsupervised_independent_decoders2(X)
         elif self.config.unsupervised_training.consistency_training_method == 'layerwise_no_detach':
-            return self.__fw_unsupervised_layerwise4(X)
+            return self.__fw_unsupervised_independent_decoders2(X)
 
         elif type_unsup == 'unsupervised':
-            return self.__fw_unsupervised_independent_decoders(X)
+            return self.__fw_unsupervised_independent_decoders2(X)
 
         else:
 
@@ -284,7 +284,8 @@ class PGS_Independent(nn.Module):
         return supervised_outputs, unsupervised_outputs
 
 
-    def __fw_unsupervised_independent_decoders(self, X):  # only_feature space aug
+    def __fw_unsupervised_independent_decoders2(self, X):  # only_feature space aug
+        print("NOO @@@@@!!@@@@@@2222")
         # no detach
         # contracting path ( SHARED ENCODER )
         c1, d1, c2, d2, c3, d3, c4, d4 = self.__fw_contracting_path(X)
