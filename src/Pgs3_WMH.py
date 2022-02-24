@@ -18,7 +18,7 @@ from dataset.Brat20 import seg2WT
 from dataset.wmhChallenge import WmhChallenge
 from utils import utils
 
-from losses.loss import consistency_weight, softmax_kl_loss, DSCLoss
+from losses.loss import consistency_weight, softmax_kl_loss
 from losses.evaluation_metrics import dice_coef, do_eval
 from models import Pgs3
 
@@ -91,8 +91,8 @@ def __fw_downsample_unsup_loss(y_stud, y_teach, loss_functions, cfg, mask=None):
         elif cfg.unsupervised_training.consistency_loss == 'MSE':
             #     teach_pred = torch.nn.functional.softmax(teach_pred / 0.85, dim=1)
             stud_pred = torch.nn.functional.softmax(stud_pred, dim=1)
-            sig = torch.nn.Sigmoid()
-            stud_pred = sig(stud_pred)
+            #sig = torch.nn.Sigmoid()
+            #stud_pred = sig(stud_pred)
             mse = torch.nn.MSELoss()
             loss = mse(stud_pred, y_true.detach())
             losses.append(loss)
@@ -483,7 +483,7 @@ def get_train_loaders(dataset, cfg):
 
 def Pgs_train_val(dataset, n_epochs, wmh_threshold, output_dir, args, cfg, seed):
     inputs_dim = [2, 64, 96, 128, 256, 768, 384, 224, 160]
-    outputs_dim = [64, 96, 128, 256, 512, 256, 128, 96, 64, 1]
+    outputs_dim = [64, 96, 128, 256, 512, 256, 128, 96, 64, 2]
     kernels = [5, 3, 3, 3, 3, 3, 3, 3, 3]
     strides = [1, 1, 1, 1, 1, 1, 1, 1, 1]
 
@@ -517,7 +517,7 @@ def Pgs_train_val(dataset, n_epochs, wmh_threshold, output_dir, args, cfg, seed)
     print("output_dir is    ", output_dir)
 
     # load model
-    if cfg.model == 'PGS':
+    if cfg.model == 'PGS3':
         pgsnet = Pgs3.PGS_Independent(inputs_dim, outputs_dim, kernels, strides, cfg)
 
     # elif cfg.model == 'PGS4':
@@ -622,7 +622,8 @@ def Pgs_train_val(dataset, n_epochs, wmh_threshold, output_dir, args, cfg, seed)
         # pgsnet, loss = trainPGS(train_loader, pgsnet, optimizer, device, epoch)
 
         if cfg.experiment_mode == 'semi_alternate':
-            dsc_loss_fn = DSCLoss(1)
+            #dsc_loss_fn = DSCLoss(1)
+            dsc_loss_fn = torch.nn.CrossEntropyLoss()
             trainPgs_semi_alternate(train_sup_loader, train_unsup_loader, pgsnet,
                                     (optimizer_sup, optimizer_unsup), device,
                                     (dsc_loss_fn, None),
@@ -809,7 +810,7 @@ def main():
     # GOING TO SET IT MANUALLY OUTSIDE OF SCRIPT
 
     config_params = dict(args=args, config=cfg)
-    wandb.init(project=args.wandb, config=config_params)
+    wandb.init(project="WMH_MICCAI2022_TEST", config=config_params)
     Pgs_train_val(dataset, cfg.n_epochs, cfg.wmh_threshold, args.output_dir, args, cfg, cfg.seed)
 
 
