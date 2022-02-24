@@ -6,12 +6,12 @@ import numpy as np
 # /home/sina/WMH_semisup_segmentation/WMH_Unsupervised_Segmentation/src/data/wmh_challenge/paths/GE3T
 
 
-def create_semi_sup_split(all_data_path, sup_dir_path, unsup_dir_path, ratio=0.5, seed=None, domain='Singapore'):
+def create_semi_sup_split(all_data_path, sup_dir_path, unsup_dir_path, ratio=None, seed=None, domain='Singapore'):
 
+    np.random(seed)
 
-
-    if seed is not None:
-        np.random.seed(seed)
+    # if seed is not None:
+    #     np.random.seed(seed)
     all_size = 48  # 3 datasets together
     lines = [p.strip().split() for p in open(all_data_path, 'r')]
     n_ids = len(lines)
@@ -49,8 +49,8 @@ def create_semi_sup_split(all_data_path, sup_dir_path, unsup_dir_path, ratio=0.5
 
 domains = ['Singapore', 'GE3T', 'Utrecht']
 
-ratios = [0.25, 0.3]
-seeds = [41,42,43]
+ratios = [0.05]
+seeds = [40]
 for ratio in ratios:
     for seed in seeds:
         for domain in domains:
