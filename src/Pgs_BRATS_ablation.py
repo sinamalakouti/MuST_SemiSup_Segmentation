@@ -16,7 +16,7 @@ import torch.nn.functional as F
 from losses.evaluation_metrics import dice_coef, do_eval
 from dataset.Brat20 import Brat20Test, seg2WT, seg2TC, seg2ET
 from models import Perturbations
-from models import Pgs, Pgs4
+from models import  Pgs_ablation
 from utils import utils
 from losses.loss import consistency_weight, Consistency_CE, softmax_kl_loss
 
@@ -815,14 +815,14 @@ def Pgs_train_val(dataset, n_epochs, wmh_threshold, output_dir, args, cfg, seed)
     print("unsup learning_rate is    ", cfg.unsupervised_training.lr)
 
     # load model
-    if cfg.model == 'PGS':
-        print("Hi")
-        pgsnet = Pgs.PGS(inputs_dim, outputs_dim, kernels, strides, cfg)
-
-    elif cfg.model == 'PGS4':
-
-        pgsnet = Pgs4.PGS4(inputs_dim, outputs_dim, kernels, strides, cfg)
-
+    # if cfg.model == 'PGS':
+    #     print("Hi")
+    #     pgsnet = Pgs_ablation.PGS(inputs_dim, outputs_dim, kernels, strides, cfg)
+    #
+    # elif cfg.model == 'PGS4':
+    #
+    #     pgsnet = Pgs_ablation.PGS4(inputs_dim, outputs_dim, kernels, strides, cfg)
+    pgsnet = Pgs_ablation.PGS(inputs_dim, outputs_dim, kernels, strides, cfg)
     if torch.cuda.is_available():
         if type(pgsnet) is not torch.nn.DataParallel and cfg.parallel and cfg.parallel:
             pgsnet = torch.nn.DataParallel(pgsnet)
