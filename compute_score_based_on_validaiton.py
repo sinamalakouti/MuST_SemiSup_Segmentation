@@ -23,7 +23,6 @@ def read(root, root2020):
         tc_strs = TC_line.split(' ')
         for i,  s in enumerate(wt_strs):
             if s != 'DICE:':
-                print("s is ", s)
                 continue
             WT.append(np.float(wt_strs[ i +1].split(',')[0]))
             ET.append(np.float(et_strs[i + 1].split(',')[0]))
@@ -62,9 +61,6 @@ def read(root, root2020):
     et_hd = None
     tc_hd = None
     for i, s in enumerate(wt_strs):
-        if s != 'DICE:':
-            print("s is ", s)
-            continue
         if s == 'DICE:':
             wt_dsc, et_dsc, tc_dsc = (np.float(wt_strs[i + 1].split(',')[0]), np.float(et_strs[i + 1].split(',')[0]), np.float(tc_strs[i + 1].split(',')[0]))
         elif s == 'hd:':
