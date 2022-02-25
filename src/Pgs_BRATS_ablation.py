@@ -34,7 +34,7 @@ def __fw_unsup_loss(y_stud, y_teach, loss_functions, cfg, mask=None):
     if cfg.unsupervised_training.loss_method == 'output-wise':
         return __fw_outputwise_unsup_loss(y_stud, y_teach, loss_functions, cfg, mask)
     else:
-        if cfg.unsupervised_training.consistency_training_method != 'layerwise_normal':
+        if cfg.unet_sup:
             return __oneLayer_unsup_loss(y_stud, y_teach, loss_functions, cfg, mask)
         return __fw_downsample_unsup_loss(y_stud, y_teach, loss_functions, cfg, mask)
 
@@ -1225,7 +1225,7 @@ def main():
     cfg['unet_sup'] = args.unet_sup
     config_params = dict(args=args, config=cfg)
 
-    wandb.init(project=args.wandb, config=config_params)
+    wandb.init(project="PGS_MICCAI2022_ABLATION", config=config_params)
     Pgs_train_val(dataset, cfg.n_epochs, cfg.wmh_threshold, args.output_dir, args, cfg, cfg.seed)
 
 
