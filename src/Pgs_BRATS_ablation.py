@@ -34,7 +34,12 @@ def __fw_unsup_loss(y_stud, y_teach, loss_functions, cfg, mask=None):
     if cfg.unsupervised_training.loss_method == 'output-wise':
         return __fw_outputwise_unsup_loss(y_stud, y_teach, loss_functions, cfg, mask)
     else:
+        if cfg.unsupervised_training.consistency_training_method != 'layerwise_normal':
+            return __oneLayer_unsup_loss(y_stud, y_teach, loss_functions, cfg, mask)
         return __fw_downsample_unsup_loss(y_stud, y_teach, loss_functions, cfg, mask)
+
+
+
 
 
 def __fw_downsample_unsup_loss(y_stud, y_teach, loss_functions, cfg, mask=None):
@@ -128,6 +133,48 @@ def __fw_outputwise_unsup_loss(y_stud, y_teach, loss_functions, cfg, masks=None)
     total_loss = sum(losses)
     return total_loss
 
+
+def __oneLayer_unsup_loss(y_stud, y_teach, loss_functions, cfg, masks=None):
+    (_, unsup_loss) = loss_functions
+
+    assert len(y_teach) == len(y_stud), "Error! unsup_preds and sup_preds have to have same length"
+
+    losses = []
+
+
+    teach_pred = y_teach
+    stud_pred = y_stud
+    assert teach_pred.shape == stud_pred.shape, "Error! for preds number {}, supervised and unsupervised" \
+                                                " prediction shape is not similar!".format(i)
+
+    if cfg.unsupervised_training.consistency_loss == 'CE':
+        teach_pred = torch.nn.functional.softmax(teach_pred, dim=1)
+        losses.append(- torch.mean(
+            torch.sum(teach_pred.detach()
+                      * torch.nn.functional.log_softmax(stud_pred, dim=1), dim=1)))
+    elif cfg.unsupervised_training.consistency_loss == 'KL':
+        losses.append(
+            softmax_kl_loss(stud_pred, teach_pred.detach(), conf_mask=False, threshold=None, use_softmax=True))
+    elif cfg.unsupervised_training.consistency_loss == 'balanced_CE':
+        losses.append(
+            unsup_loss(stud_pred, teach_pred, i, use_softmax=True))
+    elif cfg.unsupervised_training.consistency_loss == 'MSE':
+        if cfg.experiment_mode != 'semi_alternate_mix_F_G':
+            teach_pred = torch.nn.functional.softmax(teach_pred.detach(), dim=1)
+
+        if cfg.unsupervised_training.T is not None:  # sharpening
+            pt = teach_pred ** (1 / cfg.unsupervised_training.T)
+            teach_pred = pt / pt.sum(dim=1, keepdim=True)
+            if teach_pred.isnan().sum() > 0:
+                teach_pred[teach_pred.isnan()] = 0
+        else:
+            print("sharpening is none hahaha")
+
+        stud_pred = torch.nn.functional.softmax(stud_pred, dim=1)
+        mse = torch.nn.MSELoss()
+        total_loss = mse(stud_pred, teach_pred)
+
+    return total_loss
 
 def __fw_sup_loss(y_preds, y_true, sup_loss):
     # iterate over all level's output
@@ -1136,7 +1183,7 @@ def main():
     parser.add_argument(
         "--save_model",
         type=bool,
-        default=False
+        default=True
     )
     parser.add_argument(
         "--config",
@@ -1146,7 +1193,12 @@ def main():
     parser.add_argument(
         "--wandb",
         type=str,
-        default="CVPR2022_BRATS"
+        # default="CVPR2022_BRATS"
+    )
+    parser.add_argument(
+        "--unet_sup",
+        type=bool,
+        default=False
     )
 
     dataset = utils.Constants.Datasets.Brat20
@@ -1170,7 +1222,7 @@ def main():
     elif cfg.experiment_mode == 'fully_sup':
         cfg.train_sup_mode = 'all_train2018_sup'
         cfg.train_unsup_mode = None
-
+    cfg['unet_sup'] = args.unet_sup
     config_params = dict(args=args, config=cfg)
 
     wandb.init(project=args.wandb, config=config_params)

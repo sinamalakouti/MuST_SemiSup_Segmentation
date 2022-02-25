@@ -1136,7 +1136,7 @@ def main():
     parser.add_argument(
         "--save_model",
         type=bool,
-        default=False
+        default=True
     )
     parser.add_argument(
         "--config",

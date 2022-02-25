@@ -151,14 +151,17 @@ class PGS(nn.Module):
 
         # type_unsup = 'unsupervised'  # both feature_level (F) and input level (G) augmentation
         if is_supervised:
-            sup_outputs = self.__fw_supervised(X)
+            if self.config.unet_sup:
+                sup_outputs = self.__fw_supervised_unet(X)
+            else:
+                sup_outputs = self.__fw_supervised(X)
             return sup_outputs, None
 
-        elif self.config.unsupervised_training.consistency_training_method == 'layerwsie1':
+        elif self.config.unsupervised_training.consistency_training_method == 'layerwise1':
             return self.__fw_unsupervised_layerwise_1(X)
         elif self.config.unsupervised_training.consistency_training_method == 'layerwise2':
             return self.__fw_unsupervised_layerwise2(X)
-        elif self.config.unsupervised_training.consistency_training_method == 'layerwise_12':
+        elif self.config.unsupervised_training.consistency_training_method == 'layerwise12':
             return self.__fw_unsupervised_layerwise12(X)
         elif self.config.unsupervised_training.consistency_training_method == 'layerwise_bottelneck':
             return self.__fw_unsupervised_layerwise4(X)
@@ -502,6 +505,38 @@ class PGS(nn.Module):
 
         return output5, output6, output7, output8, output9
 
+    def __fw_supervised_unet(self, X):
+
+        c1, d1, c2, d2, c3, d3, c4, d4 = self.__fw_contracting_path(X)
+
+        # bottleneck
+
+        c5 = self.__fw_bottleneck(d4)
+
+        # expanding path
+        # 4th expanding layer
+
+        up1 = self.__fw_up(c5, c4, self.up1)
+        c6 = self.__fw_expand_4layer(up1)
+
+        # 3rd expanding layer
+
+        up2 = self.__fw_up(c6, c3, self.up2)
+        c7 = self.__fw_expand_3layer(up2)
+
+        # 2nd expanding layer
+
+        up3 = self.__fw_up(c7, c2, self.up3)
+        c8 = self.__fw_expand_2layer(up3)
+
+
+        # 1st expanding layer
+
+        up4 = self.__fw_up(c8, c1, self.up4)
+        c9 = self.__fw_expand_1layer(up4)
+        output9 = self.cls9(c9)
+
+        return output9
     def __fw_contracting_path(self, X):
         c1 = self.conv1(X)
         d1 = self.down1(c1)
