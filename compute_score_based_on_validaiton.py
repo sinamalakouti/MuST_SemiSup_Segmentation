@@ -145,22 +145,22 @@ def partially_sup_10():
     print("FINAL AVG  DSC")
 
     print("** WT** ")
-    print( ( DSC_41[0] + DSC_42[0]+ DSC_43[0]))
+    print( ( DSC_41[0] + DSC_42[0]+ DSC_43[0])/3)
 
     print("** ET **")
-    print( ( DSC_41[1] + DSC_42[1]+ DSC_43[1]))
+    print( ( DSC_41[1] + DSC_42[1]+ DSC_43[1])/3)
     print("***TC***")
-    print((DSC_41[2] + DSC_42[2] + DSC_43[2]))
+    print((DSC_41[2] + DSC_42[2] + DSC_43[2])/3)
 
     print("FINAL AVG  HD")
 
     print("** WT** ")
-    print( ( HD_41[0] + HD_42[0]+ HD_43[0]))
+    print( ( HD_41[0] + HD_42[0]+ HD_43[0])/3)
 
     print("** ET **")
-    print( ( HD_41[1] + HD_42[1]+ HD_43[1]))
+    print( ( HD_41[1] + HD_42[1]+ HD_43[1])/3)
     print("***TC***")
-    print((HD_41[2] + HD_42[2] + HD_43[2]))
+    print((HD_41[2] + HD_42[2] + HD_43[2])/3)
 
 
 
