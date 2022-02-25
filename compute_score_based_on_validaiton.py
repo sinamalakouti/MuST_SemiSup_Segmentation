@@ -38,7 +38,10 @@ def read(root, root2020):
     mi = np.argmax(avg)
 
     mv = avg[mi]
-
+    if iteration[mi] == 50:
+        r = 49
+    else:
+        r= iteration[mi]
     path = root2020 + str(iteration[mi])
     path = os.path.join(path, 'result.txt')
     file1 = open(path, 'r')
