@@ -255,6 +255,93 @@ def semi_sup_10():
 
 
 
+def fully_sup():
+    #sup is semi  partially_sup is partially_sup
+    mode = 'partiallySup'
+
+
+    seed = 41
+    year2019 = 'test2019'
+    year2020 = 'test2020'
+
+    ratio = 10
+    date_time ='2022-02-21 09:56:12.009571'
+    root2019 = '/projects/sina/W-Net/miccai2022/fully_sup/fullySup_ratio_10/seed_{}/2022-02-22 02:14:41.044874/result_images/{}_new_results_iter'.format(
+         seed, year2019)
+    root2020 = 'projects/sina/W-Net/miccai2022/fully_sup/fullySup_ratio_10/seed_{}/2022-02-22 02:14:41.044874/result_images/{}_new_results_iter'.format(
+        seed, year2020)
+
+    DSC_41, HD_41 = read(root2019, root2020)
+
+
+    seed = 42
+
+    year2019 = 'test2019'
+    year2020 = 'test2020'
+
+    ratio = 10
+    date_time = '2022-02-21 12:46:07.095553'
+    root2019 = '/projects/sina/W-Net/miccai2022/fully_sup/fullySup_ratio_10/seed_42/2022-02-22 08:04:47.959944/result_images/{}_new_results_iter'.format(
+         year2019)
+    root2020 = '/projects/sina/W-Net/miccai2022/fully_sup/fullySup_ratio_10/seed_42/2022-02-22 08:04:47.959944/result_images/{}_new_results_iter'.format(
+          year2020)
+
+
+    # root2019 = '/projects/sina/W-Net/PGS_result/Brats/CVPR2022/semi_pgs_CE_all2018/{}_ratio_{}/seed_{}/result_images/{}_new_results_iter'.format(mode,
+    #     ratio, seed, year2019)
+    #
+    # root2020 = '/projects/sina/W-Net/PGS_result/Brats/CVPR2022/semi_pgs_CE_all2018/{}_ratio_{}/seed_{}/result_images/{}_new_results_iter'.format(mode,
+    #     ratio, seed, year2020)
+
+    DSC_42, HD_42 = read(root2019, root2020)
+
+
+    seed = 43
+
+    year2019 = 'test2019'
+    year2020 = 'test2020'
+
+    ratio = 10
+    date_time = '2022-02-21 15:31:59.339258'
+    root2019 = '/projects/sina/W-Net/miccai2022/fully_sup/fullySup_ratio_10/seed_43/2022-02-22 15:49:12.414664/result_images/{}_new_results_iter'.format(
+        year2019)
+    root2020 = '/projects/sina/W-Net/miccai2022/fully_sup/fullySup_ratio_10/seed_43/2022-02-22 15:49:12.414664/result_images/{}_new_results_iter'.format(
+         year2020)
+
+
+    # root2019 = '/projects/sina/W-Net/PGS_result/Brats/CVPR2022/semi_pgs_CE_all2018/{}_ratio_{}/seed_{}/result_images/{}_new_results_iter'.format(mode,
+    #     ratio, seed, year2019)
+    #
+    # root2020 = '/projects/sina/W-Net/PGS_result/Brats/CVPR2022/semi_pgs_CE_all2018/{}_ratio_{}/seed_{}/result_images/{}_new_results_iter'.format(mode,
+    #     ratio, seed, year2020)
+
+    DSC_43, HD_43 = read(root2019, root2020)
+
+
+    print("FINAL AVG  DSC")
+
+    print("** WT** ")
+    print( ( DSC_41[0] + DSC_42[0]+ DSC_43[0])/3)
+
+    print("** ET **")
+    print( ( DSC_41[1] + DSC_42[1]+ DSC_43[1])/3)
+    print("***TC***")
+    print((DSC_41[2] + DSC_42[2] + DSC_43[2])/3)
+
+    print("FINAL AVG  HD")
+
+    print("** WT** ")
+    print( ( HD_41[0] + HD_42[0]+ HD_43[0])/3)
+
+    print("** ET **")
+    print( ( HD_41[1] + HD_42[1]+ HD_43[1])/3)
+    print("***TC***")
+    print((HD_41[2] + HD_42[2] + HD_43[2])/3)
+
+
+
+
+
 
 def partially_sup_5():
     #sup is semi  partially_sup is partially_sup
@@ -587,35 +674,41 @@ def semi_sup_3():
     print("***TC***")
     print((HD_41[2] + HD_42[2] + HD_43[2]) / 3)
 
-
-print("******  SUP 3 RATIO ******")
-# sup 3 ratio
-print("superivsed")
-partially_sup_3()
-
-print('semi')
-semi_sup_3()
-
-
-
-
-print("******  SUP 5 RATIO ******")
-
-
-
+#
+# print("******  SUP 3 RATIO ******")
+# # sup 3 ratio
 # print("superivsed")
-partially_sup_5()
-# print('unsupervised')
-semi_sup_5()
+# partially_sup_3()
+# 
+# print('semi')
+# semi_sup_3()
+# 
+# 
+# 
+# 
+# print("******  SUP 5 RATIO ******")
+# 
+# 
+# 
+# # print("superivsed")
+# partially_sup_5()
+# # print('unsupervised')
+# semi_sup_5()
+# 
+# print("******  SUP 10 RATIO  RESULT ******")
+# 
+# 
+# 
+# # print("superivsed")
+# partially_sup_10()
+# # print('unsupervised')
+# semi_sup_10()
+# 
+# 
+# 
 
-print("******  SUP 10 RATIO  RESULT ******")
 
+print("FULLY SUP")
+print('- * 50 ')
 
-
-# print("superivsed")
-partially_sup_10()
-# print('unsupervised')
-semi_sup_10()
-
-
-
+fully_sup
