@@ -32,11 +32,11 @@ for p in sys.path:
 
 def __fw_unsup_loss(y_stud, y_teach, loss_functions, cfg, mask=None):
     if cfg.unsupervised_training.loss_method == 'output-wise':
-        return __fw_outputwise_unsup_loss(y_stud, y_teach, loss_functions, cfg, mask)
-    else:
-        if cfg.unsupervised_training.consistency_training_method is not 'layerwise_normal':
+        if cfg.unsupervised_training.consistency_training_method != 'layerwise_normal':
             print("one layer  unsupervised loss function")
             return __oneLayer_unsup_loss(y_stud, y_teach, loss_functions, cfg, mask)
+        return __fw_outputwise_unsup_loss(y_stud, y_teach, loss_functions, cfg, mask)
+    else:
         return __fw_downsample_unsup_loss(y_stud, y_teach, loss_functions, cfg, mask)
 
 
