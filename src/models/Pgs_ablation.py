@@ -160,11 +160,12 @@ class PGS(nn.Module):
         elif self.config.unsupervised_training.consistency_training_method == 'layerwise1':
             return self.__fw_unsupervised_layerwise_1(X)
         elif self.config.unsupervised_training.consistency_training_method == 'layerwise2':
+            print("***** LYERWISE 2")
             return self.__fw_unsupervised_layerwise_2(X)
         elif self.config.unsupervised_training.consistency_training_method == 'layerwise12':
             return self.__fw_unsupervised_layerwise12(X)
         elif self.config.unsupervised_training.consistency_training_method == 'layerwiseL':
-            return self.__fw_unsupervised_layerwise4(X)
+            return self.__fw_unsupervised_layerwise_bottelneck(X)
         # elif self.config.unsupervised_training.consistency_training_method == 'layerwise2':
         #     return self.__fw_unsupervised_layerwise4(X)
 
