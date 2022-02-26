@@ -207,6 +207,7 @@ def __fw_sup_loss(y_preds, y_true, sup_loss):
 def compute_loss(y_preds, y_true, loss_functions, is_supervised, cfg, masks=None):
     if is_supervised:
         if cfg.unet_sup:
+            print("unet output tor")
             if y_true.shape[1] == 1:
                 y_true = y_true.reshape((y_true.shape[0], y_true.shape[2], y_true.shape[3]))
 
