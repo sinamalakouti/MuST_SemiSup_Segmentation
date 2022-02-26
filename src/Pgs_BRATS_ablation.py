@@ -34,7 +34,8 @@ def __fw_unsup_loss(y_stud, y_teach, loss_functions, cfg, mask=None):
     if cfg.unsupervised_training.loss_method == 'output-wise':
         return __fw_outputwise_unsup_loss(y_stud, y_teach, loss_functions, cfg, mask)
     else:
-        if cfg.unet_sup:
+        if cfg.unsupervised_training.consistency_training_method is not 'layerwise_normal':
+            print("one layer  unsupervised loss function")
             return __oneLayer_unsup_loss(y_stud, y_teach, loss_functions, cfg, mask)
         return __fw_downsample_unsup_loss(y_stud, y_teach, loss_functions, cfg, mask)
 
@@ -140,8 +141,6 @@ def __oneLayer_unsup_loss(y_stud, y_teach, loss_functions, cfg, masks=None):
     assert len(y_teach) == len(y_stud), "Error! unsup_preds and sup_preds have to have same length"
 
     losses = []
-
-
     teach_pred = y_teach
     stud_pred = y_stud
     assert teach_pred.shape == stud_pred.shape, "Error! for preds number {}, supervised and unsupervised" \
@@ -207,7 +206,13 @@ def __fw_sup_loss(y_preds, y_true, sup_loss):
 
 def compute_loss(y_preds, y_true, loss_functions, is_supervised, cfg, masks=None):
     if is_supervised:
-        total_loss = __fw_sup_loss(y_preds, y_true, loss_functions[0])
+        if cfg.unet_sup:
+            if y_true.shape[1] == 1:
+                y_true = y_true.reshape((y_true.shape[0], y_true.shape[2], y_true.shape[3]))
+
+            total_loss = loss_functions[0](y_preds, y_true.type(torch.LongTensor).to(y_preds.device))
+        else:
+            total_loss = __fw_sup_loss(y_preds, y_true, loss_functions[0])
 
         ''' y_preds is students preds and y_true is teacher_preds!
                     for comparing outputs together!  # consistency of original output and noisy output 
@@ -1197,8 +1202,8 @@ def main():
     )
     parser.add_argument(
         "--unet_sup",
-        type=bool,
-        default=False
+        type=int,
+        default=0
     )
 
     dataset = utils.Constants.Datasets.Brat20
@@ -1222,7 +1227,7 @@ def main():
     elif cfg.experiment_mode == 'fully_sup':
         cfg.train_sup_mode = 'all_train2018_sup'
         cfg.train_unsup_mode = None
-    cfg['unet_sup'] = args.unet_sup
+    cfg['unet_sup'] = args.unet_sup == 1
     config_params = dict(args=args, config=cfg)
 
     wandb.init(project="PGS_MICCAI2022_ABLATION", config=config_params)
