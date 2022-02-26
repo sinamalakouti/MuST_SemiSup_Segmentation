@@ -379,7 +379,10 @@ def trainPgs_semi_alternate(train_sup_loader, train_unsup_loader, model, optimiz
             sf = torch.nn.Softmax2d()
             target_sup[target_sup >= 1] = 1
             target_sup = target_sup
-            y_pred = sf(sup_outputs[-1])
+            if cfg.unet_sup:
+                y_pred = sf(sup_outputs)
+            else:
+                y_pred = sf(sup_outputs[-1])
             y_WT = seg2WT(y_pred, 0.5, cfg.oneHot)  # I can identify the threshold! -> more confidence!
             dice_score = dice_coef(target_sup.reshape(y_WT.shape), y_WT)
             wandb.log(
@@ -669,7 +672,11 @@ def eval_per_subjectPgs(model, device, threshold, cfg, data_mode):
                 targetET[(targetET == 3)] = 1
                 targetTC[~ ((targetTC == 3) | (targetTC == 1))] = 0
                 targetTC[(targetTC == 3) | (targetTC == 1)] = 1
-                y_pred = sf(outputs[-1])
+
+                if cfg.unet_sup:
+                    y_pred = sf(outputs)
+                else:
+                    y_pred = sf(outputs[-1])
 
             y_WT = seg2WT(y_pred, threshold, oneHot=cfg.oneHot)
             y_ET = seg2ET(y_pred, threshold)
