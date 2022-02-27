@@ -1074,7 +1074,7 @@ def semi_unet_3LayerwiseL():
     year2020 = 'test2020'
 
     ratio = 3
-    date_time = '2022-02-27 03:33:29.149890'
+    date_time = '2022-02-27 08:31:26.054997'
     root2019 = '/projects/sina/W-Net/miccai2022_ablation/semi_alternate/layerwiseL/sup_ratio_{}/seed_{}/{}/' \
                'result_images/{}_new_results_iter'.format(ratio, seed, date_time, year2019)
 
@@ -1229,7 +1229,7 @@ def semi_sup_3LayerwiseL12():
 
 # semi_sup_3Layerwise1()
 
-semi_unet_3Layerwise2()
+semi_unet_3LayerwiseL()
 # semi_sup_3LayerwiseL()
 print("FULLY SUP")
 print('- * 50 ')
