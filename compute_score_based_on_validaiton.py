@@ -605,7 +605,7 @@ def semi_sup_3Layerwise1():
     root2019 = '/projects/sina/W-Net/miccai2022_ablation/semi_alternate/layerwise1/sup_ratio_{}/seed_{}/{}/' \
                'result_images/{}_new_results_iter'.format(ratio, seed,date_time,  year2019)
 
-    root2020 = '/projects/sina/W-Net/cvpr2022/sup_ratio_{}/seed_{}/{}/' \
+    root2020 = '/projects/sina/W-Net/miccai2022_ablation/semi_alternate/layerwise1/sup_ratio_{}/seed_{}/{}/' \
                'result_images/{}_new_results_iter'.format(ratio, seed,date_time,  year2020)
 
 
@@ -619,10 +619,10 @@ def semi_sup_3Layerwise1():
 
     ratio = 3
     date_time = '2022-02-26 03:27:11.556000'
-    root2019 = '/projects/sina/W-Net/cvpr2022/sup_ratio_{}/seed_{}/{}/' \
+    root2019 = '/projects/sina/W-Net/miccai2022_ablation/semi_alternate/layerwise1/sup_ratio_{}/seed_{}/{}/' \
                'result_images/{}_new_results_iter'.format(ratio, seed, date_time, year2019)
 
-    root2020 = '/projects/sina/W-Net/cvpr2022/sup_ratio_{}/seed_{}/{}/' \
+    root2020 = '/projects/sina/W-Net/miccai2022_ablation/semi_alternate/layerwise1/sup_ratio_{}/seed_{}/{}/' \
                'result_images/{}_new_results_iter'.format(ratio, seed, date_time, year2020)
 
 
@@ -642,10 +642,10 @@ def semi_sup_3Layerwise1():
 
     ratio = 3
     date_time = '2022-02-26 02:32:54.337290'
-    root2019 = '/projects/sina/W-Net/cvpr2022/sup_ratio_{}/seed_{}/{}/' \
+    root2019 = '/projects/sina/W-Net/miccai2022_ablation/semi_alternate/layerwise1/sup_ratio_{}/seed_{}/{}/' \
                'result_images/{}_new_results_iter'.format(ratio, seed, date_time, year2019)
 
-    root2020 = '/projects/sina/W-Net/cvpr2022/sup_ratio_{}/seed_{}/{}/' \
+    root2020 = '/projects/sina/W-Net/miccai2022_ablation/semi_alternate/layerwise1/sup_ratio_{}/seed_{}/{}/' \
                'result_images/{}_new_results_iter'.format(ratio, seed, date_time, year2020)
 
     # root2019 = '/projects/sina/W-Net/PGS_result/Brats/CVPR2022/semi_pgs_CE_all2018/{}_ratio_{}/seed_{}/result_images/{}_new_results_iter'.format(mode,
