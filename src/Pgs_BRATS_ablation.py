@@ -32,7 +32,8 @@ for p in sys.path:
 
 def __fw_unsup_loss(y_stud, y_teach, loss_functions, cfg, mask=None):
     if cfg.unsupervised_training.loss_method == 'output-wise':
-        if cfg.unsupervised_training.consistency_training_method != 'layerwise_normal':
+        if cfg.unsupervised_training.consistency_training_method != 'layerwise_normal'\
+                and cfg.unsupervised_training.consistency_training_method != 'layerwiseL12':
             print("one layer  unsupervised loss function")
             return __oneLayer_unsup_loss(y_stud, y_teach, loss_functions, cfg, mask)
         return __fw_outputwise_unsup_loss(y_stud, y_teach, loss_functions, cfg, mask)
@@ -156,7 +157,7 @@ def __oneLayer_unsup_loss(y_stud, y_teach, loss_functions, cfg, masks=None):
             softmax_kl_loss(stud_pred, teach_pred.detach(), conf_mask=False, threshold=None, use_softmax=True))
     elif cfg.unsupervised_training.consistency_loss == 'balanced_CE':
         losses.append(
-            unsup_loss(stud_pred, teach_pred, i, use_softmax=True))
+            unsup_loss(stud_pred, teach_pred, 0, use_softmax=True))
     elif cfg.unsupervised_training.consistency_loss == 'MSE':
         if cfg.experiment_mode != 'semi_alternate_mix_F_G':
             teach_pred = torch.nn.functional.softmax(teach_pred.detach(), dim=1)

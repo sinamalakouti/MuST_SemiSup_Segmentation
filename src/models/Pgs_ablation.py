@@ -164,6 +164,8 @@ class PGS(nn.Module):
             return self.__fw_unsupervised_layerwise_2(X)
         elif self.config.unsupervised_training.consistency_training_method == 'layerwise12':
             return self.__fw_unsupervised_layerwise12(X)
+        elif self.config.unsupervised_training.consistency_training_method == 'layerwiseL12':
+            return self.__fw_unsupervised_layerwise_12L(X)
         elif self.config.unsupervised_training.consistency_training_method == 'layerwiseL':
             return self.__fw_unsupervised_layerwise_bottelneck(X)
         # elif self.config.unsupervised_training.consistency_training_method == 'layerwise2':
@@ -307,6 +309,7 @@ class PGS(nn.Module):
         unsupervised_outputs = output8_stud
         return supervised_outputs, unsupervised_outputs
 
+
     def __fw_unsupervised_layerwise_bottelneck(self, X):  # only_feature space aug  layerwise2 asli
 
         # contracting path
@@ -390,6 +393,73 @@ class PGS(nn.Module):
         unsupervised_outputs = output5_stud #, output6_stud, output7_stud, output8_stud, output9_stud
         return supervised_outputs, unsupervised_outputs
 
+    def __fw_unsupervised_layerwise_12L(self, X):  # only_feature space aug  layerwise2 asli
+
+        # contracting path
+        c1, d1, c2, d2, c3, d3, c4, d4 = self.__fw_contracting_path(X)
+
+        # bottleneck
+
+        with torch.no_grad():
+            c5_teach = self.__fw_bottleneck(d4).detach()
+            aug_output5_teach = self.cls5(c5_teach).detach()
+
+        d4_stud, _ = self.transformer(d4, None, perturbation_mode='F')
+        c5_stud = self.__fw_bottleneck(d4_stud)
+        output5_stud = self.cls5(c5_stud)
+        #
+        # expanding path
+        teach_up1 = self.__fw_up(c5_teach, c4, self.up1,
+                                 transformer=None)
+
+        #
+        with torch.no_grad():
+            c6_teach = self.__fw_expand_4layer(teach_up1).detach()
+
+
+
+        teach_up2 = self.__fw_up(c6_teach, c3, self.up2,
+                                 transformer=None)
+
+        #
+        with torch.no_grad():
+            c7_teach = self.__fw_expand_3layer(teach_up2).detach()
+
+        #####
+        teach_up3 = self.__fw_up(c7_teach, c2, self.up3,
+                                 transformer=None)
+
+
+        stud_up3 = self.__fw_up(c7_teach, c2, self.up3,
+                                transformer=self.transformer)
+
+        with torch.no_grad():
+            c8_teach = self.__fw_expand_2layer(teach_up3).detach()
+            aug_output8_teach = self.cls8(c8_teach).detach()
+
+        c8_stud = self.__fw_expand_2layer(stud_up3)
+        output8_stud = self.cls8(c8_stud)
+        #
+        # ####
+        teach_up4 = self.__fw_up(c8_teach, c1, self.up4,
+                                 transformer=None) if self.config.information_passing_strategy == 'teacher' \
+            else self.__fw_up(c8_stud, c1, self.up4, transformer=None)
+
+        stud_up4 = self.__fw_up(c8_teach, c1, self.up4,
+                                transformer=self.transformer) if self.config.information_passing_strategy == 'teacher' \
+            else self.__fw_up(c8_stud, c1, self.up4, transformer=self.transformer)
+
+        with torch.no_grad():
+            # output9 is the main output of the network
+            c9_teach = self.__fw_expand_1layer(teach_up4).detach()
+            aug_output9_teach = self.cls9(c9_teach).detach()
+
+        c9_stud = self.__fw_expand_1layer(stud_up4)
+        output9_stud = self.cls9(c9_stud)
+
+        supervised_outputs = aug_output5_teach, aug_output8_teach, aug_output9_teach #, aug_output6_teach, aug_output7_teach, aug_output8_teach, aug_output9_teach
+        unsupervised_outputs = output5_stud, output8_stud, output9_stud #, output6_stud, output7_stud, output8_stud, output9_stud
+        return supervised_outputs, unsupervised_outputs
     def __fw_supervised(self, X):
 
         c1, d1, c2, d2, c3, d3, c4, d4 = self.__fw_contracting_path(X)
