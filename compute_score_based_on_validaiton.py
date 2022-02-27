@@ -39,7 +39,7 @@ def read(root, root2020):
 
     mv = avg[mi]
     if iteration[mi] == 50:
-        r = 49
+        r = 50
     else:
         r= iteration[mi]
     path = root2020 + str(r)
@@ -677,19 +677,19 @@ def semi_sup_3Layerwise1():
     print((HD_41[2] + HD_42[2] + HD_43[2]) / 3)
 
 def semi_sup_3Layerwise2():
-    # sup is semi  partially_sup is partially_sup
-    mode = 'partiallySup'
+    
+    print(" LAYERWISE2 result")
 
     seed = 41
     year2019 = 'test2019'
     year2020 = 'test2020'
 
     ratio = 3
-    date_time = '2022-02-15 22:14:39.973107'
-    root2019 = '/projects/sina/W-Net/cvpr2022/sup_ratio_{}/seed_{}/{}/' \
+    date_time = '2022-02-26 06:07:18.691142'
+    root2019 = '/projects/sina/W-Net/miccai2022_ablation/semi_alternate/layerwise2/sup_ratio_{}/seed_{}/{}/' \
                'result_images/{}_new_results_iter'.format(ratio, seed,date_time,  year2019)
 
-    root2020 = '/projects/sina/W-Net/cvpr2022/sup_ratio_{}/seed_{}/{}/' \
+    root2020 = '/projects/sina/W-Net/miccai2022_ablation/semi_alternate/layerwise2/sup_ratio_{}/seed_{}/{}/' \
                'result_images/{}_new_results_iter'.format(ratio, seed,date_time,  year2020)
 
 
@@ -702,11 +702,11 @@ def semi_sup_3Layerwise2():
     year2020 = 'test2020'
 
     ratio = 3
-    date_time = '2022-02-16 10:28:39.015293'
-    root2019 = '/projects/sina/W-Net/cvpr2022/sup_ratio_{}/seed_{}/{}/' \
+    date_time = '2022-02-26 05:20:05.151941'
+    root2019 = '/projects/sina/W-Net/miccai2022_ablation/semi_alternate/layerwise2/sup_ratio_{}/seed_{}/{}/' \
                'result_images/{}_new_results_iter'.format(ratio, seed, date_time, year2019)
 
-    root2020 = '/projects/sina/W-Net/cvpr2022/sup_ratio_{}/seed_{}/{}/' \
+    root2020 = '/projects/sina/W-Net/miccai2022_ablation/semi_alternate/layerwise2/sup_ratio_{}/seed_{}/{}/' \
                'result_images/{}_new_results_iter'.format(ratio, seed, date_time, year2020)
 
 
@@ -725,8 +725,8 @@ def semi_sup_3Layerwise2():
     year2020 = 'test2020'
 
     ratio = 3
-    date_time = '2022-02-16 07:48:53.989469'
-    root2019 = '/projects/sina/W-Net/cvpr2022/sup_ratio_{}/seed_{}/{}/' \
+    date_time = '2022-02-26 08:49:08.928590'
+    root2019 = '/projects/sina/W-Net/miccai2022_ablation/semi_alternate/layerwise2/sup_ratio_{}/seed_{}/{}/' \
                'result_images/{}_new_results_iter'.format(ratio, seed, date_time, year2019)
 
     root2020 = '/projects/sina/W-Net/cvpr2022/sup_ratio_{}/seed_{}/{}/' \
