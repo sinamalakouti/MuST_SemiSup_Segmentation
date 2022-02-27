@@ -763,18 +763,18 @@ def semi_sup_3Layerwise2():
 
 def semi_sup_3LayerwiseL():
     # sup is semi  partially_sup is partially_sup
-    mode = 'partiallySup'
+    print("LAYERWISE L REsult")
 
     seed = 41
     year2019 = 'test2019'
     year2020 = 'test2020'
 
     ratio = 3
-    date_time = '2022-02-15 22:14:39.973107'
-    root2019 = '/projects/sina/W-Net/cvpr2022/sup_ratio_{}/seed_{}/{}/' \
+    date_time = '2022-02-26 07:54:10.326390'
+    root2019 = '/projects/sina/W-Net/miccai2022_ablation/semi_alternate/layerwiseL/sup_ratio_{}/seed_{}/{}/' \
                'result_images/{}_new_results_iter'.format(ratio, seed,date_time,  year2019)
 
-    root2020 = '/projects/sina/W-Net/cvpr2022/sup_ratio_{}/seed_{}/{}/' \
+    root2020 = '/projects/sina/W-Net/miccai2022_ablation/semi_alternate/layerwiseL/sup_ratio_{}/seed_{}/{}/' \
                'result_images/{}_new_results_iter'.format(ratio, seed,date_time,  year2020)
 
 
@@ -787,11 +787,11 @@ def semi_sup_3LayerwiseL():
     year2020 = 'test2020'
 
     ratio = 3
-    date_time = '2022-02-16 10:28:39.015293'
-    root2019 = '/projects/sina/W-Net/cvpr2022/sup_ratio_{}/seed_{}/{}/' \
+    date_time = '2022-02-26 11:27:27.383681'
+    root2019 = '/projects/sina/W-Net/miccai2022_ablation/semi_alternate/layerwiseL/sup_ratio_{}/seed_{}/{}/' \
                'result_images/{}_new_results_iter'.format(ratio, seed, date_time, year2019)
 
-    root2020 = '/projects/sina/W-Net/cvpr2022/sup_ratio_{}/seed_{}/{}/' \
+    root2020 = '/projects/sina/W-Net/miccai2022_ablation/semi_alternate/layerwiseL/sup_ratio_{}/seed_{}/{}/' \
                'result_images/{}_new_results_iter'.format(ratio, seed, date_time, year2020)
 
 
@@ -810,11 +810,11 @@ def semi_sup_3LayerwiseL():
     year2020 = 'test2020'
 
     ratio = 3
-    date_time = '2022-02-16 07:48:53.989469'
-    root2019 = '/projects/sina/W-Net/cvpr2022/sup_ratio_{}/seed_{}/{}/' \
+    date_time = '2022-02-26 10:32:34.524417'
+    root2019 = '/projects/sina/W-Net/miccai2022_ablation/semi_alternate/layerwiseL/sup_ratio_{}/seed_{}/{}/' \
                'result_images/{}_new_results_iter'.format(ratio, seed, date_time, year2019)
 
-    root2020 = '/projects/sina/W-Net/cvpr2022/sup_ratio_{}/seed_{}/{}/' \
+    root2020 = '/projects/sina/W-Net/miccai2022_ablation/semi_alternate/layerwiseL/sup_ratio_{}/seed_{}/{}/' \
                'result_images/{}_new_results_iter'.format(ratio, seed, date_time, year2020)
 
     # root2019 = '/projects/sina/W-Net/PGS_result/Brats/CVPR2022/semi_pgs_CE_all2018/{}_ratio_{}/seed_{}/result_images/{}_new_results_iter'.format(mode,
@@ -965,8 +965,8 @@ def semi_sup_3LayerwiseL12():
 # 
 # 
 
-semi_sup_3Layerwise1()
-
+# semi_sup_3Layerwise1()
+semi_sup_3LayerwiseL()  
 print("FULLY SUP")
 print('- * 50 ')
 
