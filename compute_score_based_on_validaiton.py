@@ -677,7 +677,7 @@ def semi_sup_3Layerwise1():
     print((HD_41[2] + HD_42[2] + HD_43[2]) / 3)
 
 def semi_sup_3Layerwise2():
-    
+
     print(" LAYERWISE2 result")
 
     seed = 41
@@ -729,7 +729,7 @@ def semi_sup_3Layerwise2():
     root2019 = '/projects/sina/W-Net/miccai2022_ablation/semi_alternate/layerwise2/sup_ratio_{}/seed_{}/{}/' \
                'result_images/{}_new_results_iter'.format(ratio, seed, date_time, year2019)
 
-    root2020 = '/projects/sina/W-Net/cvpr2022/sup_ratio_{}/seed_{}/{}/' \
+    root2020 = '/projects/sina/W-Net/miccai2022_ablation/semi_alternate/layerwise2/sup_ratio_{}/seed_{}/{}/' \
                'result_images/{}_new_results_iter'.format(ratio, seed, date_time, year2020)
 
     # root2019 = '/projects/sina/W-Net/PGS_result/Brats/CVPR2022/semi_pgs_CE_all2018/{}_ratio_{}/seed_{}/result_images/{}_new_results_iter'.format(mode,
