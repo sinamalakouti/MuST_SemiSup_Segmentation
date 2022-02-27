@@ -763,6 +763,8 @@ def semi_unet_3Layerwise1():
     print((HD_41[2] + HD_42[2] + HD_43[2]) / 3)
 
 
+
+
 def semi_sup_3Layerwise2():
 
     print(" LAYERWISE2 result")
@@ -847,6 +849,91 @@ def semi_sup_3Layerwise2():
     print("***TC***")
     print((HD_41[2] + HD_42[2] + HD_43[2]) / 3)
 
+def semi_unet_3Layerwise2():
+
+
+    print("RESULTS FOR SEMI - UNET - LAYERWISE 2")
+
+
+    seed = 41
+    year2019 = 'test2019'
+    year2020 = 'test2020'
+
+    ratio = 3
+    date_time = '2022-02-26 18:25:21.278886'
+    root2019 = '/projects/sina/W-Net/miccai2022_ablation/semi_alternate/layerwise2/sup_ratio_{}/seed_{}/{}/' \
+               'result_images/{}_new_results_iter'.format(ratio, seed,date_time,  year2019)
+
+    root2020 = '/projects/sina/W-Net/miccai2022_ablation/semi_alternate/layerwise2/sup_ratio_{}/seed_{}/{}/' \
+               'result_images/{}_new_results_iter'.format(ratio, seed,date_time,  year2020)
+
+
+
+    DSC_41, HD_41 = read(root2019, root2020)
+
+    seed = 42
+
+    year2019 = 'test2019'
+    year2020 = 'test2020'
+
+    ratio = 3
+    date_time = '2022-02-26 20:58:27.884484'
+    root2019 = '/projects/sina/W-Net/miccai2022_ablation/semi_alternate/layerwise2/sup_ratio_{}/seed_{}/{}/' \
+               'result_images/{}_new_results_iter'.format(ratio, seed, date_time, year2019)
+
+    root2020 = '/projects/sina/W-Net/miccai2022_ablation/semi_alternate/layerwise2/sup_ratio_{}/seed_{}/{}/' \
+               'result_images/{}_new_results_iter'.format(ratio, seed, date_time, year2020)
+
+
+
+    # root2019 = '/projects/sina/W-Net/PGS_result/Brats/CVPR2022/semi_pgs_CE_all2018/{}_ratio_{}/seed_{}/result_images/{}_new_results_iter'.format(mode,
+    #     ratio, seed, year2019)
+    #
+    # root2020 = '/projects/sina/W-Net/PGS_result/Brats/CVPR2022/semi_pgs_CE_all2018/{}_ratio_{}/seed_{}/result_images/{}_new_results_iter'.format(mode,
+    #     ratio, seed, year2020)
+
+    DSC_42, HD_42 = read(root2019, root2020)
+
+    seed = 43
+
+    year2019 = 'test2019'
+    year2020 = 'test2020'
+
+    ratio = 3
+    date_time = '2022-02-27 00:53:14.623309'
+    root2019 = '/projects/sina/W-Net/miccai2022_ablation/semi_alternate/layerwise2/sup_ratio_{}/seed_{}/{}/' \
+               'result_images/{}_new_results_iter'.format(ratio, seed, date_time, year2019)
+
+    root2020 = '/projects/sina/W-Net/miccai2022_ablation/semi_alternate/layerwise2/sup_ratio_{}/seed_{}/{}/' \
+               'result_images/{}_new_results_iter'.format(ratio, seed, date_time, year2020)
+
+    # root2019 = '/projects/sina/W-Net/PGS_result/Brats/CVPR2022/semi_pgs_CE_all2018/{}_ratio_{}/seed_{}/result_images/{}_new_results_iter'.format(mode,
+    #     ratio, seed, year2019)
+    #
+    # root2020 = '/projects/sina/W-Net/PGS_result/Brats/CVPR2022/semi_pgs_CE_all2018/{}_ratio_{}/seed_{}/result_images/{}_new_results_iter'.format(mode,
+    #     ratio, seed, year2020)
+
+    DSC_43, HD_43 = read(root2019, root2020)
+
+    print("FINAL AVG  DSC")
+
+    print("** WT** ")
+    print((DSC_41[0] + DSC_42[0] + DSC_43[0]) / 3)
+
+    print("** ET **")
+    print((DSC_41[1] + DSC_42[1] + DSC_43[1]) / 3)
+    print("***TC***")
+    print((DSC_41[2] + DSC_42[2] + DSC_43[2]) / 3)
+
+    print("FINAL AVG  HD")
+
+    print("** WT** ")
+    print((HD_41[0] + HD_42[0] + HD_43[0]) / 3)
+
+    print("** ET **")
+    print((HD_41[1] + HD_42[1] + HD_43[1]) / 3)
+    print("***TC***")
+    print((HD_41[2] + HD_42[2] + HD_43[2]) / 3)
 
 def semi_sup_3LayerwiseL():
     # sup is semi  partially_sup is partially_sup
@@ -1054,8 +1141,8 @@ def semi_sup_3LayerwiseL12():
 
 # semi_sup_3Layerwise1()
 
-semi_unet_3Layerwise1()
-semi_sup_3LayerwiseL()
+semi_unet_3Layerwise2()
+# semi_sup_3LayerwiseL()
 print("FULLY SUP")
 print('- * 50 ')
 
