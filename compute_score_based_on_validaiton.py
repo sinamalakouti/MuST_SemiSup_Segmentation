@@ -621,16 +621,16 @@ def semi_sup_3():
     print("FINAL AVG  DSC")
 
     print("** WT** ")
-    dsc_wt = [DSC_41[0], DSC_42[0], DSC_43[0]]
+    dsc_wt = [DSC_41[0], DSC_42[0], DSC_43[0]]* 100
     print("WT:  mu:  {}    std: {}".format(np.mean(dsc_wt), np.std(dsc_wt)))
 
     print("** ET **")
-    dsc_et = [DSC_41[1], DSC_42[1], DSC_43[1]]
+    dsc_et = [DSC_41[1], DSC_42[1], DSC_43[1]] * 100
     print("ET:  mu:  {}    std: {}".format(np.mean(dsc_et), np.std(dsc_et)))
 
     print("***TC***")
 
-    dsc_tc = [DSC_41[2], DSC_42[2], DSC_43[2]]
+    dsc_tc = [DSC_41[2], DSC_42[2], DSC_43[2]] * 100
     print("TC:  mu:  {}    std: {}".format(np.mean(dsc_tc), np.std(dsc_tc)))
 
 
