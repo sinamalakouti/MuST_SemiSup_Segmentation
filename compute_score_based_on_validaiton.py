@@ -69,7 +69,7 @@ def read(root, root2020):
         elif s == 'hd:':
             wt_hd, et_hd, tc_hd = (np.float(wt_strs[i + 1].split(',')[0]), np.float(et_strs[i + 1].split(',')[0]),
                                       np.float(tc_strs[i + 1].split(',')[0]))
-    return (wt_dsc, et_dsc, tc_dsc), (wt_hd, et_hd, tc_hd)
+    return (wt_dsc * 100, et_dsc* 100, tc_dsc* 100), (wt_hd* 100, et_hd* 100, tc_hd* 100)
 
 
 
@@ -621,16 +621,16 @@ def semi_sup_3():
     print("FINAL AVG  DSC")
 
     print("** WT** ")
-    dsc_wt = [DSC_41[0], DSC_42[0], DSC_43[0]]* 100
+    dsc_wt = [DSC_41[0], DSC_42[0], DSC_43[0]]
     print("WT:  mu:  {}    std: {}".format(np.mean(dsc_wt), np.std(dsc_wt)))
 
     print("** ET **")
-    dsc_et = [DSC_41[1], DSC_42[1], DSC_43[1]] * 100
+    dsc_et = [DSC_41[1], DSC_42[1], DSC_43[1]]
     print("ET:  mu:  {}    std: {}".format(np.mean(dsc_et), np.std(dsc_et)))
 
     print("***TC***")
 
-    dsc_tc = [DSC_41[2], DSC_42[2], DSC_43[2]] * 100
+    dsc_tc = [DSC_41[2], DSC_42[2], DSC_43[2]]
     print("TC:  mu:  {}    std: {}".format(np.mean(dsc_tc), np.std(dsc_tc)))
 
 
