@@ -1242,20 +1242,20 @@ input1 = input()
 if int(input1) == 0:
     print('what ratio? do you want?')
     input2 = input()
-    if input2 == int(3):
+    if int(input2) == int(3):
         print("partially supervised results:  \n ")
         partially_sup_3()
         print("-" * 50)
         print('Semi supervised result: \n')
         # semi_sup_3()
-    elif input2 == int(5):
+    elif int(input2) == 5:
         print("result for    5")
         print("partially supervised results:  \n ")
         partially_sup_5()
         print("-" * 50)
         print('Semi supervised result: \n')
         semi_sup_5()
-    elif input2 == int(10):
+    elif int(input2) == int(10):
         print("result for    10")
         print("partially supervised results:  \n ")
         partially_sup_10()
