@@ -39,7 +39,7 @@ def read(root, root2020):
 
     mv = avg[mi]
     if iteration[mi] == 50:
-        r = 50
+        r = 49
     else:
         r= iteration[mi]
     path = root2020 + str(r)
