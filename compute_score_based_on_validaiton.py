@@ -883,22 +883,19 @@ def semi_sup_3Layerwise2():
     print("FINAL AVG  DSC")
 
     print("** WT** ")
-    print((DSC_41[0] + DSC_42[0] + DSC_43[0]) / 3)
+    dsc_wt = [DSC_41[0] , DSC_42[0] , DSC_43[0]]
+    print("WT:  mu:  {}    std: {}".format(np.mean(dsc_wt), np.std(dsc_wt)))
+
 
     print("** ET **")
-    print((DSC_41[1] + DSC_42[1] + DSC_43[1]) / 3)
+    dsc_et = [DSC_41[1], DSC_42[1], DSC_43[1]]
+    print("ET:  mu:  {}    std: {}".format(np.mean(dsc_et), np.std(dsc_et)))
+
+
     print("***TC***")
-    print((DSC_41[2] + DSC_42[2] + DSC_43[2]) / 3)
 
-    print("FINAL AVG  HD")
-
-    print("** WT** ")
-    print((HD_41[0] + HD_42[0] + HD_43[0]) / 3)
-
-    print("** ET **")
-    print((HD_41[1] + HD_42[1] + HD_43[1]) / 3)
-    print("***TC***")
-    print((HD_41[2] + HD_42[2] + HD_43[2]) / 3)
+    dsc_tc = [DSC_41[2] , DSC_42[2] , DSC_43[2]]
+    print("TC:  mu:  {}    std: {}".format(np.mean(dsc_tc), np.std(dsc_tc)))
 
 def semi_unet_3Layerwise2():
 
@@ -1143,22 +1140,19 @@ def semi_unet_3LayerwiseL():
     print("FINAL AVG  DSC")
 
     print("** WT** ")
-    print((DSC_41[0] + DSC_42[0] + DSC_43[0]) / 3)
+    dsc_wt = [DSC_41[0] , DSC_42[0] , DSC_43[0]]
+    print("WT:  mu:  {}    std: {}".format(np.mean(dsc_wt), np.std(dsc_wt)))
+
 
     print("** ET **")
-    print((DSC_41[1] + DSC_42[1] + DSC_43[1]) / 3)
+    dsc_et = [DSC_41[1], DSC_42[1], DSC_43[1]]
+    print("ET:  mu:  {}    std: {}".format(np.mean(dsc_et), np.std(dsc_et)))
+
+
     print("***TC***")
-    print((DSC_41[2] + DSC_42[2] + DSC_43[2]) / 3)
 
-    print("FINAL AVG  HD")
-
-    print("** WT** ")
-    print((HD_41[0] + HD_42[0] + HD_43[0]) / 3)
-
-    print("** ET **")
-    print((HD_41[1] + HD_42[1] + HD_43[1]) / 3)
-    print("***TC***")
-    print((HD_41[2] + HD_42[2] + HD_43[2]) / 3)
+    dsc_tc = [DSC_41[2] , DSC_42[2] , DSC_43[2]]
+    print("TC:  mu:  {}    std: {}".format(np.mean(dsc_tc), np.std(dsc_tc)))
 
 def semi_sup_3LayerwiseL12():
     # sup is semi  partially_sup is partially_sup
