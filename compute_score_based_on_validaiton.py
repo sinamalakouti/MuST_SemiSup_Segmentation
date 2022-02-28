@@ -590,6 +590,9 @@ def partially_sup_3():
     print("***TC***")
     print((HD_41[2] + HD_42[2] + HD_43[2]) / 3)
 
+
+
+
 def semi_pgs_3Layerwise1():
 
 
@@ -1233,6 +1236,33 @@ def semi_sup_3LayerwiseL12():
 # 
 # 
 # 
+print("press 9 to exit!")
+print("do you want ablation result or main result? if main press 0 else press 1")
+input1 = input()
+if int(input1) == 0:
+    print('what ratio? do you want?')
+    input2  = input()
+    if input2 == int(3):
+        print("partially supervised results:  \n ")
+        partially_sup_3()
+        print("-" * 50)
+        print('Semi supervised result: \n')
+        # semi_sup_3()
+    elif input == int(5):
+        print("result for    5")
+        print("partially supervised results:  \n ")
+        partially_sup_5()
+        print("-" * 50)
+        print('Semi supervised result: \n')
+        semi_sup_5()
+    elif input == int(10):
+        print("result for    10")
+        print("partially supervised results:  \n ")
+        partially_sup_10()
+        print("-" * 50)
+        print('Semi supervised result: \n')
+        semi_sup_10()
+
 
 # semi_sup_3Layerwise1()
 
