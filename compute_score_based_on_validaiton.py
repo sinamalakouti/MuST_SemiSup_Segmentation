@@ -1328,7 +1328,7 @@ if int(input1) == 0:
 elif int(input1) == 1:
     print('what layer? do you want?')
     input2 = input()
-    if int(input2) == '1':
+    if input2 == '1':
         print("result for  layer  1")
         # print("partially supervised results:  \n ")
         # partially_sup_3()
@@ -1336,12 +1336,12 @@ elif int(input1) == 1:
         print('Semi supervised result: \n')
         semi_pgs_3Layerwise1()
 
-    elif int(input2) == '2':
+    elif input2 == '2':
         print("result for   layer 2")
         print("-" * 50)
         print('Semi supervised result: \n')
         semi_sup_3Layerwise2()
-    elif int(input2) == 'L':
+    elif input2== 'L':
         print("result for   layer L")
         print("-" * 50)
         print('Semi supervised result: \n')
