@@ -601,7 +601,10 @@ def trainPgs_sup(train_sup_loader, model, optimizer, device, loss_functions, epo
                 sf = torch.nn.Softmax2d()
                 target_sup[target_sup >= 1] = 1
                 target_sup = target_sup
-                y_pred = sf(sup_outputs[-1])
+                if cfg.unet_sup:
+                    y_pred = sf(sup_outputs)
+                else:
+                    y_pred = sf(sup_outputs[-1])
 
             y_WT = seg2WT(y_pred, 0.5, cfg.oneHot)
             dice_score = dice_coef(target_sup.reshape(y_WT.shape), y_WT)
