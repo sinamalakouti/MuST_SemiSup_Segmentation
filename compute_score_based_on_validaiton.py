@@ -558,7 +558,80 @@ def partially_sup_3():
     dsc_tc = [DSC_41[2], DSC_42[2], DSC_43[2]]
     print("TC:  mu:  {}    std: {}".format(np.mean(dsc_tc), np.std(dsc_tc)))
 
+def semi_sup_3():
+    #sup is semi  partially_sup is partially_sup
+    mode = 'semi_sup'
 
+
+    seed = 41
+    year2019 = 'test2019'
+    year2020 = 'test2020'
+
+    ratio = 3
+
+    root2019 = '/projects/sina/W-Net/miccai2022_final/braTS/semi_alternate/sup_ratio_{}/seed_{}/1/result_images/{}_new_results_iter'.format(
+        ratio, seed, year2019)
+    root2020 = '/projects/sina/W-Net/miccai2022_final/braTS/semi_alternate/sup_ratio_{}/seed_{}/1/result_images/{}_new_results_iter'.format(
+        ratio, seed, year2020)
+
+    DSC_41, HD_41 = read(root2019, root2020)
+
+    seed = 42
+
+    year2019 = 'test2019'
+    year2020 = 'test2020'
+
+    ratio=3
+
+
+    root2019 = '/projects/sina/W-Net/miccai2022_final/braTS/semi_alternate/sup_ratio_{}/seed_{}/1/result_images/{}_new_results_iter'.format(
+        ratio, seed, year2019)
+    root2020 = '/projects/sina/W-Net/miccai2022_final/braTS/semi_alternate/sup_ratio_{}/seed_{}/1/result_images/{}_new_results_iter'.format(
+        ratio, seed, year2020)
+
+    # root2019 = '/projects/sina/W-Net/PGS_result/Brats/CVPR2022/semi_pgs_CE_all2018/{}_ratio_{}/seed_{}/result_images/{}_new_results_iter'.format(mode,
+    #     ratio, seed, year2019)
+    #
+    # root2020 = '/projects/sina/W-Net/PGS_result/Brats/CVPR2022/semi_pgs_CE_all2018/{}_ratio_{}/seed_{}/result_images/{}_new_results_iter'.format(mode,
+    #     ratio, seed, year2020)
+
+    DSC_42, HD_42 = read(root2019, root2020)
+
+
+    seed = 43
+
+    year2019 = 'test2019'
+    year2020 = 'test2020'
+
+
+    root2019 = '/projects/sina/W-Net/miccai2022_final/braTS/semi_alternate/sup_ratio_{}/seed_{}/1/result_images/{}_new_results_iter'.format(
+        ratio, seed, year2019)
+    root2020 = '/projects/sina/W-Net/miccai2022_final/braTS/semi_alternate/sup_ratio_{}/seed_{}/1/result_images/{}_new_results_iter'.format(
+        ratio, seed, year2020)
+
+
+    # root2019 = '/projects/sina/W-Net/PGS_result/Brats/CVPR2022/semi_pgs_CE_all2018/{}_ratio_{}/seed_{}/result_images/{}_new_results_iter'.format(mode,
+    #     ratio, seed, year2019)
+    #
+    # root2020 = '/projects/sina/W-Net/PGS_result/Brats/CVPR2022/semi_pgs_CE_all2018/{}_ratio_{}/seed_{}/result_images/{}_new_results_iter'.format(mode,
+    #     ratio, seed, year2020)
+
+    DSC_43, HD_43 = read(root2019, root2020)
+
+    print("FINAL AVG  DSC")
+
+    print("** WT** ")
+    dsc_wt = [DSC_41[0], DSC_42[0], DSC_43[0]]
+    print("WT:  mu:  {}    std: {}".format(np.mean(dsc_wt), np.std(dsc_wt)))
+
+    print("** ET **")
+    dsc_et = [DSC_41[1], DSC_42[1], DSC_43[1]]
+    print("ET:  mu:  {}    std: {}".format(np.mean(dsc_et), np.std(dsc_et)))
+
+    print("***TC***")
+
+    dsc_tc = [DSC_41[2], DSC_42[2], DSC_43[2]]
+    print("TC:  mu:  {}    std: {}".format(np.mean(dsc_tc), np.std(dsc_tc)))
 
 
 def semi_pgs_3Layerwise1():
@@ -1236,7 +1309,7 @@ if int(input1) == 0:
         partially_sup_3()
         print("-" * 50)
         print('Semi supervised result: \n')
-        # semi_sup_3()
+        semi_sup_3()
     elif int(input2) == 5:
         print("result for    5")
         print("partially supervised results:  \n ")
