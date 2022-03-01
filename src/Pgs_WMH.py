@@ -53,8 +53,51 @@ def temp_rampDown(x_s, y_s, x_e, y_e, cur_x):
     return cur_y
 
 
+def __oneLayer_unsup_loss(y_stud, y_teach, loss_functions, cfg, masks=None):
+    (_, unsup_loss) = loss_functions
+
+    assert len(y_teach) == len(y_stud), "Error! unsup_preds and sup_preds have to have same length"
+
+    losses = []
+    teach_pred = y_teach
+    stud_pred = y_stud
+    assert teach_pred.shape == stud_pred.shape, "Error! for preds number {}, supervised and unsupervised" \
+                                                " prediction shape is not similar!".format(i)
+
+    if cfg.unsupervised_training.consistency_loss == 'CE':
+        teach_pred = torch.nn.functional.softmax(teach_pred, dim=1)
+        losses.append(- torch.mean(
+            torch.sum(teach_pred.detach()
+                      * torch.nn.functional.log_softmax(stud_pred, dim=1), dim=1)))
+    elif cfg.unsupervised_training.consistency_loss == 'KL':
+        losses.append(
+            softmax_kl_loss(stud_pred, teach_pred.detach(), conf_mask=False, threshold=None, use_softmax=True))
+    elif cfg.unsupervised_training.consistency_loss == 'balanced_CE':
+        losses.append(
+            unsup_loss(stud_pred, teach_pred, 0, use_softmax=True))
+    elif cfg.unsupervised_training.consistency_loss == 'MSE':
+        if cfg.experiment_mode != 'semi_alternate_mix_F_G':
+            teach_pred = torch.nn.functional.softmax(teach_pred.detach(), dim=1)
+
+        if cfg.unsupervised_training.T is not None:  # sharpening
+            pt = teach_pred ** (1 / cfg.unsupervised_training.T)
+            teach_pred = pt / pt.sum(dim=1, keepdim=True)
+            if teach_pred.isnan().sum() > 0:
+                teach_pred[teach_pred.isnan()] = 0
+        else:
+            print("sharpening is none hahaha")
+
+        stud_pred = torch.nn.functional.softmax(stud_pred, dim=1)
+        mse = torch.nn.MSELoss()
+        total_loss = mse(stud_pred, teach_pred)
+
+    return total_loss
+
 def __fw_unsup_loss(y_stud, y_teach, loss_functions, cfg, mask=None):
     if cfg.unsupervised_training.loss_method == 'output-wise':
+        if cfg.unsupervised_training.consistency_training_method == 'layerwiseL_final':
+            return __oneLayer_unsup_loss(y_stud, y_teach, loss_functions, cfg, mask)
+
         return __fw_outputwise_unsup_loss(y_stud, y_teach, loss_functions, cfg, mask)
     else:
         return __fw_downsample_unsup_loss(y_stud, y_teach, loss_functions, cfg, mask)
@@ -188,7 +231,14 @@ def __fw_sup_loss(y_preds, y_true, sup_loss):
 
 def compute_loss(y_preds, y_true, loss_functions, is_supervised, cfg, masks=None):
     if is_supervised:
-        total_loss = __fw_sup_loss(y_preds, y_true, loss_functions[0])
+        if cfg.unet_sup:
+            print("UNET SUPERVISED LOSS")
+            if y_true.shape[1] == 1:
+                y_true = y_true.reshape((y_true.shape[0], y_true.shape[2], y_true.shape[3]))
+            total_loss = loss_functions[0](y_preds, y_true.type(torch.LongTensor).to(y_preds.device))
+            
+        else:
+            total_loss = __fw_sup_loss(y_preds, y_true, loss_functions[0])
 
         ''' y_preds is students preds and y_true is teacher_preds!
                     for comparing outputs together!  # consistency of original output and noisy output 
