@@ -95,7 +95,7 @@ def __oneLayer_unsup_loss(y_stud, y_teach, loss_functions, cfg, masks=None):
 
 def __fw_unsup_loss(y_stud, y_teach, loss_functions, cfg, mask=None):
     if cfg.unsupervised_training.loss_method == 'output-wise':
-        if cfg.unsupervised_training.consistency_training_method == 'layerwiseL_final':
+        if cfg.unsupervised_training.consistency_training_method != 'layerwise_normal':
             return __oneLayer_unsup_loss(y_stud, y_teach, loss_functions, cfg, mask)
 
         return __fw_outputwise_unsup_loss(y_stud, y_teach, loss_functions, cfg, mask)
