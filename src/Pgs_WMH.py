@@ -890,13 +890,18 @@ def main():
         default=True
     )
 
+    parser.add_argument(
+            '--unet_sup',
+            type=bool,
+            default=False
+            )
     dataset = utils.Constants.Datasets.Wmh_challenge
     args = parser.parse_args()
 
     with open(args.config, "r") as f:
         cfg = edict(yaml.safe_load(f))
 
-    cfg['unet_sup'] = False
+    cfg['unet_sup'] = args.unet_sup
     torch.manual_seed(cfg.seed)
     np.random.seed(cfg.seed)
     torch.cuda.manual_seed(cfg.seed)
