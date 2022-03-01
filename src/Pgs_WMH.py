@@ -13,9 +13,9 @@ import torch.nn as nn
 from torch.optim import lr_scheduler
 import torch.nn.functional as F
 
-from wmh_utils import get_splits
+from dataset.wmh_utils import get_splits
 from dataset.Brat20 import seg2WT
-from wmhChallenge import WmhChallenge
+from dataset.wmhChallenge import WmhChallenge
 from utils import utils
 
 from losses.loss import consistency_weight, softmax_kl_loss
@@ -91,17 +91,11 @@ def __fw_downsample_unsup_loss(y_stud, y_teach, loss_functions, cfg, mask=None):
         elif cfg.unsupervised_training.consistency_loss == 'MSE':
             #     teach_pred = torch.nn.functional.softmax(teach_pred / 0.85, dim=1)
             stud_pred = torch.nn.functional.softmax(stud_pred, dim=1)
-            sig = torch.nn.Sigmoid()
-            stud_pred = sig(stud_pred)
             mse = torch.nn.MSELoss()
             loss = mse(stud_pred, y_true.detach())
             losses.append(loss)
     total_loss = sum(losses)
     return total_loss
-
-
-from torch.distributions.normal import Normal
-from utils.model_utils import update_adaptiveRate, ema_update, copy_params
 
 
 def __fw_outputwise_unsup_loss(y_stud, y_teach, loss_functions, cfg, masks=None):
@@ -260,87 +254,6 @@ def trainPgs_semi_alternate(train_sup_loader, train_unsup_loader, model, optimiz
         # del b_sup
         # del target_sup
 
-
-def train_MT(train_sup_loader, train_unsup_loader, models, optimizer, device, loss_functions, cons_w_unsup,
-                          epochid, cfg):
-
-    student_model = models[0]
-    teacher_model = models[1]
-    student_model.train()
-    teacher_model.train()
-    semi_loader = zip(train_sup_loader, train_unsup_loader)
-
-    student_model.to(device)
-    teacher_model.to(device)
-
-    for batch_idx, (batch_sup, batch_unsup) in enumerate(semi_loader):
-        optimizer.zero_grad()
-
-
-        b_unsup = batch_unsup['data']
-        b_unsup = b_unsup.to(device)
-
-        # unsupervised training - forward
-        # tacher ofw pass
-
-        additive_dist = Normal(torch.tensor([0.0]), torch.tensor([0.05]))
-        multiplicative_dist = Normal(torch.tensor([1.0]), torch.tensor([0.01]))
-        ns = additive_dist.sample(b_unsup.shape).reshape(b_unsup.shape).to(b_unsup.device)
-        nm = multiplicative_dist.sample(b_unsup.shape).reshape(b_unsup.shape).to(b_unsup.device)
-
-        ns2 = additive_dist.sample(b_unsup.shape).reshape(b_unsup.shape).to(b_unsup.device)
-        nm2 = multiplicative_dist.sample(b_unsup.shape).reshape(b_unsup.shape).to(b_unsup.device)
-        b_teacher = (b_unsup + ns) * nm
-
-        b_student = (b_unsup + ns2) * nm2
-        with torch.no_grad():
-            teacher_outputs, _ = teacher_model(b_teacher, True)
-
-        student_outputs, _ = student_model(b_student, True)
-        uLoss = compute_loss(student_outputs, teacher_outputs, loss_functions, is_supervised=False, cfg=cfg)
-
-        b_sup = batch_sup['data'].to(device)
-        target_sup = batch_sup['label'].to(device)
-
-        # supervised training - forward
-
-        sup_outputs, _ = student_outputs(b_sup, is_supervised=True)
-        sLoss = compute_loss(sup_outputs, target_sup, loss_functions, is_supervised=True, cfg=cfg)
-
-        # supervised training - backward
-        sLoss.backward()
-        # optimizer[0.step()
-
-        print("**************** UNSUP LOSSS ( weighted) : {} ****************".format(uLoss))
-        print("**************** SUP LOSSS  : {} ****************".format(sLoss))
-
-        unsup_loss = nn.BCELoss()
-        sup_loss = torch.nn.BCELoss()
-        loss_functions = (sup_loss, unsup_loss)
-
-        total_loss = sup_loss + uLoss * update_adaptiveRate(len(train_sup_loader) * epochid + batch_idx, 400)
-        total_loss.backward()
-        optimizer.step()
-        student_model, teacher_model = ema_update(student_model, teacher_model,
-                                                              epochid * len(train_sup_loader) + batch_idx, 400)
-
-        with torch.no_grad():
-            sf = torch.nn.Softmax2d()
-            target_sup[target_sup >= 1] = 1
-            target_sup = target_sup
-            if cfg.unet_sup:
-                y_pred = sf(sup_outputs)
-            else:
-                y_pred = sf(sup_outputs[-1])
-            y_WT = seg2WT(y_pred, 0.5, cfg.oneHot)  # I can identify the threshold! -> more confidence!
-            dice_score = dice_coef(target_sup.reshape(y_WT.shape), y_WT)
-            wandb.log(
-                {"sup_batch_id": batch_idx + epochid * len(train_sup_loader),
-                 "sup loss": sLoss,
-                 "unsup_batch_id": batch_idx + epochid * len(train_sup_loader),
-                 "unsup loss": uLoss,
-                 "batch_score_WT": dice_score,
-                 })
 
 def trainPgs_sup(train_sup_loader, model, optimizer, device, loss_functions, epochid, cfg):
     model.train()
@@ -568,7 +481,7 @@ def get_train_loaders(dataset, cfg):
 
 def Pgs_train_val(dataset, n_epochs, wmh_threshold, output_dir, args, cfg, seed):
     inputs_dim = [2, 64, 96, 128, 256, 768, 384, 224, 160]
-    outputs_dim = [64, 96, 128, 256, 512, 256, 128, 96, 64, 1]
+    outputs_dim = [64, 96, 128, 256, 512, 256, 128, 96, 64, 2]
     kernels = [5, 3, 3, 3, 3, 3, 3, 3, 3]
     strides = [1, 1, 1, 1, 1, 1, 1, 1, 1]
 
@@ -604,10 +517,6 @@ def Pgs_train_val(dataset, n_epochs, wmh_threshold, output_dir, args, cfg, seed)
     # load model
     if cfg.model == 'PGS':
         pgsnet = Pgs.PGS(inputs_dim, outputs_dim, kernels, strides, cfg)
-    if cfg.model == 'MT':
-        pgsnet = Pgs.PGS(inputs_dim, outputs_dim, kernels, strides, cfg)
-        pgsnet_student = Pgs.PGS(inputs_dim, outputs_dim, kernels, strides, cfg)
-        copy_params(pgsnet, pgsnet_student)
 
     # elif cfg.model == 'PGS4':
     #     # pgsnet = Pgs4.PGS4(inputs_dim, outputs_dim, kernels, strides, cfg)
@@ -711,29 +620,22 @@ def Pgs_train_val(dataset, n_epochs, wmh_threshold, output_dir, args, cfg, seed)
         # pgsnet, loss = trainPGS(train_loader, pgsnet, optimizer, device, epoch)
 
         if cfg.experiment_mode == 'semi_alternate':
-            # dsc_loss_fn = DSCLoss(1)
-            dsc_loss_fn = torch.nn.CrossEntropyLoss() #TODO
-            scheduler_unsup = None
-            train_MT(train_sup_loader, train_unsup_loader, (pgsnet_student, pgsnet),
-                                    optimizer_sup, device,
-                                    (dsc_loss_fn, None),
+
+            trainPgs_semi_alternate(train_sup_loader, train_unsup_loader, pgsnet,
+                                    (optimizer_sup, optimizer_unsup), device,
+                                    (torch.nn.CrossEntropyLoss(), None),
                                     cons_w_unsup,
                                     epoch, cfg)
-            # trainPgs_semi_alternate(train_sup_loader, train_unsup_loader, pgsnet,
-            #                         (optimizer_sup, optimizer_unsup), device,
-            #                         (dsc_loss_fn, None),
-            #                         cons_w_unsup,
-            #                         epoch, cfg)
 
         elif cfg.experiment_mode == 'partially_sup':
 
             trainPgs_sup(train_sup_loader, pgsnet, optimizer_sup, device,
-                         (dsc_loss_fn, None),
+                         (torch.nn.CrossEntropyLoss(), None),
                          epoch, cfg)
 
         elif cfg.experiment_mode == 'fully_sup':
             trainPgs_sup(train_sup_loader, pgsnet, optimizer_sup, device,
-                         (dsc_loss_fn, None),
+                         (torch.nn.CrossEntropyLoss(), None),
                          epoch, cfg)
 
         if epoch % 2 == 0:  # todo
