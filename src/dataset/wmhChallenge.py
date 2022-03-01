@@ -1,10 +1,19 @@
+from PIL import Image
+from torchvision import transforms
 import torch
 import numpy as np
+import random
+import copy
 import SimpleITK as sitk
 import scipy
+from pathlib import Path
+import os
+import matplotlib.pyplot as plt
+from torchvision.transforms import ToPILImage, ToTensor
 import torchvision.transforms.functional as augmentor
 import scipy.ndimage
 
+from torchvision.utils import save_image
 '''
 Code adapted from https://github.com/FourierX9/wmh_ibbmTum/blob/master/test_leave_one_out.py
 '''
@@ -279,20 +288,20 @@ class ImageSet(torch.utils.data.Dataset):
                     img, label, mask = Utrecht_preprocessing(
                         img, label, train=train, whitestripe=whitestripe)
 
-                if True:
+                for i in range(0, img.shape[0]):
                     self.data.append({
                         'img':
-                        img,
+                        img[i, :, :],
                         'label':
-                        label,
+                        label[i, :, :],
                         'mask':
-                        mask,
+                        mask[i, :, :],
                         'domain_s':
                         DOMAINS2IDS[self.domain]
 #                        0 if self.domain == 'Singapore' else 1
                     })
                     if T1:
-                        self.data[-1]['T1_img'] = T1_img
+                        self.data[-1]['T1_img'] = T1_img[i, :, :]
             else:
                 if T1:
                     img, label, mask, T1_img = GE3T_preprocessing(
@@ -305,15 +314,15 @@ class ImageSet(torch.utils.data.Dataset):
                     img, label, mask = GE3T_preprocessing(
                         img, label, train=train, whitestripe=whitestripe)
 
-                # for i in range(0, img.shape[0]):
-                self.data.append({
-                    'img': img,
-                    'label': label,
-                    'mask': mask,
-                    'domain_s': DOMAINS2IDS[self.domain]
-                })
-                if T1:
-                    self.data[-1]['T1_img'] = T1_img
+                for i in range(0, img.shape[0]):
+                    self.data.append({
+                        'img': img[i, :, :],
+                        'label': label[i, :, :],
+                        'mask': mask[i, :, :],
+                        'domain_s': DOMAINS2IDS[self.domain]
+                    })
+                    if T1:
+                        self.data[-1]['T1_img'] = T1_img[i, :, :]
             print(f'finish: {img_subj_pth}')
 
     def __len__(self):
@@ -437,23 +446,19 @@ class WmhChallenge(torch.utils.data.Dataset):
             if T1 is not None:
                 T1 = self.intensity_rescaling(T1, c_factor)
 
-        # img = augmentor.to_pil_image(img, mode='F')
-        img =  torch.tensor(img).float()
-        label[label == 2] = 0
-        label = torch.tensor(label).float()
-        mask = torch.tensor(mask).float()
+        img = augmentor.to_pil_image(img, mode='F')
 
-        # label = augmentor.to_pil_image(label, mode='F')
-        # mask = augmentor.to_pil_image(mask, mode='F')
+        # label[label == 2] = 0
+        label = augmentor.to_pil_image(label, mode='F')
+        mask = augmentor.to_pil_image(mask, mode='F')
         if T1 is not None:
-            T1 = torch.tensor(T1).float()
-            # T1_img = augmentor.to_pil_image(T1, mode='F')
-            T1_img = augmentor.affine(T1,
+            T1_img = augmentor.to_pil_image(T1, mode='F')
+            T1_img = augmentor.affine(T1_img,
                                       angle=angle,
                                       translate=(0, 0),
                                       shear=shear,
                                       scale=scale)
-            # T1_img = augmentor.to_tensor(T1_img).float()
+            T1_img = augmentor.to_tensor(T1_img).float()
 
         img = augmentor.affine(img,
                                angle=angle,
@@ -471,10 +476,10 @@ class WmhChallenge(torch.utils.data.Dataset):
                                 shear=shear,
                                 scale=scale)
 
-        # img = augmentor.to_tensor(img).float()
-        # label = augmentor.to_tensor(label).float()
+        img = augmentor.to_tensor(img).float()
+        label = augmentor.to_tensor(label).float()
         label = (label > 0).float()
-        # mask = augmentor.to_tensor(mask).float()
+        mask = augmentor.to_tensor(mask).float()
         mask = (mask > 0).float()
         if T1 is not None:
             return img, label, mask, T1_img
@@ -491,7 +496,6 @@ def baseline(img, label, mask, T1=None):
     label = augmentor.to_pil_image(label, mode='F')
     mask = augmentor.to_pil_image(mask, mode='F')
     img = augmentor.to_tensor(img).float()
-
     label = augmentor.to_tensor(label).float()
     mask = augmentor.to_tensor(mask).float()
     if T1 is not None:
@@ -509,11 +513,11 @@ def tensorize(x):
 
 if __name__ == '__main__':
     print("here")
-    from wmh_utils import get_splits
+    from dataset.wmh_utils import get_splits
 
     splits, num_domains = get_splits(
         'WMH_SEG',  # get data of different domains
-        T1=False,
+        T1=True,
         whitestripe=False,
         supRatio=5,
         seed=41,
@@ -527,15 +531,12 @@ if __name__ == '__main__':
                             base_and_aug=False)
 
     train = torch.utils.data.DataLoader(trainset,
-                                        batch_size=1,
+                                        batch_size=16,
                                         drop_last=True,
                                         num_workers=4,
                                         shuffle=True)
+    it = iter(train)
+    # print(len(trainset_unsup))
+    print(len(valset))
 
-
-    for i , batch in enumerate(train):
-        print("batch i ")
-        print("1 ")
-        print("2 ")
-        print("3 ")
-        print("4 ")
+    print("dfasfs")
