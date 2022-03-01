@@ -20,8 +20,8 @@ from utils import utils
 
 from losses.loss import consistency_weight, softmax_kl_loss
 from losses.evaluation_metrics import dice_coef, do_eval
-from models import Pgs
-
+# from models import Pgs
+from models import Pgs_ablation
 
 
 
@@ -236,7 +236,7 @@ def compute_loss(y_preds, y_true, loss_functions, is_supervised, cfg, masks=None
             if y_true.shape[1] == 1:
                 y_true = y_true.reshape((y_true.shape[0], y_true.shape[2], y_true.shape[3]))
             total_loss = loss_functions[0](y_preds, y_true.type(torch.LongTensor).to(y_preds.device))
-            
+
         else:
             total_loss = __fw_sup_loss(y_preds, y_true, loss_functions[0])
 
