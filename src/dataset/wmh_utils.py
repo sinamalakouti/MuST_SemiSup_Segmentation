@@ -1,4 +1,4 @@
-from wmhChallenge import LazyLoader, ImageSet, Mixed
+from dataset.wmhChallenge import LazyLoader, ImageSet, Mixed
 import numpy as np
 
 # Utrecht', 'GE3T',
