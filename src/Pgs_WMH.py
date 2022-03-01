@@ -307,24 +307,24 @@ def train_MT(train_sup_loader, train_unsup_loader, models, optimizer, device, lo
 
         # supervised training - forward
 
-        sup_outputs, _ = student_outputs(b_sup, is_supervised=True)
+        sup_outputs, _ = student_model(b_sup, is_supervised=True)
         sLoss = compute_loss(sup_outputs, target_sup, loss_functions, is_supervised=True, cfg=cfg)
 
         # supervised training - backward
-        sLoss.backward()
+        #sLoss.backward()
         # optimizer[0.step()
 
         print("**************** UNSUP LOSSS ( weighted) : {} ****************".format(uLoss))
         print("**************** SUP LOSSS  : {} ****************".format(sLoss))
 
-        unsup_loss = nn.BCELoss()
-        sup_loss = torch.nn.BCELoss()
-        loss_functions = (sup_loss, unsup_loss)
+        #unsup_loss = nn.BCELoss()
+        #sup_loss = torch.nn.BCELoss()
+        #loss_functions = (sup_loss, unsup_loss)
 
-        total_loss = sup_loss + uLoss * update_adaptiveRate(len(train_sup_loader) * epochid + batch_idx, 400)
+        total_loss = sLoss  + uLoss * update_adaptiveRate(len(train_sup_loader) * epochid + batch_idx, 400)
         total_loss.backward()
         optimizer.step()
-        student_model, teacher_model = ema_update(student_model, teacher_model,
+        ema_update(student_model, teacher_model,
                                                               epochid * len(train_sup_loader) + batch_idx, 400)
 
         with torch.no_grad():
@@ -606,10 +606,10 @@ def Pgs_train_val(dataset, n_epochs, wmh_threshold, output_dir, args, cfg, seed)
 
     # load model
 
-    if cfg.model == 'PGS':
-        pgsnet = Pgs.PGS(inputs_dim, outputs_dim, kernels, strides, cfg)
-        pgsnet_student = Pgs.PGS(inputs_dim, outputs_dim, kernels, strides, cfg)
-        copy_params(pgsnet, pgsnet_student)
+    #if cfg.model == 'PGS':
+    pgsnet = Pgs.PGS(inputs_dim, outputs_dim, kernels, strides, cfg)
+    pgsnet_student = Pgs.PGS(inputs_dim, outputs_dim, kernels, strides, cfg)
+    copy_params(pgsnet, pgsnet_student)
     # elif cfg.model == 'PGS4':
     #     # pgsnet = Pgs4.PGS4(inputs_dim, outputs_dim, kernels, strides, cfg)
     # pgsnet = Pgs.PGS(inputs_dim, outputs_dim, kernels, strides, cfg)
@@ -694,7 +694,7 @@ def Pgs_train_val(dataset, n_epochs, wmh_threshold, output_dir, args, cfg, seed)
         optimizer_unsup = None
         scheduler_unsup = None
 
-    optimizer_sup = torch.optim.SGD(pgsnet.parameters(), cfg.supervised_training.lr, momentum=0.9,
+    optimizer_sup = torch.optim.SGD(pgsnet_student.parameters(), cfg.supervised_training.lr, momentum=0.9,
                                     weight_decay=1e-4)
     scheduler_sup = lr_scheduler.StepLR(optimizer_sup, step_size=cfg.supervised_training.scheduler_step_size,
                                         gamma=cfg.supervised_training.lr_gamma)
@@ -712,9 +712,9 @@ def Pgs_train_val(dataset, n_epochs, wmh_threshold, output_dir, args, cfg, seed)
         # pgsnet, loss = trainPGS(train_loader, pgsnet, optimizer, device, epoch)
 
         if cfg.experiment_mode == 'semi_alternate':
-
+            scheduler_unsup = None
             train_MT(train_sup_loader, train_unsup_loader, (pgsnet_student, pgsnet),
-                                    (optimizer_sup, optimizer_unsup), device,
+                                    (optimizer_sup), device,
                                     (torch.nn.CrossEntropyLoss(), None),
                                     cons_w_unsup,
                                     epoch, cfg)
@@ -896,6 +896,7 @@ def main():
     with open(args.config, "r") as f:
         cfg = edict(yaml.safe_load(f))
 
+    cfg['unet_sup'] = False
     torch.manual_seed(cfg.seed)
     np.random.seed(cfg.seed)
     torch.cuda.manual_seed(cfg.seed)
