@@ -155,13 +155,17 @@ def wmh_dataset(cfg, model_path, result_path):
 
     # load model
 
-    if torch.cuda.is_available():
-        if type(model) is not torch.nn.DataParallel and cfg.parallel and cfg.parallel:
-            model = torch.nn.DataParallel(model)
-        device = 'cuda'
-    elif not torch.cuda.is_available():
-        device = 'cpu'
+   # if torch.cuda.is_available():
+    #    if type(model) is not torch.nn.DataParallel and cfg.parallel and cfg.parallel:
+     #       model = torch.nn.DataParallel(model)
+     #   device = 'cuda'
+    #elif not torch.cuda.is_available():
+     #   device = 'cpu'
+    device = 'cuda:0'
     device = torch.device(device)
+ #   model.load_state_dict(torch.load(model_path))
+    
+    model = torch.load(model_path)
     model.to(device)
 
     # loading datasets
@@ -236,10 +240,10 @@ def wmh_dataset(cfg, model_path, result_path):
             y_subject[y_subject >= 1] = 1
             y_pred = sf(yhat_subject[-1])
             y_WT = seg2WT(y_pred, 0.5, oneHot=cfg.oneHot)
-            brain_mask = brain_mask.reshape(y_WT.shape)
+            #brain_mask = brain_mask.reshape(y_WT.shape)
             y_subject = y_subject.reshape(y_WT.shape)
-            y_WT = y_WT[brain_mask]
-            y_subject = y_subject[brain_mask].bool()
+            #y_WT = y_WT[brain_mask]
+           # y_subject = y_subject[brain_mask].bool()
 
             metrics_WMH = do_eval(y_subject.to('cpu'), y_WT.to('cpu'))
 
@@ -266,18 +270,45 @@ def wmh_dataset(cfg, model_path, result_path):
                     print("Creation of the directory %s failed" % dir_path)
 
             img_path = os.path.join(dir_path, 'flair')
+            if not os.path.isdir(img_path):
+                os.mkdir(img_path, 0o777)
+            
+          #  if subject == 0:
+              # subject += 1
+               #continue
+            print( "CREATING PLOTS FOR subject : ", subject)
+            
+            log = os.path.join(dir_path, 'metrics.txt')
+            with open(log, "w") as f:
+                f.write("SCORE for subejct {}:\n"
+                        " **WMH**  DICE: {}".
+                        format(subject, metrics_WMH['dsc']))
+
+            
+            
+            subject += 1
             for i in range(0, len(y_subject)):
+                
+                
                 true = y_subject[i]
                 pred = y_WT[i]
+                
+               # print("shape")
+               # print(y_subject.shape)
+              #  print(true.shape)
+               # print(pred.shape)
+                #print(x_subject[i][0].shape)
+                
+                
                 plt.axis('off')
                 plt.imshow(true)
                 plt.savefig(os.path.join(true_path, "true_{}.png".format(i)))
                 plt.axis('off')
-                plt.imshow(pred)
+                plt.imshow(pred.cpu())
                 plt.savefig(os.path.join(pred_path, "pred{}.png".format(i)))
 
                 plt.axis('off')
-                plt.imshow(x_subject[i][0])
+                plt.imshow(x_subject[i][0].cpu())
                 plt.savefig(os.path.join(img_path, "inptu{}.png".format(i)))
 
             print(
@@ -286,12 +317,13 @@ def wmh_dataset(cfg, model_path, result_path):
                     metrics_WMH['sens'],
                     metrics_WMH['spec'], metrics_WMH['hd']))
 
-            with open(dir_path, "w") as f:
-                f.write("SCORE for subejct {}:\n"
-                        " **WMH**  DICE: {}".
-                        format(subject, metrics_WMH['dsc']))
+          #  log = os.path.join(dir_path, 'metrics.txt')
+          #  with open(log, "w") as f:
+           #     f.write("SCORE for subejct {}:\n"
+            #            " **WMH**  DICE: {}".
+             #           format(subject, metrics_WMH['dsc']))
 
-            subject += 1
+            
 
 
 @torch.no_grad()
@@ -333,7 +365,7 @@ def main():
     parser.add_argument(
         "--config",
         type=str,
-        default='None'
+        default='PGS_config_WMH.yaml'
     )
 
     dataset = utils.Constants.Datasets.Wmh_challenge
@@ -341,9 +373,11 @@ def main():
 
     with open(args.config, "r") as f:
         cfg = edict(yaml.safe_load(f))
-
-    model_path = None
-    result_path = None
+    result_path = '/home/sina/WMH_semisup_segmentation/WMH_Unsupervised_Segmentation/src/plots/partially_sup/'
+   # model_path = '/home/sina/WMH_semisup_segmentation/WMH_Unsupervised_Segmentation/miccai2022/anthony/semi_alternate/layerwise_normal/sup_ratio_5/seed_40/2022-02-23 21:57:08.434793/best_model/pgsnet_best.model'
+   
+   
+    model_path = '/home/sina/WMH_semisup_segmentation/WMH_Unsupervised_Segmentation/miccai2022/anthony/partially_sup/sup_ratio_5/seed_40/2022-02-23 21:57:25.071910/best_model/pgsnet_best.model'
     wmh_dataset(cfg, model_path, result_path)
 
 
