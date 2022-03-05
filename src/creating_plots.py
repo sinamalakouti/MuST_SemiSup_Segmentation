@@ -172,13 +172,13 @@ def brats(cfg, model_path_sup, model_path_semi, result_path):
 
             # plot true labels
             plt.axis('off')
-            plt.imshow(true_WT)
+            plt.imshow(true_WT.cpu())
             plt.savefig(os.path.join(true_path, "true_WT_{}.png".format(i)))
             plt.axis('off')
-            plt.imshow(true_ET)
+            plt.imshow(true_ET.cpu())
             plt.savefig(os.path.join(true_path, "true_ET_{}.png".format(i)))
             plt.axis('off')
-            plt.imshow(true_TC)
+            plt.imshow(true_TC.cpu())
             plt.savefig(os.path.join(true_path, "true_TC_{}.png".format(i)))
 
             # plot supervised predictions
