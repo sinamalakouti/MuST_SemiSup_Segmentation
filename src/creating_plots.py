@@ -46,7 +46,7 @@ def brats(cfg, model_path_sup, model_path_semi, result_path):
     if torch.cuda.is_available():
         if type(sup_model) is not torch.nn.DataParallel and cfg.parallel and cfg.parallel:
             sup_model = torch.nn.DataParallel(sup_model)
-            device = 'cuda'
+        device = 'cuda'
     elif not torch.cuda.is_available():
         device = 'cpu'
 
