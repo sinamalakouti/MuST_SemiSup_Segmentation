@@ -227,12 +227,13 @@ def brats(cfg, model_path_sup, model_path_semi, result_path):
             plt.savefig(os.path.join(img_path, "input_t1ce_{}.png".format(i)))
 
 
-def wmh_dataset(cfg, model_path, result_path):
+def wmh_dataset(cfg, model_path_sup, model_path_semi, result_path):
     inputs_dim = [2, 64, 96, 128, 256, 768, 384, 224, 160]
     outputs_dim = [64, 96, 128, 256, 512, 256, 128, 96, 64, 2]
     kernels = [5, 3, 3, 3, 3, 3, 3, 3, 3]
     strides = [1, 1, 1, 1, 1, 1, 1, 1, 1]
-    model = Pgs.PGS(inputs_dim, outputs_dim, kernels, strides, cfg)
+    model_sup = Pgs.PGS(inputs_dim, outputs_dim, kernels, strides, cfg)
+    model_semi = Pgs.PGS(inputs_dim, outputs_dim, kernels, strides, cfg)
 
     # load model
 
@@ -246,8 +247,10 @@ def wmh_dataset(cfg, model_path, result_path):
     device = torch.device(device)
     #   model.load_state_dict(torch.load(model_path))
 
-    model = torch.load(model_path)
-    model.to(device)
+    model_sup = torch.load(model_path_sup)
+    model_semi = torch.load(model_path_semi)
+    model_sup.to(device)
+    model_semi.to(device)
 
     # loading datasets
     splits, num_domains = get_splits(
@@ -272,10 +275,18 @@ def wmh_dataset(cfg, model_path, result_path):
         '1': 48,
         '2': 83
     }
-    model.to(device)
+
     subject = 0
+
+    most_gap_score = -1
+    most_gap_index = -1
+    final_x = -1
+    final_true = -1
+    final_sup_pred = -1
+    final_semi_pred = -1
     with torch.no_grad():
-        model.eval()
+        model_sup.eval()
+        model_semi.eval()
 
         x_all_test = None
         y_all_test = None
@@ -307,7 +318,8 @@ def wmh_dataset(cfg, model_path, result_path):
             y_subject[y_subject != 1] = 0
             brain_mask = b_all_test[first:last, :, :, :]
             # first = first + step
-            yhat_subject, _ = model(x_subject, True)
+            sup_yhat_subject, _ = model_sup(x_subject, True)
+            semi_yhat_subject, _ = model_semi(x_subject, True)
             x_subject = x_subject.to('cpu')
             brain_mask = brain_mask.to('cpu')
 
@@ -319,85 +331,114 @@ def wmh_dataset(cfg, model_path, result_path):
             sf = torch.nn.Softmax2d()
             y_subject = y_subject.clone()
             y_subject[y_subject >= 1] = 1
-            y_pred = sf(yhat_subject[-1])
-            y_WT = seg2WT(y_pred, 0.5, oneHot=cfg.oneHot)
+            sup_y_pred = sf(sup_yhat_subject[-1])
+            semi_y_pred = sf(semi_yhat_subject[-1])
+            sup_y_WT = seg2WT(sup_y_pred, 0.5, oneHot=cfg.oneHot)
+            semi_y_WT = seg2WT(semi_y_pred, 0.5, oneHot=cfg.oneHot)
             # brain_mask = brain_mask.reshape(y_WT.shape)
-            y_subject = y_subject.reshape(y_WT.shape)
+            y_subject = y_subject.reshape(sup_y_WT.shape)
             # y_WT = y_WT[brain_mask]
             # y_subject = y_subject[brain_mask].bool()
 
-            metrics_WMH = do_eval(y_subject.to('cpu'), y_WT.to('cpu'))
+            sup_metrics_WMH = do_eval(y_subject.to('cpu'), sup_y_WT.to('cpu'))
+            semi_metrics_WMH = do_eval(y_subject.to('cpu'), semi_y_WT.to('cpu'))
+            diff = semi_metrics_WMH['dsc'] - sup_metrics_WMH ['dsc']
 
-            dir_path = os.path.join(result_path, 'subject_{}'.format(subject))
-
-            if not os.path.isdir(dir_path):
-                try:
-                    os.mkdir(dir_path, 0o777)
-                except OSError:
-                    print("Creation of the directory %s failed" % dir_path)
-
-            true_path = os.path.join(dir_path, 'ture_images')
-            if not os.path.isdir(true_path):
-                try:
-                    os.mkdir(true_path, 0o777)
-                except OSError:
-                    print("Creation of the directory %s failed" % dir_path)
-
-            pred_path = os.path.join(dir_path, 'pred_images')
-            if not os.path.isdir(pred_path):
-                try:
-                    os.mkdir(pred_path, 0o777)
-                except OSError:
-                    print("Creation of the directory %s failed" % dir_path)
-
-            img_path = os.path.join(dir_path, 'flair')
-            if not os.path.isdir(img_path):
-                os.mkdir(img_path, 0o777)
-
-            #  if subject == 0:
-            # subject += 1
-            # continue
-            print("CREATING PLOTS FOR subject : ", subject)
-
-            log = os.path.join(dir_path, 'metrics.txt')
-            with open(log, "w") as f:
-                f.write("SCORE for subejct {}:\n"
-                        " **WMH**  DICE: {}".
-                        format(subject, metrics_WMH['dsc']))
-
+            if diff > most_gap_score:
+                most_gap_index = subject
+                most_gap_score = diff
+                final_x = x_subject
+                final_true = y_subject
+                final_sup_pred = sup_y_WT
+                final_semi_pred = semi_y_WT
             subject += 1
-            for i in range(0, len(y_subject)):
-                true = y_subject[i]
-                pred = y_WT[i]
 
-                # print("shape")
-                # print(y_subject.shape)
-                #  print(true.shape)
-                # print(pred.shape)
-                # print(x_subject[i][0].shape)
+        dir_path = os.path.join(result_path, 'subject_{}'.format(most_gap_index))
 
-                plt.axis('off')
-                plt.imshow(true)
-                plt.savefig(os.path.join(true_path, "true_{}.png".format(i)))
-                plt.axis('off')
-                plt.imshow(pred.cpu())
-                plt.savefig(os.path.join(pred_path, "pred{}.png".format(i)))
+        if not os.path.isdir(dir_path):
+            try:
+                os.mkdir(dir_path, 0o777)
+            except OSError:
+                print("Creation of the directory %s failed" % dir_path)
 
-                plt.axis('off')
-                plt.imshow(x_subject[i][0].cpu())
-                plt.savefig(os.path.join(img_path, "inptu{}.png".format(i)))
+        true_path = os.path.join(dir_path, 'true_images')
+        if not os.path.isdir(true_path):
+            try:
+                os.mkdir(true_path, 0o777)
+            except OSError:
+                print("Creation of the directory %s failed" % dir_path)
 
-            print(
-                "(WMH) :  DICE SCORE   {}, PPV  {},  Sensitivity: {}, Specificity: {}, Hausdorff: {}".format(
-                    metrics_WMH['dsc'], metrics_WMH['ppv'],
-                    metrics_WMH['sens'],
-                    metrics_WMH['spec'], metrics_WMH['hd']))
+        sup_pred_path = os.path.join(dir_path, 'sup_pred_images')
+        if not os.path.isdir(sup_pred_path):
+            try:
+                os.mkdir(sup_pred_path, 0o777)
+            except OSError:
+                print("Creation of the directory %s failed" % dir_path)
 
-        #  log = os.path.join(dir_path, 'metrics.txt')
-        #  with open(log, "w") as f:
-        #     f.write("SCORE for subejct {}:\n"
-        #            " **WMH**  DICE: {}".
-        #           format(subject, metrics_WMH['dsc']))
+        semi_pred_path = os.path.join(dir_path, 'semi_pred_images')
+        if not os.path.isdir(semi_pred_path):
+            try:
+                os.mkdir(semi_pred_path, 0o777)
+            except OSError:
+                print("Creation of the directory %s failed" % dir_path)
+
+        img_path = os.path.join(dir_path, 'flair')
+        if not os.path.isdir(img_path):
+            os.mkdir(img_path, 0o777)
+
+        #  if subject == 0:
+        # subject += 1
+        # continue
+        print("CREATING PLOTS FOR subject : ", most_gap_index)
+
+        log = os.path.join(dir_path, 'metrics.txt')
+        with open(log, "w") as f:
+            f.write("diff for subejct {}:\n"
+                    " **WMH**  DICE: {}".
+                    format(most_gap_index, most_gap_score))
+
+
+        for i in range(0, len(y_subject)):
+            true = final_true[i]
+            sup_pred = final_sup_pred[i]
+            semi_pred  = final_semi_pred[i]
+            # print("shape")
+            # print(y_subject.shape)
+            #  print(true.shape)
+            # print(pred.shape)
+            # print(x_subject[i][0].shape)
+
+            plt.axis('off')
+            plt.imshow(true, cmap='gray')
+            plt.savefig(os.path.join(true_path, "true_{}.png".format(i)))
+
+            plt.axis('off')
+            plt.imshow(sup_pred.cpu(), cmap='gray')
+            plt.savefig(os.path.join(sup_pred_path, "pred{}.png".format(i)))
+
+            plt.axis('off')
+            plt.imshow(semi_pred.cpu(), cmap='gray')
+            plt.savefig(os.path.join(semi_pred_path, "pred{}.png".format(i)))
+
+            plt.axis('off')
+            plt.imshow(final_x[i][0].cpu(), cmap='gray')
+            plt.savefig(os.path.join(img_path, "flair{}.png".format(i)))
+
+            plt.axis('off')
+            plt.imshow(final_x[i][1].cpu(),cmap='gray')
+            plt.savefig(os.path.join(img_path, "t1_{}.png".format(i)))
+
+    # print(
+        #     "(WMH) :  DICE SCORE   {}, PPV  {},  Sensitivity: {}, Specificity: {}, Hausdorff: {}".format(
+        #         metrics_WMH['dsc'], metrics_WMH['ppv'],
+        #         metrics_WMH['sens'],
+        #         metrics_WMH['spec'], metrics_WMH['hd']))
+
+    #  log = os.path.join(dir_path, 'metrics.txt')
+    #  with open(log, "w") as f:
+    #     f.write("SCORE for subejct {}:\n"
+    #            " **WMH**  DICE: {}".
+    #           format(subject, metrics_WMH['dsc']))
 
 
 @torch.no_grad()
@@ -450,12 +491,15 @@ def main():
     # result_path = '/home/sina/WMH_semisup_segmentation/WMH_Unsupervised_Segmentation/src/plots/partially_sup/'
     # model_path = '/home/sina/WMH_semisup_segmentation/WMH_Unsupervised_Segmentation/miccai2022/anthony/semi_alternate/layerwise_normal/sup_ratio_5/seed_40/2022-02-23 21:57:08.434793/best_model/pgsnet_best.model'
 
-    model_sup_path = '/projects/sina/W-Net/cvpr2022/partiallySup_ratio_3/seed_41/2022-02-15 13:25:46.112535/best_model/pgsnet_best.model'
-    model_semi_path = '/projects/sina/W-Net/miccai2022_final/braTS/semi_alternate/sup_ratio_3/seed_41/1/best_model/pgsnet_best.model'
-    result_path = '/projects/sina/W-Net/src/plots/'
+    # model_sup_path = '/projects/sina/W-Net/cvpr2022/partiallySup_ratio_3/seed_41/2022-02-15 13:25:46.112535/best_model/pgsnet_best.model'
+    # model_semi_path = '/projects/sina/W-Net/miccai2022_final/braTS/semi_alternate/sup_ratio_3/seed_41/1/best_model/pgsnet_best.model'
+    # result_path = '/projects/sina/W-Net/src/plots/'
 
-    # wmh_dataset(cfg, (model_sup_path, model_semi_path), result_path)
-    brats(cfg, model_sup_path, model_semi_path, result_path)
+    model_sup_path =  '/home/sina/WMH_semisup_segmentation/WMH_Unsupervised_Segmentation/miccai2022/anthony/partially_sup/sup_ratio_5/seed_40/2022-02-23 21:57:25.071910/best_model/pgsnet_best.model'
+    model_semi_path = '/home/sina/WMH_semisup_segmentation/WMH_Unsupervised_Segmentation/miccai2022/anthony/semi_alternate/layerwise_normal/sup_ratio_5/seed_40/2022-02-23 21:57:08.434793/best_model/pgsnet_best.model'
+    result_path =  '/home/sina/WMH_semisup_segmentation/WMH_Unsupervised_Segmentation/src/plots/all-together/'
+    wmh_dataset(cfg, model_sup_path, model_semi_path, result_path)
+    # brats(cfg, model_sup_path, model_semi_path, result_path)
 
 
 if __name__ == '__main__':
