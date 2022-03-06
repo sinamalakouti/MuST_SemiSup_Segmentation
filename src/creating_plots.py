@@ -517,9 +517,9 @@ def main():
     # model_semi_path = '/projects/sina/W-Net/miccai2022_final/braTS/semi_alternate/sup_ratio_3/seed_41/1/best_model/pgsnet_best.model'
     # result_path = '/projects/sina/W-Net/src/plots/'
 
-    model_sup_path =  '/home/sina/WMH_semisup_segmentation/WMH_Unsupervised_Segmentation/miccai2022/anthony/partially_sup/sup_ratio_5/seed_42/2022-02-23 21:57:25.071910/best_model/pgsnet_best.model'
-    model_semi_path = '/home/sina/WMH_semisup_segmentation/WMH_Unsupervised_Segmentation/miccai2022/anthony/semi_alternate/layerwise_normal/sup_ratio_5/seed_42/2022-02-23 21:57:08.434793/best_model/pgsnet_best.model'
-    result_path =  '/home/sina/WMH_semisup_segmentation/WMH_Unsupervised_Segmentation/src/plots/all-together/final'
+    model_sup_path =  '/projects/sina/W-Net/miccai_wmh/partially_sup/sup_ratio_5/seed_42/2022-02-22 23:44:45.731844/best_model/pgsnet_best.model'
+    model_semi_path = '/projects/sina/W-Net/miccai_wmh/semi_alternate/layerwise_normal/sup_ratio_5/seed_42/2022-02-23 17:48:46.447302/best_model/pgsnet_best.model'
+    result_path =  '/projects/sina/W-Net/src/wmh'
     wmh_dataset(cfg, model_sup_path, model_semi_path, result_path)
     # brats(cfg, model_sup_path, model_semi_path, result_path)
 
