@@ -243,7 +243,8 @@ def wmh_dataset(cfg, model_path_sup, model_path_semi, result_path):
     #   device = 'cuda'
     # elif not torch.cuda.is_available():
     #   device = 'cpu'
-    device = 'cuda:0'
+    device = 'cuda'
+    
     device = torch.device(device)
     #   model.load_state_dict(torch.load(model_path))
 
@@ -335,22 +336,43 @@ def wmh_dataset(cfg, model_path_sup, model_path_semi, result_path):
             semi_y_pred = sf(semi_yhat_subject[-1])
             sup_y_WT = seg2WT(sup_y_pred, 0.5, oneHot=cfg.oneHot)
             semi_y_WT = seg2WT(semi_y_pred, 0.5, oneHot=cfg.oneHot)
-            # brain_mask = brain_mask.reshape(y_WT.shape)
+            #brain_mask = brain_mask.reshape(y_WT.shape)
             y_subject = y_subject.reshape(sup_y_WT.shape)
-            # y_WT = y_WT[brain_mask]
-            # y_subject = y_subject[brain_mask].bool()
+            #y_WT = y_WT[brain_mask]
+             #y_subject = y_subject[brain_mask].bool()
 
             sup_metrics_WMH = do_eval(y_subject.to('cpu'), sup_y_WT.to('cpu'))
             semi_metrics_WMH = do_eval(y_subject.to('cpu'), semi_y_WT.to('cpu'))
             diff = semi_metrics_WMH['dsc'] - sup_metrics_WMH ['dsc']
-
+            print(" now subject   ", subject)
+            print('difff ', diff)
             if diff > most_gap_score:
+                print("bestttt")
+                print("subject   ",subject)
+                print(semi_metrics_WMH['dsc'])
+                print(sup_metrics_WMH['dsc'])
+                print(diff)
                 most_gap_index = subject
                 most_gap_score = diff
                 final_x = x_subject
                 final_true = y_subject
                 final_sup_pred = sup_y_WT
                 final_semi_pred = semi_y_WT
+            
+
+           # dir_path = os.path.join(result_path, 'subject_{}'.format(subject))
+           # if not os.path.isdir(dir_path):
+            #    try:
+             #       os.mkdir(dir_path, 0o777)
+              #  except OSError:
+               #     print("Creation of the directory %s failed" % dir_path)
+            
+           # log = os.path.join(dir_path, 'metrics.txt')
+           # with open(log, "w") as f:
+            #    f.write("SCORE for subejct {}:\n"
+              #          " **WMH**  DICE: {}".
+             #           format(subject, sup_metrics_WMH['dsc']))
+            
             subject += 1
 
         dir_path = os.path.join(result_path, 'subject_{}'.format(most_gap_index))
@@ -495,9 +517,9 @@ def main():
     # model_semi_path = '/projects/sina/W-Net/miccai2022_final/braTS/semi_alternate/sup_ratio_3/seed_41/1/best_model/pgsnet_best.model'
     # result_path = '/projects/sina/W-Net/src/plots/'
 
-    model_sup_path =  '/home/sina/WMH_semisup_segmentation/WMH_Unsupervised_Segmentation/miccai2022/anthony/partially_sup/sup_ratio_5/seed_40/2022-02-23 21:57:25.071910/best_model/pgsnet_best.model'
-    model_semi_path = '/home/sina/WMH_semisup_segmentation/WMH_Unsupervised_Segmentation/miccai2022/anthony/semi_alternate/layerwise_normal/sup_ratio_5/seed_40/2022-02-23 21:57:08.434793/best_model/pgsnet_best.model'
-    result_path =  '/home/sina/WMH_semisup_segmentation/WMH_Unsupervised_Segmentation/src/plots/all-together/'
+    model_sup_path =  '/home/sina/WMH_semisup_segmentation/WMH_Unsupervised_Segmentation/miccai2022/anthony/partially_sup/sup_ratio_5/seed_42/2022-02-23 21:57:25.071910/best_model/pgsnet_best.model'
+    model_semi_path = '/home/sina/WMH_semisup_segmentation/WMH_Unsupervised_Segmentation/miccai2022/anthony/semi_alternate/layerwise_normal/sup_ratio_5/seed_42/2022-02-23 21:57:08.434793/best_model/pgsnet_best.model'
+    result_path =  '/home/sina/WMH_semisup_segmentation/WMH_Unsupervised_Segmentation/src/plots/all-together/final'
     wmh_dataset(cfg, model_sup_path, model_semi_path, result_path)
     # brats(cfg, model_sup_path, model_semi_path, result_path)
 
