@@ -30,7 +30,164 @@ utils.Constants.USE_CUDA = True
 parser = argparse.ArgumentParser()
 
 
-def brats(cfg, model_path_sup, model_path_semi, result_path):
+def plot_slice(cfg, model_path_sup, model_path_semi, result_path, sujbect_id, slice_num):
+    inputs_dim = [2, 64, 96, 128, 256, 768, 384, 224, 160]
+    outputs_dim = [64, 96, 128, 256, 512, 256, 128, 96, 64, 4]
+    kernels = [5, 3, 3, 3, 3, 3, 3, 3, 3]
+    strides = [1, 1, 1, 1, 1, 1, 1, 1, 1]
+    os.environ['CUDA_VISIBLE_DEVICES'] = '0,1'
+    sup_model = Pgs.PGS(inputs_dim, outputs_dim, kernels, strides, cfg)
+    semi_model = Pgs.PGS(inputs_dim, outputs_dim, kernels, strides, cfg)
+    # load_model
+
+    sup_model = torch.load(model_path_sup)
+    semi_model = torch.load(model_path_semi)
+
+    if torch.cuda.is_available():
+        if type(sup_model) is not torch.nn.DataParallel and cfg.parallel and cfg.parallel:
+            sup_model = torch.nn.DataParallel(sup_model)
+        device = 'cuda'
+    elif not torch.cuda.is_available():
+        device = 'cpu'
+
+    device = torch.device(device)
+    sup_model.to(device)
+
+    if torch.cuda.is_available():
+        if type(semi_model) is not torch.nn.DataParallel and cfg.parallel and cfg.parallel:
+            semi_model = torch.nn.DataParallel(semi_model)
+            device = 'cuda'
+    elif not torch.cuda.is_available():
+        device = 'cpu'
+
+    device = torch.device(device)
+    semi_model.to(device)
+
+    testset = Brat20Test(f'data/brats20', 'test2020_new', 10, 155,
+                         augment=False, center_cropping=True, t1=True, t2=True, t1ce=True, oneHot=cfg.oneHot)
+    paths = testset.paths
+    threshold = 0.5
+
+    most_gap_score = -1
+    most_gap_index = -1
+    sup_final_preds = None
+    semi_final_preds = None
+    final_inputs = None
+    final_target = None
+    with torch.no_grad():
+        for path in paths:
+            batch = testset.get_subject(path)
+            b = batch['data']
+            target = batch['label'].to(device)
+            subjects = batch['subjects']
+            if subjects[0] != sujbect_id:
+                continue
+            assert len(np.unique(subjects)) == 1, print("More than one subject at a time")
+            b = b.to(device)
+            outputs_sup, _ = sup_model(b, True)
+            outputs_semi, _ = semi_model(b, True)
+
+            sf = torch.nn.Softmax2d()
+            pred_sup = sf(outputs_sup[-1])
+            pred_semi = sf(outputs_semi[-1])
+
+            print("*** EVALUATION METRICS FOR SUBJECT {} IS: ".format(subjects[0]))
+
+        dir_path = os.path.join(result_path, 'subject_{}'.format(most_gap_index))
+
+        if not os.path.isdir(dir_path):
+            try:
+                os.mkdir(dir_path, 0o777)
+            except OSError:
+                print("Creation of the directory %s failed" % dir_path)
+
+        true_path = os.path.join(dir_path, 'true_images')
+        if not os.path.isdir(true_path):
+            try:
+                os.mkdir(true_path, 0o777)
+            except OSError:
+                print("Creation of the directory %s failed" % dir_path)
+
+        sup_pred_path = os.path.join(dir_path, 'sup_pred_images')
+        semi_pred_path = os.path.join(dir_path, 'semi_pred_images')
+        if not os.path.isdir(sup_pred_path):
+            os.mkdir(sup_pred_path, 0o777)
+        if not os.path.isdir(semi_pred_path):
+            os.mkdir(semi_pred_path, 0o777)
+
+        img_path = os.path.join(dir_path, 'input_images')
+        if not os.path.isdir(img_path):
+            os.mkdir(img_path, 0o777)
+        print("CREATING PLOTS FOR subject : ", most_gap_index)
+
+        log = os.path.join(dir_path, 'metrics.txt')
+        with open(log, "w") as f:
+            f.write("AVG GAP for subject {}:\n"
+                    " DICE: {}".
+                    format(most_gap_index, most_gap_score))
+
+        from matplotlib.colors import ListedColormap
+        from skimage.color import label2rgb
+
+        ls = ListedColormap(['black', 'g', 'b', 'yellow'])
+        input = b[slice_num].cpu()  #
+        y_true = target[slice_num].cpu()  # 0: bg, 1: NET  2: ED  3: ET
+        seg_sup = pred_sup[slice_num].cpu()
+        seg_semi = pred_semi[slice_num].cpu()
+
+        # target
+
+        gd_net = y_true[1, :, :]
+        gd_ed = y_true[2, :, :]
+        gd_et = y_true[3, :, :]
+        gd = np.zeros(gd_net.shape)
+        gd[gd_net == 1] = 1
+        gd[gd_ed == 1] = 2
+        gd[gd_et == 1] = 3
+
+        gd_img = label2rgb(gd, input[0], colors=['r', 'b', 'g'], bg_label=0)
+
+        # supervised-baseline
+
+        sup_net = seg_sup[1, :, :] >= 0.5
+        sup_ed = seg_sup[2, :, :] >= 0.5
+        sup_et = seg_sup[3, :, :] >= 0.5
+
+        sup_mix = np.zeros(sup_net.shape)
+        sup_mix[sup_net == 1] = 1
+        sup_mix[sup_ed == 1] = 2
+        sup_mix[sup_et == 1] = 3
+
+        sup_mix_img = label2rgb(sup_mix, input[0], colors=['r', 'b', 'g'], bg_label=0)
+
+        # semi-supervised
+
+        semi_net = seg_semi[1, :, :] >= 0.5
+        semi_ed = seg_semi[2, :, :] >= 0.5
+        semi_et = seg_semi[3, :, :] >= 0.5
+
+        semi_mix = np.zeros(semi_net.shape)
+        semi_mix[semi_net == 1] = 1
+        semi_mix[semi_ed == 1] = 2
+        semi_mix[semi_et == 1] = 3
+
+        semi_mix_img = label2rgb(semi_mix, input[0], colors=['r', 'b', 'g'], bg_label=0)
+
+        # plot mixes!
+        plt.axis('off')
+        plt.imshow(gd_img)
+        plt.savefig(os.path.join(true_path, 'true_slice_{}.png'.format(slice_num)))
+
+        plt.axis('off')
+        plt.imshow(sup_mix_img)
+        plt.savefig(os.path.join(sup_pred_path, 'sup_pred_slice_{}.png'.format(slice_num)))
+
+        plt.axis('off')
+        plt.imshow(semi_mix_img)
+        plt.savefig(os.path.join(semi_pred_path, 'semi_pred_slice_{}.png'.format(slice_num)))
+
+
+def plot_all_brats(cfg, model_path_sup, model_path_semi, result_path):
     inputs_dim = [2, 64, 96, 128, 256, 768, 384, 224, 160]
     outputs_dim = [64, 96, 128, 256, 512, 256, 128, 96, 64, 4]
     kernels = [5, 3, 3, 3, 3, 3, 3, 3, 3]
@@ -118,7 +275,7 @@ def brats(cfg, model_path_sup, model_path_semi, result_path):
 
             print("*** EVALUATION METRICS FOR SUBJECT {} IS: ".format(subjects[0]))
             gap_score = avg_score_semi - avg_score_sup
-            if  gap_score > most_gap_score:
+            if gap_score > most_gap_score:
                 print("max is subject {}   gap {}".format(subjects[0], gap_score))
                 most_gap_score = gap_score
                 most_gap_index = subjects[0]
@@ -168,13 +325,13 @@ def brats(cfg, model_path_sup, model_path_semi, result_path):
             true_WT, true_ET, true_TC = (final_target[0][i], final_target[1][i], final_target[2][i])
 
             sup_pred_WT, sup_pred_ET, sup_pred_TC = (
-            sup_final_preds[0][i], sup_final_preds[1][i], sup_final_preds[2][i])
+                sup_final_preds[0][i], sup_final_preds[1][i], sup_final_preds[2][i])
             semi_pred_WT, semi_pred_ET, semi_pred_TC = (
-            semi_final_preds[0][i], semi_final_preds[1][i], semi_final_preds[2][i])
+                semi_final_preds[0][i], semi_final_preds[1][i], semi_final_preds[2][i])
 
             # plot true labels
             plt.axis('off')
-            plt.imshow(true_WT.cpu(),cmap='gray')
+            plt.imshow(true_WT.cpu(), cmap='gray')
             plt.savefig(os.path.join(true_path, "true_WT_{}.png".format(i)))
             plt.axis('off')
             plt.imshow(true_ET.cpu(), cmap='gray')
@@ -188,30 +345,30 @@ def brats(cfg, model_path_sup, model_path_semi, result_path):
             true_mix[true_ET == 1] = 3
 
             plt.axis('off')
-            plt.imshow(true_mix.cpu(), cmap = ls)
+            plt.imshow(true_mix.cpu(), cmap=ls)
             plt.savefig(os.path.join(true_path, "true_mix_{}.png".format(i)))
             # plot supervised predictions
 
             plt.axis('off')
-            plt.imshow(sup_pred_WT.cpu(),cmap='gray')
+            plt.imshow(sup_pred_WT.cpu(), cmap='gray')
             plt.savefig(os.path.join(sup_pred_path, "pred_WT_{}.png".format(i)))
 
             plt.axis('off')
-            plt.imshow(sup_pred_ET.cpu(),cmap='gray')
+            plt.imshow(sup_pred_ET.cpu(), cmap='gray')
             plt.savefig(os.path.join(sup_pred_path, "pred_ET_{}.png".format(i)))
 
             plt.axis('off')
             plt.imshow(sup_pred_TC.cpu(), cmap='gray')
             plt.savefig(os.path.join(sup_pred_path, "pred_TC_{}.png".format(i)))
-            
+
             sup_pred_mix = sup_pred_WT
             sup_pred_mix[sup_pred_TC == 1] = 2
             sup_pred_mix[sup_pred_ET == 1] = 3
-            
+
             plt.axis('off')
             plt.imshow(sup_pred_mix.cpu(), cmap=ls)
             plt.savefig(os.path.join(sup_pred_path, "sup_pred_mix_{}.png".format(i)))
-            
+
             # plot semi predictions
 
             plt.axis('off')
@@ -225,31 +382,30 @@ def brats(cfg, model_path_sup, model_path_semi, result_path):
             plt.axis('off')
             plt.imshow(semi_pred_TC.cpu(), cmap='gray')
             plt.savefig(os.path.join(semi_pred_path, "pred_TC_{}.png".format(i)))
-            
+
             semi_pred_mix = semi_pred_WT
             semi_pred_mix[semi_pred_TC == 1] = 2
             semi_pred_mix[semi_pred_ET == 1] = 3
-            
-            plt.axis('off')                                                            
-            plt.imshow(semi_pred_mix.cpu(),cmap=ls)
-            plt.savefig(os.path.join(semi_pred_path, "semi_pred_mix_{}.png".format(i)))
 
+            plt.axis('off')
+            plt.imshow(semi_pred_mix.cpu(), cmap=ls)
+            plt.savefig(os.path.join(semi_pred_path, "semi_pred_mix_{}.png".format(i)))
 
             # plot inputs:  flair, T1, T2, t1ce
             plt.axis('off')
-            plt.imshow(final_inputs[i][0].cpu(),cmap='gray')
+            plt.imshow(final_inputs[i][0].cpu(), cmap='gray')
             plt.savefig(os.path.join(img_path, "input_flair_{}.png".format(i)))
 
             plt.axis('off')
-            plt.imshow(final_inputs[i][1].cpu(),cmap='gray')
+            plt.imshow(final_inputs[i][1].cpu(), cmap='gray')
             plt.savefig(os.path.join(img_path, "input_t1_{}.png".format(i)))
 
             plt.axis('off')
-            plt.imshow(final_inputs[i][2].cpu(),cmap='gray')
+            plt.imshow(final_inputs[i][2].cpu(), cmap='gray')
             plt.savefig(os.path.join(img_path, "input_t2_{}.png".format(i)))
 
             plt.axis('off')
-            plt.imshow(final_inputs[i][3].cpu(),cmap='gray')
+            plt.imshow(final_inputs[i][3].cpu(), cmap='gray')
             plt.savefig(os.path.join(img_path, "input_t1ce_{}.png".format(i)))
 
 
@@ -270,7 +426,7 @@ def wmh_dataset(cfg, model_path_sup, model_path_semi, result_path):
     # elif not torch.cuda.is_available():
     #   device = 'cpu'
     device = 'cuda'
-    
+
     device = torch.device(device)
     #   model.load_state_dict(torch.load(model_path))
 
@@ -362,19 +518,19 @@ def wmh_dataset(cfg, model_path_sup, model_path_semi, result_path):
             semi_y_pred = sf(semi_yhat_subject[-1])
             sup_y_WT = seg2WT(sup_y_pred, 0.5, oneHot=cfg.oneHot)
             semi_y_WT = seg2WT(semi_y_pred, 0.5, oneHot=cfg.oneHot)
-            #brain_mask = brain_mask.reshape(y_WT.shape)
+            # brain_mask = brain_mask.reshape(y_WT.shape)
             y_subject = y_subject.reshape(sup_y_WT.shape)
-            #y_WT = y_WT[brain_mask]
-             #y_subject = y_subject[brain_mask].bool()
+            # y_WT = y_WT[brain_mask]
+            # y_subject = y_subject[brain_mask].bool()
 
             sup_metrics_WMH = do_eval(y_subject.to('cpu'), sup_y_WT.to('cpu'))
             semi_metrics_WMH = do_eval(y_subject.to('cpu'), semi_y_WT.to('cpu'))
-            diff = semi_metrics_WMH['dsc'] - sup_metrics_WMH ['dsc']
+            diff = semi_metrics_WMH['dsc'] - sup_metrics_WMH['dsc']
             print(" now subject   ", subject)
             print('difff ', diff)
             if subject != 4 and diff > most_gap_score:
                 print("bestttt")
-                print("subject   ",subject)
+                print("subject   ", subject)
                 print(semi_metrics_WMH['dsc'])
                 print(sup_metrics_WMH['dsc'])
                 print(diff)
@@ -384,21 +540,20 @@ def wmh_dataset(cfg, model_path_sup, model_path_semi, result_path):
                 final_true = y_subject
                 final_sup_pred = sup_y_WT
                 final_semi_pred = semi_y_WT
-            
 
-           # dir_path = os.path.join(result_path, 'subject_{}'.format(subject))
-           # if not os.path.isdir(dir_path):
+            # dir_path = os.path.join(result_path, 'subject_{}'.format(subject))
+            # if not os.path.isdir(dir_path):
             #    try:
-             #       os.mkdir(dir_path, 0o777)
-              #  except OSError:
-               #     print("Creation of the directory %s failed" % dir_path)
-            
-           # log = os.path.join(dir_path, 'metrics.txt')
-           # with open(log, "w") as f:
+            #       os.mkdir(dir_path, 0o777)
+            #  except OSError:
+            #     print("Creation of the directory %s failed" % dir_path)
+
+            # log = os.path.join(dir_path, 'metrics.txt')
+            # with open(log, "w") as f:
             #    f.write("SCORE for subejct {}:\n"
-              #          " **WMH**  DICE: {}".
-             #           format(subject, sup_metrics_WMH['dsc']))
-            
+            #          " **WMH**  DICE: {}".
+            #           format(subject, sup_metrics_WMH['dsc']))
+
             subject += 1
 
         dir_path = os.path.join(result_path, 'subject_{}'.format(most_gap_index))
@@ -445,11 +600,10 @@ def wmh_dataset(cfg, model_path_sup, model_path_semi, result_path):
                     " **WMH**  DICE: {}".
                     format(most_gap_index, most_gap_score))
 
-
         for i in range(0, len(y_subject)):
             true = final_true[i]
             sup_pred = final_sup_pred[i]
-            semi_pred  = final_semi_pred[i]
+            semi_pred = final_semi_pred[i]
             # print("shape")
             # print(y_subject.shape)
             #  print(true.shape)
@@ -473,14 +627,14 @@ def wmh_dataset(cfg, model_path_sup, model_path_semi, result_path):
             plt.savefig(os.path.join(img_path, "flair{}.png".format(i)))
 
             plt.axis('off')
-            plt.imshow(final_x[i][1].cpu(),cmap='gray')
+            plt.imshow(final_x[i][1].cpu(), cmap='gray')
             plt.savefig(os.path.join(img_path, "t1_{}.png".format(i)))
 
     # print(
-        #     "(WMH) :  DICE SCORE   {}, PPV  {},  Sensitivity: {}, Specificity: {}, Hausdorff: {}".format(
-        #         metrics_WMH['dsc'], metrics_WMH['ppv'],
-        #         metrics_WMH['sens'],
-        #         metrics_WMH['spec'], metrics_WMH['hd']))
+    #     "(WMH) :  DICE SCORE   {}, PPV  {},  Sensitivity: {}, Specificity: {}, Hausdorff: {}".format(
+    #         metrics_WMH['dsc'], metrics_WMH['ppv'],
+    #         metrics_WMH['sens'],
+    #         metrics_WMH['spec'], metrics_WMH['hd']))
 
     #  log = os.path.join(dir_path, 'metrics.txt')
     #  with open(log, "w") as f:
@@ -538,21 +692,21 @@ def main():
         cfg = edict(yaml.safe_load(f))
     # result_path = '/home/sina/WMH_semisup_segmentation/WMH_Unsupervised_Segmentation/src/plots/partially_sup/'
     # model_path = '/home/sina/WMH_semisup_segmentation/WMH_Unsupervised_Segmentation/miccai2022/anthony/semi_alternate/layerwise_normal/sup_ratio_5/seed_40/2022-02-23 21:57:08.434793/best_model/pgsnet_best.model'
-    
-    #semi - brats
-  #  model_sup_path = '/projects/sina/W-Net/cvpr2022/partiallySup_ratio_3/seed_41/2022-02-15 13:25:46.112535/best_model/pgsnet_best.model'
-   # model_semi_path = '/projects/sina/W-Net/miccai2022_final/braTS/semi_alternate/sup_ratio_3/seed_41/1/best_model/pgsnet_best.model'
-   # result_path = '/projects/sina/W-Net/src/plots/'
+
+    # semi - brats
+    #  model_sup_path = '/projects/sina/W-Net/cvpr2022/partiallySup_ratio_3/seed_41/2022-02-15 13:25:46.112535/best_model/pgsnet_best.model'
+    # model_semi_path = '/projects/sina/W-Net/miccai2022_final/braTS/semi_alternate/sup_ratio_3/seed_41/1/best_model/pgsnet_best.model'
+    # result_path = '/projects/sina/W-Net/src/plots/'
 
     model_semi_path = '/projects/sina/W-Net/miccai_supplement/semi_alternate/layerwise_normal/sup_ratio_5/seed_42/2022-03-06 16:10:57.314890/best_model/pgsnet_best.model'
     model_sup_path = '/projects/sina/W-Net/miccai_supplement/partially_sup/sup_ratio_5/seed_42/2022-03-06 16:13:33.088266/best_model/pgsnet_best.model'
     result_path = '/projects/sina/W-Net/src/plots/brats-5-percent/'
-   # model_sup_path =  '/projects/sina/W-Net/miccai_wmh/partially_sup/sup_ratio_5/seed_42/2022-02-22 23:44:45.731844/best_model/pgsnet_best.model'
-   # model_semi_path = '/projects/sina/W-Net/miccai_wmh/semi_alternate/layerwise_normal/sup_ratio_5/seed_42/2022-02-23 17:48:46.447302/best_model/pgsnet_best.model'
-   # result_path =  '/projects/sina/W-Net/src/plots/wmh'
-   # wmh_dataset(cfg, model_sup_path, model_semi_path, result_path)
-    brats(cfg, model_sup_path, model_semi_path, result_path)
-
+    # model_sup_path =  '/projects/sina/W-Net/miccai_wmh/partially_sup/sup_ratio_5/seed_42/2022-02-22 23:44:45.731844/best_model/pgsnet_best.model'
+    # model_semi_path = '/projects/sina/W-Net/miccai_wmh/semi_alternate/layerwise_normal/sup_ratio_5/seed_42/2022-02-23 17:48:46.447302/best_model/pgsnet_best.model'
+    # result_path =  '/projects/sina/W-Net/src/plots/wmh'
+    # wmh_dataset(cfg, model_sup_path, model_semi_path, result_path)
+    # brats(plot_slice)
+    plot_slice(cfg, model_sup_path, model_semi_path, result_path, 356, 48)
 
 if __name__ == '__main__':
     main()
